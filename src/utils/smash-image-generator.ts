@@ -24,18 +24,12 @@ export class SmashImageGenerator {
   private static readonly IMAGE_HEIGHT = 900; // Height matches avatar height
   private static readonly AVATAR_WIDTH = 900; // Square avatar width
   private static readonly AVATAR_HEIGHT = 900; // Square avatar height
-  private static readonly FONT_SIZE = 54; // Scaled up proportionally (30 * 1.8)
-  private static readonly BAR_HEIGHT = 45; // Scaled up proportionally (25 * 1.8)
 
   /**
-   * Generate a voting state image with vote counts and progress bars
+   * Generate a voting state image with vote counts
    */
   static async generateVotingImage(data: SmashImageData): Promise<Buffer> {
     const { player1Avatar, player2Avatar, player1Votes, player2Votes } = data;
-    
-    const totalVotes = player1Votes + player2Votes;
-    const player1Percent = totalVotes > 0 ? Math.round((player1Votes / totalVotes) * 100) : 0;
-    const player2Percent = totalVotes > 0 ? Math.round((player2Votes / totalVotes) * 100) : 0;
 
     // Resize avatars to half-width each for seamless layout (no effects for voting stage)
     const avatar1 = sharp(player1Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
@@ -69,9 +63,7 @@ export class SmashImageGenerator {
     // Add text overlays using sharp's composite with SVG
     const svgText = this.createVotingSVG(
       player1Votes, 
-      player2Votes, 
-      player1Percent, 
-      player2Percent
+      player2Votes
     );
 
     return await finalImage
@@ -89,8 +81,6 @@ export class SmashImageGenerator {
     console.log('[Result Image] Generating result image');
     
     const totalVotes = player1Votes + player2Votes;
-    const player1Percent = totalVotes > 0 ? Math.round((player1Votes / totalVotes) * 100) : 0;
-    const player2Percent = totalVotes > 0 ? Math.round((player2Votes / totalVotes) * 100) : 0;
 
     // Determine if this is a 0-0 tie (no votes cast) vs a genuine tie with votes
     const isZeroVoteTie = totalVotes === 0;
@@ -203,9 +193,7 @@ export class SmashImageGenerator {
     // Add SVG text overlay
     const svgText = this.createResultSVG(
       player1Votes, 
-      player2Votes, 
-      player1Percent, 
-      player2Percent
+      player2Votes
     );
     overlays.push({ input: Buffer.from(svgText), left: 0, top: 0 });
 
@@ -226,53 +214,34 @@ export class SmashImageGenerator {
 
   private static createVotingSVG(
     player1Votes: number,
-    player2Votes: number,
-    player1Percent: number,
-    player2Percent: number
+    player2Votes: number
   ): string {
-    const player1BarWidth = Math.round((player1Percent / 100) * 720); // Bar width for 1800px canvas (400 * 1.8)
-    const player2BarWidth = Math.round((player2Percent / 100) * 720); // Bar width for 1800px canvas (400 * 1.8)
+    const voteCountFontSize = 96; // Large heading size for vote counts
 
     return `
       <svg width="${this.IMAGE_WIDTH}" height="${this.IMAGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-        <!-- Semi-transparent overlay for text readability -->
-        <rect x="0" y="720" width="${this.IMAGE_WIDTH}" height="180" fill="rgba(0,0,0,0.7)" />
+        <!-- Player 1 Vote Count - Top Left Corner -->
+        <text x="60" y="100" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${voteCountFontSize}" fill="white" text-anchor="start" font-weight="bold">${player1Votes}</text>
         
-        <!-- Player 1 Info -->
-        <text x="450" y="788" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player1Votes} votes (${player1Percent}%)</text>
-        
-        <!-- Player 1 Progress Bar Background -->
-        <rect x="90" y="800" width="720" height="${this.BAR_HEIGHT}" fill="#4752C4" rx="9" opacity="0.3" />
-        <!-- Player 1 Progress Bar Fill -->
-        <rect x="90" y="800" width="${player1BarWidth}" height="${this.BAR_HEIGHT}" fill="#5865F2" rx="9" />
-
-        <!-- Player 2 Info -->
-        <text x="1350" y="788" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player2Votes} votes (${player2Percent}%)</text>
-        
-        <!-- Player 2 Progress Bar Background -->
-        <rect x="990" y="800" width="720" height="${this.BAR_HEIGHT}" fill="#C02C2F" rx="9" opacity="0.3" />
-        <!-- Player 2 Progress Bar Fill -->
-        <rect x="990" y="800" width="${player2BarWidth}" height="${this.BAR_HEIGHT}" fill="#ED4245" rx="9" />
+        <!-- Player 2 Vote Count - Top Right Corner -->
+        <text x="${this.IMAGE_WIDTH - 60}" y="100" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${voteCountFontSize}" fill="white" text-anchor="end" font-weight="bold">${player2Votes}</text>
       </svg>
     `;
   }
 
   private static createResultSVG(
     player1Votes: number,
-    player2Votes: number,
-    player1Percent: number,
-    player2Percent: number
+    player2Votes: number
   ): string {
+    const voteCountFontSize = 96; // Large heading size for vote counts
+
     return `
       <svg width="${this.IMAGE_WIDTH}" height="${this.IMAGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-        <!-- Semi-transparent overlay for text readability -->
-        <rect x="0" y="720" width="${this.IMAGE_WIDTH}" height="180" fill="rgba(0,0,0,0.7)" />
+        <!-- Player 1 Vote Count - Top Left Corner -->
+        <text x="60" y="100" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${voteCountFontSize}" fill="white" text-anchor="start" font-weight="bold">${player1Votes}</text>
         
-        <!-- Player 1 Info -->
-        <text x="450" y="788" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player1Votes} votes (${player1Percent}%)</text>
-
-        <!-- Player 2 Info -->
-        <text x="1350" y="788" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player2Votes} votes (${player2Percent}%)</text>
+        <!-- Player 2 Vote Count - Top Right Corner -->
+        <text x="${this.IMAGE_WIDTH - 60}" y="100" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${voteCountFontSize}" fill="white" text-anchor="end" font-weight="bold">${player2Votes}</text>
       </svg>
     `;
   }
