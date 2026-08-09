@@ -79,6 +79,8 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
         });
         return;
       }
+      
+      console.log(`[Smash] Manual event started successfully for users: ${user1.username} and ${user2.username}`);
     } else {
       // No users provided - use random selection
       const result = await scheduler.startManualEvent(channelId, guildId, botId);
@@ -89,6 +91,8 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
         });
         return;
       }
+      
+      console.log(`[Smash] Random event started successfully`);
     }
 
     // Get the created event
@@ -96,11 +100,14 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
     const event = repository.getActiveEventInChannel(channelId);
     
     if (!event) {
+      console.error(`[Smash] Failed to retrieve active event in channel ${channelId}`);
       await message.reply({
         content: BobKunPersonality.error,
       });
       return;
     }
+    
+    console.log(`[Smash] Retrieved event: ${event.eventId} for players: ${event.player1DisplayName} vs ${event.player2DisplayName}`);
 
     // Create UI
     const uiData: SmashUIData = {

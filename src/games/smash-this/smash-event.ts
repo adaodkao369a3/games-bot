@@ -35,6 +35,8 @@ export class SmashEventHandler {
     player2: RecentUserActivity,
     isManual: boolean = false
   ): Promise<SmashEvent> {
+    console.log(`[SmashEventHandler] Creating event for players: ${player1.displayName} vs ${player2.displayName}`);
+    
     const event = await this.repository.createEvent({
       eventId: this.eventId,
       guildId: this.guildId,
@@ -49,6 +51,7 @@ export class SmashEventHandler {
       isManual,
     });
 
+    console.log(`[SmashEventHandler] Event created successfully: ${event.eventId}`);
     return event;
   }
 

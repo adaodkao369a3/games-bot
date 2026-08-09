@@ -113,14 +113,14 @@ export class SmashScheduler {
       const user1Data = {
         userId: user1.id,
         displayName: user1.displayName || user1.username,
-        avatarUrl: user1.avatarURL(),
+        avatarUrl: user1.avatarURL() || user1.defaultAvatarURL,
         channelId,
         lastActiveAt: Date.now(),
       };
       const user2Data = {
         userId: user2.id,
         displayName: user2.displayName || user2.username,
-        avatarUrl: user2.avatarURL(),
+        avatarUrl: user2.avatarURL() || user2.defaultAvatarURL,
         channelId,
         lastActiveAt: Date.now(),
       };
@@ -134,7 +134,9 @@ export class SmashScheduler {
     }
 
     // Start the event immediately
+    console.log(`[SmashScheduler] Starting manual event for users: ${selectedUsers.user1.displayName} and ${selectedUsers.user2.displayName}`);
     await this.startEvent(channelId, guildId, selectedUsers.user1, selectedUsers.user2, true);
+    console.log(`[SmashScheduler] Manual event started successfully`);
     return { success: true };
   }
 
@@ -148,9 +150,13 @@ export class SmashScheduler {
     player2: any,
     isManual: boolean
   ): Promise<void> {
+    console.log(`[SmashScheduler] startEvent called for players: ${player1.displayName} vs ${player2.displayName}`);
+    
     // Create the event
     const smashEvent = new SmashEventHandler(channelId, guildId);
-    await smashEvent.createEvent(player1, player2, isManual);
+    const createdEvent = await smashEvent.createEvent(player1, player2, isManual);
+    
+    console.log(`[SmashScheduler] Event created with ID: ${createdEvent.eventId}`);
     
     // Store the active event
     this.activeEvents.set(channelId, smashEvent);
@@ -162,6 +168,8 @@ export class SmashScheduler {
     
     // Start the 20-second voting timer
     await smashEvent.startVoting();
+    
+    console.log(`[SmashScheduler] Voting period started for event: ${createdEvent.eventId}`);
   }
 
   /**
