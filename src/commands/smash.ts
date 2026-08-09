@@ -272,13 +272,23 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
         .setImage('attachment://smash-result.png')
         .setFooter({ text: 'Bob Kun 🍌' });
 
+      // Generate result content text
+      let resultContent: string;
+      if (winner === 'tie') {
+        resultContent = '🤝 Both are certified smashes!';
+      } else {
+        const winnerUser = winner === 'player1' ? voteData.user1 : voteData.user2;
+        const winnerName = winnerUser.displayName || winnerUser.username;
+        resultContent = `🏆 @${winnerName} is a total smash by public choice!`;
+      }
+
       // Post as reply to the original voting message
       if (channel && 'messages' in channel) {
         const originalMessage = await channel.messages.fetch(voteData.messageId);
         await originalMessage.reply({
           files: [attachment],
           embeds: [embed],
-          content: winner === 'tie' ? '🤝 It\'s a tie!' : '🏆 The results are in!',
+          content: resultContent,
         });
         console.log('[End Voting] Result message posted successfully');
       }

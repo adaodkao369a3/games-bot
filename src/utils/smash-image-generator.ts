@@ -41,11 +41,11 @@ export class SmashImageGenerator {
     const avatar1 = sharp(player1Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
       fit: 'cover',
       position: 'center'
-    });
+    }).modulate({ saturation: 0.7 }); // Add mild desaturation (30% less saturation)
     const avatar2 = sharp(player2Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
       fit: 'cover',
       position: 'center'
-    });
+    }).modulate({ saturation: 0.7 }); // Add mild desaturation (30% less saturation)
 
     // Create seamless side-by-side layout
     const composite = await sharp({
@@ -94,11 +94,11 @@ export class SmashImageGenerator {
     const avatar1 = sharp(player1Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
       fit: 'cover',
       position: 'center'
-    });
+    }).modulate({ saturation: 0.7 }); // Add mild desaturation (30% less saturation)
     const avatar2 = sharp(player2Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
       fit: 'cover',
       position: 'center'
-    });
+    }).modulate({ saturation: 0.7 }); // Add mild desaturation (30% less saturation)
 
     // Create seamless side-by-side layout
     const composite = await sharp({
@@ -140,30 +140,30 @@ export class SmashImageGenerator {
         throw new Error(`pass.png not found at ${passPath}`);
       }
       
-      // Load and resize overlay images
-      const smashOverlay = await sharp(smashPath).resize(120, 120).png().toBuffer();
-      const passOverlay = await sharp(passPath).resize(120, 120).png().toBuffer();
+      // Load and resize overlay images (2x size as requested)
+      const smashOverlay = await sharp(smashPath).resize(240, 240).png().toBuffer();
+      const passOverlay = await sharp(passPath).resize(240, 240).png().toBuffer();
       
       console.log('[Image Generator] Overlay images loaded successfully');
       console.log('[Image Generator] Smash overlay size:', smashOverlay.length, 'bytes');
       console.log('[Image Generator] Pass overlay size:', passOverlay.length, 'bytes');
       
-      // Position overlays on respective avatars (centered on each half)
+      // Position overlays on respective avatars (centered on each half, 2x size)
       if (winner === 'player1' || winner === 'tie') {
-        overlays.push({ input: smashOverlay, left: 140, top: 140 }); // Center on player1 side (400/2 - 120/2 = 140)
-        console.log('[Image Generator] Adding smash overlay to player1 at (140, 140)');
+        overlays.push({ input: smashOverlay, left: 80, top: 80 }); // Center on player1 side (400/2 - 240/2 = 80)
+        console.log('[Image Generator] Adding smash overlay to player1 at (80, 80)');
       }
       if (winner === 'player2' || winner === 'tie') {
-        overlays.push({ input: smashOverlay, left: 540, top: 140 }); // Center on player2 side (400 + 400/2 - 120/2 = 540)
-        console.log('[Image Generator] Adding smash overlay to player2 at (540, 140)');
+        overlays.push({ input: smashOverlay, left: 480, top: 80 }); // Center on player2 side (400 + 400/2 - 240/2 = 480)
+        console.log('[Image Generator] Adding smash overlay to player2 at (480, 80)');
       }
       if (winner === 'player1') {
-        overlays.push({ input: passOverlay, left: 540, top: 140 }); // Pass on player2
-        console.log('[Image Generator] Adding pass overlay to player2 at (540, 140)');
+        overlays.push({ input: passOverlay, left: 480, top: 80 }); // Pass on player2
+        console.log('[Image Generator] Adding pass overlay to player2 at (480, 80)');
       }
       if (winner === 'player2') {
-        overlays.push({ input: passOverlay, left: 140, top: 140 }); // Pass on player1
-        console.log('[Image Generator] Adding pass overlay to player1 at (140, 140)');
+        overlays.push({ input: passOverlay, left: 80, top: 80 }); // Pass on player1
+        console.log('[Image Generator] Adding pass overlay to player1 at (80, 80)');
       }
       
       console.log('[Image Generator] Total overlays to apply:', overlays.length);
