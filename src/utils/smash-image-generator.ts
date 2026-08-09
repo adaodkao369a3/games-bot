@@ -1,10 +1,12 @@
 import sharp from 'sharp';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+import { cwd } from 'process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const PROJECT_ROOT = join(__dirname, '../../..');
+const PROJECT_ROOT = cwd(); // Use current working directory instead of calculated path
 
 export interface SmashImageData {
   player1Name: string;
@@ -29,7 +31,7 @@ export class SmashImageGenerator {
    * Generate a voting state image with vote counts and progress bars
    */
   static async generateVotingImage(data: SmashImageData): Promise<Buffer> {
-    const { player1Avatar, player2Avatar, player1Votes, player2Votes, player1Name, player2Name } = data;
+    const { player1Avatar, player2Avatar, player1Votes, player2Votes } = data;
     
     const totalVotes = player1Votes + player2Votes;
     const player1Percent = totalVotes > 0 ? Math.round((player1Votes / totalVotes) * 100) : 0;
@@ -66,8 +68,6 @@ export class SmashImageGenerator {
     
     // Create SVG for text overlays
     const svgText = this.createVotingSVG(
-      player1Name, 
-      player2Name, 
       player1Votes, 
       player2Votes, 
       player1Percent, 
@@ -84,7 +84,7 @@ export class SmashImageGenerator {
    * Generate a result image with smash/pass PNG overlays
    */
   static async generateResultImage(data: SmashImageData): Promise<Buffer> {
-    const { player1Avatar, player2Avatar, player1Votes, player2Votes, player1Name, player2Name, winner } = data;
+    const { player1Avatar, player2Avatar, player1Votes, player2Votes, winner } = data;
     
     const totalVotes = player1Votes + player2Votes;
     const player1Percent = totalVotes > 0 ? Math.round((player1Votes / totalVotes) * 100) : 0;
@@ -124,33 +124,59 @@ export class SmashImageGenerator {
       const smashPath = join(PROJECT_ROOT, 'smash.png');
       const passPath = join(PROJECT_ROOT, 'pass.png');
       
-      console.log('[Image Generator] Loading overlays from:', smashPath, passPath);
+      console.log('[Image Generator] Project root:', PROJECT_ROOT);
+      console.log('[Image Generator] Smash path:', smashPath);
+      console.log('[Image Generator] Pass path:', passPath);
+      console.log('[Image Generator] Smash exists:', existsSync(smashPath));
+      console.log('[Image Generator] Pass exists:', existsSync(passPath));
+      console.log('[Image Generator] Current working directory:', process.cwd());
+      
+      if (!existsSync(smashPath)) {
+        console.error('[Image Generator] smash.png not found at:', smashPath);
+        throw new Error(`smash.png not found at ${smashPath}`);
+      }
+      if (!existsSync(passPath)) {
+        console.error('[Image Generator] pass.png not found at:', passPath);
+        throw new Error(`pass.png not found at ${passPath}`);
+      }
       
       // Load and resize overlay images
       const smashOverlay = await sharp(smashPath).resize(120, 120).png().toBuffer();
       const passOverlay = await sharp(passPath).resize(120, 120).png().toBuffer();
       
+      console.log('[Image Generator] Overlay images loaded successfully');
+      console.log('[Image Generator] Smash overlay size:', smashOverlay.length, 'bytes');
+      console.log('[Image Generator] Pass overlay size:', passOverlay.length, 'bytes');
+      
       // Position overlays on respective avatars (centered on each half)
       if (winner === 'player1' || winner === 'tie') {
         overlays.push({ input: smashOverlay, left: 140, top: 140 }); // Center on player1 side (400/2 - 120/2 = 140)
+        console.log('[Image Generator] Adding smash overlay to player1 at (140, 140)');
       }
       if (winner === 'player2' || winner === 'tie') {
         overlays.push({ input: smashOverlay, left: 540, top: 140 }); // Center on player2 side (400 + 400/2 - 120/2 = 540)
+        console.log('[Image Generator] Adding smash overlay to player2 at (540, 140)');
       }
       if (winner === 'player1') {
         overlays.push({ input: passOverlay, left: 540, top: 140 }); // Pass on player2
+        console.log('[Image Generator] Adding pass overlay to player2 at (540, 140)');
       }
       if (winner === 'player2') {
         overlays.push({ input: passOverlay, left: 140, top: 140 }); // Pass on player1
+        console.log('[Image Generator] Adding pass overlay to player1 at (140, 140)');
       }
+      
+      console.log('[Image Generator] Total overlays to apply:', overlays.length);
     } catch (error) {
       console.error('[Image Generator] Failed to load overlay images:', error);
+      if (error instanceof Error) {
+        console.error('[Image Generator] Error details:', error.message);
+      }
+      throw error; // Re-throw to ensure the error is visible
     }
 
     // Add SVG text overlay
     const svgText = this.createResultSVG(
-      player1Name, 
-      player2Name, 
       player1Votes, 
       player2Votes, 
       player1Percent, 
@@ -174,8 +200,6 @@ export class SmashImageGenerator {
   }
 
   private static createVotingSVG(
-    player1Name: string,
-    player2Name: string,
     player1Votes: number,
     player2Votes: number,
     player1Percent: number,
@@ -190,8 +214,7 @@ export class SmashImageGenerator {
         <rect x="0" y="320" width="${this.IMAGE_WIDTH}" height="80" fill="rgba(0,0,0,0.7)" />
         
         <!-- Player 1 Info -->
-        <text x="200" y="350" font-family="system-ui, -apple-system, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player1Name}</text>
-        <text x="200" y="380" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#AAAAAA" text-anchor="middle">${player1Votes} votes (${player1Percent}%)</text>
+        <text x="200" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player1Votes} votes (${player1Percent}%)</text>
         
         <!-- Player 1 Progress Bar Background -->
         <rect x="25" y="355" width="350" height="${this.BAR_HEIGHT}" fill="#4752C4" rx="4" opacity="0.3" />
@@ -199,8 +222,7 @@ export class SmashImageGenerator {
         <rect x="25" y="355" width="${player1BarWidth}" height="${this.BAR_HEIGHT}" fill="#5865F2" rx="4" />
 
         <!-- Player 2 Info -->
-        <text x="600" y="350" font-family="system-ui, -apple-system, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player2Name}</text>
-        <text x="600" y="380" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#AAAAAA" text-anchor="middle">${player2Votes} votes (${player2Percent}%)</text>
+        <text x="600" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player2Votes} votes (${player2Percent}%)</text>
         
         <!-- Player 2 Progress Bar Background -->
         <rect x="425" y="355" width="350" height="${this.BAR_HEIGHT}" fill="#C02C2F" rx="4" opacity="0.3" />
@@ -211,8 +233,6 @@ export class SmashImageGenerator {
   }
 
   private static createResultSVG(
-    player1Name: string,
-    player2Name: string,
     player1Votes: number,
     player2Votes: number,
     player1Percent: number,
@@ -224,12 +244,10 @@ export class SmashImageGenerator {
         <rect x="0" y="320" width="${this.IMAGE_WIDTH}" height="80" fill="rgba(0,0,0,0.7)" />
         
         <!-- Player 1 Info -->
-        <text x="200" y="350" font-family="system-ui, -apple-system, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player1Name}</text>
-        <text x="200" y="380" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#AAAAAA" text-anchor="middle">${player1Votes} votes (${player1Percent}%)</text>
+        <text x="200" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player1Votes} votes (${player1Percent}%)</text>
 
         <!-- Player 2 Info -->
-        <text x="600" y="350" font-family="system-ui, -apple-system, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player2Name}</text>
-        <text x="600" y="380" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#AAAAAA" text-anchor="middle">${player2Votes} votes (${player2Percent}%)</text>
+        <text x="600" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player2Votes} votes (${player2Percent}%)</text>
       </svg>
     `;
   }
