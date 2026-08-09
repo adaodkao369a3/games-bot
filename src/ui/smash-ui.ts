@@ -91,13 +91,13 @@ export class SmashUI {
       new ButtonBuilder()
         .setCustomId('smash_disabled_player1')
         .setLabel('Voting Ended')
-        .setStyle(ButtonStyle.Primary)
+        .setStyle(ButtonStyle.Secondary)
         .setDisabled(true),
       
       new ButtonBuilder()
         .setCustomId('smash_disabled_player2')
         .setLabel('Voting Ended')
-        .setStyle(ButtonStyle.Primary)
+        .setStyle(ButtonStyle.Secondary)
         .setDisabled(true)
     );
 

@@ -1,4 +1,4 @@
-import { Message, MessageComponentInteraction, AttachmentBuilder } from 'discord.js';
+import { Message, MessageComponentInteraction, AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import { SmashRepository } from '../database/repositories/smash-repository.js';
 import { SmashUI, SmashUIData } from '../ui/smash-ui.js';
 import { ErrorHandler } from '../utils/error-handler.js';
@@ -90,10 +90,15 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
 
     const actionRow = SmashUI.createActionRow(eventId, user1.displayName || user1.username, user2.displayName || user2.username);
 
+    const embed = new EmbedBuilder()
+      .setColor(0xFFD700)
+      .setImage('attachment://smash-voting.png')
+      .setFooter({ text: '15 seconds to vote' });
+
     const replyMessage = await message.reply({
       files: [attachment],
+      embeds: [embed],
       components: [actionRow],
-      content: '⏱️ 15 seconds to vote!',
     });
 
     // Store the message ID for updates
@@ -111,7 +116,7 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
 
     // Start the 15-second voting timer
     setTimeout(async () => {
-      await endVotingPeriod(message.channel, eventId, user1, user2);
+      await endVotingPeriod(message.channel, eventId);
     }, 15 * 1000);
 
   } catch (error) {
@@ -188,8 +193,14 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
           const updatedImage = await SmashImageGenerator.generateVotingImage(imageData);
           const attachment = new AttachmentBuilder(updatedImage, { name: 'smash-voting.png' });
 
+          const embed = new EmbedBuilder()
+            .setColor(0xFFD700)
+            .setImage('attachment://smash-voting.png')
+            .setFooter({ text: '15 seconds to vote' });
+
           await message.edit({
             files: [attachment],
+            embeds: [embed],
           });
           console.log('[Vote Handler] Image updated successfully');
         }
@@ -208,7 +219,7 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
   }
 }
 
-async function endVotingPeriod(channel: any, eventId: string, user1: any, user2: any): Promise<void> {
+async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
   const voteData = activeVotes.get(eventId);
   
   if (!voteData) return;
@@ -221,9 +232,10 @@ async function endVotingPeriod(channel: any, eventId: string, user1: any, user2:
         const message = await msgChannel.messages.fetch(voteData.messageId);
         const disabledRow = SmashUI.createVotingDisabledRow();
         await message.edit({ components: [disabledRow] });
+        console.log('[End Voting] Buttons disabled successfully');
       }
     } catch (error) {
-      console.error('Failed to disable buttons:', error);
+      console.error('[End Voting] Failed to disable buttons:', error);
     }
   }
 
@@ -238,12 +250,12 @@ async function endVotingPeriod(channel: any, eventId: string, user1: any, user2:
   }
 
   // Generate result image
-  if (voteData.player1AvatarBuffer && voteData.player2AvatarBuffer) {
+  if (voteData.player1AvatarBuffer && voteData.player2AvatarBuffer && voteData.user1 && voteData.user2) {
     try {
       const imageData: SmashImageData = {
-        player1Name: user1.displayName || user1.username,
+        player1Name: voteData.user1.displayName || voteData.user1.username,
         player1Avatar: voteData.player1AvatarBuffer,
-        player2Name: user2.displayName || user2.username,
+        player2Name: voteData.user2.displayName || voteData.user2.username,
         player2Avatar: voteData.player2AvatarBuffer,
         player1Votes: voteData.player1Votes,
         player2Votes: voteData.player2Votes,
@@ -251,15 +263,27 @@ async function endVotingPeriod(channel: any, eventId: string, user1: any, user2:
         winner,
       };
 
+      console.log('[End Voting] Generating result image with winner:', winner);
       const resultImage = await SmashImageGenerator.generateResultImage(imageData);
       const attachment = new AttachmentBuilder(resultImage, { name: 'smash-result.png' });
 
-      await channel.send({
-        files: [attachment],
-        content: winner === 'tie' ? '🤝 It\'s a tie!' : '🏆 The results are in!',
-      });
+      const embed = new EmbedBuilder()
+        .setColor(winner === 'tie' ? 0xFFA500 : 0xFFD700)
+        .setImage('attachment://smash-result.png')
+        .setFooter({ text: 'Bob Kun 🍌' });
+
+      // Post as reply to the original voting message
+      if (channel && 'messages' in channel) {
+        const originalMessage = await channel.messages.fetch(voteData.messageId);
+        await originalMessage.reply({
+          files: [attachment],
+          embeds: [embed],
+          content: winner === 'tie' ? '🤝 It\'s a tie!' : '🏆 The results are in!',
+        });
+        console.log('[End Voting] Result message posted successfully');
+      }
     } catch (error) {
-      console.error('Failed to generate result image:', error);
+      console.error('[End Voting] Failed to generate result image:', error);
     }
   }
 
