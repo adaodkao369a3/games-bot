@@ -57,6 +57,8 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
     // Generate a unique event ID
     const eventId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
+    console.log('[Smash Command] Generated eventId:', eventId);
+
     // Initialize vote tracking
     activeVotes.set(eventId, {
       player1Votes: 0,
@@ -64,12 +66,14 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
       voters: new Set(),
     });
 
+    console.log('[Smash Command] Stored event in activeVotes, total events:', activeVotes.size);
+
     // Create UI data
     const uiData: SmashUIData = {
       player1Name: user1.displayName || user1.username,
-      player1Avatar: user1.displayAvatarURL(),
+      player1Avatar: user1.displayAvatarURL({ size: 256 }),
       player2Name: user2.displayName || user2.username,
-      player2Avatar: user2.displayAvatarURL(),
+      player2Avatar: user2.displayAvatarURL({ size: 256 }),
       matchupId: eventId,
       round: 1,
       totalRounds: 1,
@@ -109,16 +113,24 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
 export async function handleSmashVote(interaction: MessageComponentInteraction): Promise<void> {
   const customId = interaction.customId;
   
-  const parts = customId.split('_');
+  console.log('[Vote Handler] Received vote interaction with customId:', customId);
+  
+  const parts = customId.split('|');
   const eventId = parts[0]; // First part is the eventId
   const player = parts[1]; // 'player1' or 'player2'
+
+  console.log('[Vote Handler] Parsed eventId:', eventId, 'player:', player);
+  console.log('[Vote Handler] Active event IDs:', Array.from(activeVotes.keys()));
 
   await interaction.deferReply({ ephemeral: true });
 
   try {
     const voteData = activeVotes.get(eventId);
 
+    console.log('[Vote Handler] Vote data for eventId:', eventId, ':', voteData ? 'Found' : 'Not found');
+
     if (!voteData) {
+      console.log('[Vote Handler] Event not found, available events:', Array.from(activeVotes.keys()));
       await interaction.editReply({
         content: 'Event not found',
       });
@@ -126,6 +138,7 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
     }
 
     const voterId = interaction.user.id;
+    console.log('[Vote Handler] Voter ID:', voterId, 'already voted:', voteData.voters.has(voterId));
 
     // Check if user already voted
     if (voteData.voters.has(voterId)) {
@@ -139,8 +152,10 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
     voteData.voters.add(voterId);
     if (player === 'player1') {
       voteData.player1Votes++;
+      console.log('[Vote Handler] Recorded vote for player1, new count:', voteData.player1Votes);
     } else {
       voteData.player2Votes++;
+      console.log('[Vote Handler] Recorded vote for player2, new count:', voteData.player2Votes);
     }
 
     // Update the embed with new vote counts
@@ -151,9 +166,9 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
           const message = await channel.messages.fetch(voteData.messageId);
           const updatedUiData: SmashUIData = {
             player1Name: voteData.user1.displayName || voteData.user1.username,
-            player1Avatar: voteData.user1.displayAvatarURL(),
+            player1Avatar: voteData.user1.displayAvatarURL({ size: 256 }),
             player2Name: voteData.user2.displayName || voteData.user2.username,
-            player2Avatar: voteData.user2.displayAvatarURL(),
+            player2Avatar: voteData.user2.displayAvatarURL({ size: 256 }),
             matchupId: eventId,
             round: 1,
             totalRounds: 1,
@@ -161,11 +176,13 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
             player2Votes: voteData.player2Votes,
           };
           
+          console.log('[Vote Handler] Updating embed with votes:', voteData.player1Votes, '-', voteData.player2Votes);
           const updatedEmbed = SmashUI.createMatchupEmbed(updatedUiData);
           await message.edit({ embeds: [updatedEmbed] });
+          console.log('[Vote Handler] Embed updated successfully');
         }
       } catch (error) {
-        console.error('Failed to update embed:', error);
+        console.error('[Vote Handler] Failed to update embed:', error);
       }
     }
 
@@ -174,6 +191,7 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
     });
 
   } catch (error) {
+    console.error('[Vote Handler] Error in vote handler:', error);
     await ErrorHandler.handleInteractionError(interaction, error, 'smash-vote');
   }
 }
@@ -200,20 +218,20 @@ async function endVotingPeriod(channel: any, eventId: string, user1: any, user2:
   // Clean up vote tracking
   activeVotes.delete(eventId);
 
-  // Determine winner
-  let winnerUser: any;
-
-  if (voteData.player1Votes > voteData.player2Votes) {
-    winnerUser = user1;
-  } else if (voteData.player2Votes > voteData.player1Votes) {
-    winnerUser = user2;
-  } else {
-    // Tie - in case of tie, pick randomly
-    winnerUser = Math.random() > 0.5 ? user1 : user2;
+  // Determine winner or tie
+  if (voteData.player1Votes === voteData.player2Votes) {
+    // Tie - show tie result
+    const tieEmbed = SmashUI.createTieEmbed(voteData.player1Votes, voteData.player2Votes);
+    await channel.send({
+      embeds: [tieEmbed],
+    });
+    return;
   }
 
+  // There's a clear winner
+  const winnerUser = voteData.player1Votes > voteData.player2Votes ? user1 : user2;
   const winnerName = winnerUser.displayName || winnerUser.username;
-  const winnerAvatar = winnerUser.displayAvatarURL();
+  const winnerAvatar = winnerUser.displayAvatarURL({ size: 256 });
 
   // Post result message using proper embed
   const resultEmbed = SmashUI.createResultEmbed(

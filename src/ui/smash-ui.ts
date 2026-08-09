@@ -32,16 +32,23 @@ export class SmashUI {
     const player1Bar = this.createProgressBar(player1Percent, '🔵');
     const player2Bar = this.createProgressBar(player2Percent, '🔴');
 
+    // Use larger avatar URLs for better quality
+    const player1AvatarLarge = data.player1Avatar.replace(/\?size=\d+$/, '') + '?size=256';
+    const player2AvatarLarge = data.player2Avatar.replace(/\?size=\d+$/, '') + '?size=256';
+
     const embed = new EmbedBuilder()
       .setColor(0xFFD700)
       .setTimestamp()
       .setFooter({ text: '15 seconds to vote' })
-      .setThumbnail(data.player1Avatar)
-      .setImage(data.player2Avatar);
+      .setAuthor({ 
+        name: `${data.player1Name} ⚔️ ${data.player2Name}`, 
+        iconURL: player1AvatarLarge 
+      })
+      .setThumbnail(player1AvatarLarge)
+      .setImage(player2AvatarLarge);
 
     // Create the description with vote counts and percentages
     embed.setDescription(
-      `**${data.player1Name}** ⚔️ **${data.player2Name}**\n\n` +
       `${BobKunPersonality.emojis.trophy} **Vote Counts:**\n` +
       `${data.player1Name}: ${player1Votes} votes (${player1Percent}%)\n` +
       `${data.player2Name}: ${player2Votes} votes (${player2Percent}%)\n\n` +
@@ -64,12 +71,12 @@ export class SmashUI {
 
     row.addComponents(
       new ButtonBuilder()
-        .setCustomId(`${eventId}_player1`)
+        .setCustomId(`${eventId}|player1`)
         .setLabel(`Vote for ${player1Name}`)
         .setStyle(ButtonStyle.Primary), // Blue
       
       new ButtonBuilder()
-        .setCustomId(`${eventId}_player2`)
+        .setCustomId(`${eventId}|player2`)
         .setLabel(`Vote for ${player2Name}`)
         .setStyle(ButtonStyle.Danger) // Red
     );
@@ -103,15 +110,19 @@ export class SmashUI {
     player1Votes: number,
     player2Votes: number
   ): EmbedBuilder {
+    const winnerAvatarLarge = winnerAvatar.replace(/\?size=\d+$/, '') + '?size=256';
+    const winnerVotes = Math.max(player1Votes, player2Votes);
+    const loserVotes = Math.min(player1Votes, player2Votes);
+
     const embed = new EmbedBuilder()
       .setTitle(`${BobKunPersonality.emojis.banana} BOB KUN HAS SPOKEN`)
       .setDescription(
         `${BobKunPersonality.emojis.boom} **${winnerName} WINS!**\n\n` +
         `Final Score:\n` +
-        `${winnerName} — ${Math.max(player1Votes, player2Votes)} votes\n` +
-        `Opponent — ${Math.min(player1Votes, player2Votes)} votes`
+        `${winnerName} — ${winnerVotes} votes\n` +
+        `Opponent — ${loserVotes} votes`
       )
-      .setThumbnail(winnerAvatar)
+      .setThumbnail(winnerAvatarLarge)
       .setColor(0xFFD700)
       .setTimestamp()
       .setFooter({ text: 'Bob Kun 🍌' });
