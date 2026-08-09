@@ -1,7 +1,8 @@
-import { Message, MessageComponentInteraction } from 'discord.js';
+import { Message, MessageComponentInteraction, AttachmentBuilder } from 'discord.js';
 import { SmashRepository } from '../database/repositories/smash-repository.js';
 import { SmashUI, SmashUIData } from '../ui/smash-ui.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { SmashImageGenerator, SmashImageData } from '../utils/smash-image-generator.js';
 
 // Simple in-memory vote tracking
 interface VoteData {
@@ -12,6 +13,8 @@ interface VoteData {
   channelId?: string;
   user1?: any;
   user2?: any;
+  player1AvatarBuffer?: Buffer;
+  player2AvatarBuffer?: Buffer;
 }
 
 const activeVotes = new Map<string, VoteData>();
@@ -68,25 +71,29 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
 
     console.log('[Smash Command] Stored event in activeVotes, total events:', activeVotes.size);
 
-    // Create UI data
-    const uiData: SmashUIData = {
+    // Download avatars for image generation
+    const player1AvatarBuffer = await SmashImageGenerator.downloadAvatar(user1.displayAvatarURL({ size: 256 }));
+    const player2AvatarBuffer = await SmashImageGenerator.downloadAvatar(user2.displayAvatarURL({ size: 256 }));
+
+    // Generate initial voting image
+    const imageData: SmashImageData = {
       player1Name: user1.displayName || user1.username,
-      player1Avatar: user1.displayAvatarURL({ size: 256 }),
+      player1Avatar: player1AvatarBuffer,
       player2Name: user2.displayName || user2.username,
-      player2Avatar: user2.displayAvatarURL({ size: 256 }),
-      matchupId: eventId,
-      round: 1,
-      totalRounds: 1,
+      player2Avatar: player2AvatarBuffer,
       player1Votes: 0,
       player2Votes: 0,
     };
 
-    const embed = SmashUI.createMatchupEmbed(uiData);
-    const actionRow = SmashUI.createActionRow(eventId, uiData.player1Name, uiData.player2Name);
+    const votingImage = await SmashImageGenerator.generateVotingImage(imageData);
+    const attachment = new AttachmentBuilder(votingImage, { name: 'smash-voting.png' });
+
+    const actionRow = SmashUI.createActionRow(eventId, user1.displayName || user1.username, user2.displayName || user2.username);
 
     const replyMessage = await message.reply({
-      embeds: [embed],
+      files: [attachment],
       components: [actionRow],
+      content: '⏱️ 15 seconds to vote!',
     });
 
     // Store the message ID for updates
@@ -98,6 +105,8 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
       channelId: message.channel.id,
       user1,
       user2,
+      player1AvatarBuffer,
+      player2AvatarBuffer,
     });
 
     // Start the 15-second voting timer
@@ -158,31 +167,34 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
       console.log('[Vote Handler] Recorded vote for player2, new count:', voteData.player2Votes);
     }
 
-    // Update the embed with new vote counts
-    if (voteData.messageId && voteData.channelId && voteData.user1 && voteData.user2) {
+    // Update the image with new vote counts
+    if (voteData.messageId && voteData.channelId && voteData.user1 && voteData.user2 && voteData.player1AvatarBuffer && voteData.player2AvatarBuffer) {
       try {
         const channel = await interaction.client.channels.fetch(voteData.channelId);
         if (channel && 'messages' in channel) {
           const message = await channel.messages.fetch(voteData.messageId);
-          const updatedUiData: SmashUIData = {
+          
+          console.log('[Vote Handler] Regenerating image with votes:', voteData.player1Votes, '-', voteData.player2Votes);
+          
+          const imageData: SmashImageData = {
             player1Name: voteData.user1.displayName || voteData.user1.username,
-            player1Avatar: voteData.user1.displayAvatarURL({ size: 256 }),
+            player1Avatar: voteData.player1AvatarBuffer,
             player2Name: voteData.user2.displayName || voteData.user2.username,
-            player2Avatar: voteData.user2.displayAvatarURL({ size: 256 }),
-            matchupId: eventId,
-            round: 1,
-            totalRounds: 1,
+            player2Avatar: voteData.player2AvatarBuffer,
             player1Votes: voteData.player1Votes,
             player2Votes: voteData.player2Votes,
           };
-          
-          console.log('[Vote Handler] Updating embed with votes:', voteData.player1Votes, '-', voteData.player2Votes);
-          const updatedEmbed = SmashUI.createMatchupEmbed(updatedUiData);
-          await message.edit({ embeds: [updatedEmbed] });
-          console.log('[Vote Handler] Embed updated successfully');
+
+          const updatedImage = await SmashImageGenerator.generateVotingImage(imageData);
+          const attachment = new AttachmentBuilder(updatedImage, { name: 'smash-voting.png' });
+
+          await message.edit({
+            files: [attachment],
+          });
+          console.log('[Vote Handler] Image updated successfully');
         }
       } catch (error) {
-        console.error('[Vote Handler] Failed to update embed:', error);
+        console.error('[Vote Handler] Failed to update image:', error);
       }
     }
 
@@ -215,33 +227,42 @@ async function endVotingPeriod(channel: any, eventId: string, user1: any, user2:
     }
   }
 
-  // Clean up vote tracking
-  activeVotes.delete(eventId);
-
   // Determine winner or tie
-  if (voteData.player1Votes === voteData.player2Votes) {
-    // Tie - show tie result
-    const tieEmbed = SmashUI.createTieEmbed(voteData.player1Votes, voteData.player2Votes);
-    await channel.send({
-      embeds: [tieEmbed],
-    });
-    return;
+  let winner: 'player1' | 'player2' | 'tie' = 'tie';
+  if (voteData.player1Votes > voteData.player2Votes) {
+    winner = 'player1';
+  } else if (voteData.player2Votes > voteData.player1Votes) {
+    winner = 'player2';
+  } else {
+    winner = 'tie';
   }
 
-  // There's a clear winner
-  const winnerUser = voteData.player1Votes > voteData.player2Votes ? user1 : user2;
-  const winnerName = winnerUser.displayName || winnerUser.username;
-  const winnerAvatar = winnerUser.displayAvatarURL({ size: 256 });
+  // Generate result image
+  if (voteData.player1AvatarBuffer && voteData.player2AvatarBuffer) {
+    try {
+      const imageData: SmashImageData = {
+        player1Name: user1.displayName || user1.username,
+        player1Avatar: voteData.player1AvatarBuffer,
+        player2Name: user2.displayName || user2.username,
+        player2Avatar: voteData.player2AvatarBuffer,
+        player1Votes: voteData.player1Votes,
+        player2Votes: voteData.player2Votes,
+        isResult: true,
+        winner,
+      };
 
-  // Post result message using proper embed
-  const resultEmbed = SmashUI.createResultEmbed(
-    winnerName,
-    winnerAvatar,
-    voteData.player1Votes,
-    voteData.player2Votes
-  );
+      const resultImage = await SmashImageGenerator.generateResultImage(imageData);
+      const attachment = new AttachmentBuilder(resultImage, { name: 'smash-result.png' });
 
-  await channel.send({
-    embeds: [resultEmbed],
-  });
+      await channel.send({
+        files: [attachment],
+        content: winner === 'tie' ? '🤝 It\'s a tie!' : '🏆 The results are in!',
+      });
+    } catch (error) {
+      console.error('Failed to generate result image:', error);
+    }
+  }
+
+  // Clean up vote tracking
+  activeVotes.delete(eventId);
 }
