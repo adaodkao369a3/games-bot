@@ -279,7 +279,7 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
       } else {
         const winnerUser = winner === 'player1' ? voteData.user1 : voteData.user2;
         const winnerUserId = winnerUser.id; // Use actual Discord user ID for mention
-        resultContent = `🏆 <@${winnerUserId}> is a total smash by public choice!`;
+        resultContent = `<a:pinkheartexclaim:1529443130104090734> <@${winnerUserId}> is a total smash by public choice!`;
         console.log('[End Voting] Using Discord mention for user ID:', winnerUserId);
       }
 
