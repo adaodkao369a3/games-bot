@@ -20,9 +20,9 @@ export interface SmashImageData {
 }
 
 export class SmashImageGenerator {
-  private static readonly IMAGE_WIDTH = 800;
+  private static readonly IMAGE_WIDTH = 1000; // Increased for 25% larger avatars
   private static readonly IMAGE_HEIGHT = 400;
-  private static readonly AVATAR_WIDTH = 400; // Half of image width for seamless layout
+  private static readonly AVATAR_WIDTH = 500; // 25% larger (400 * 1.25 = 500)
   private static readonly AVATAR_HEIGHT = 400; // Full height
   private static readonly FONT_SIZE = 24;
   private static readonly BAR_HEIGHT = 20;
@@ -41,11 +41,11 @@ export class SmashImageGenerator {
     const avatar1 = sharp(player1Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
       fit: 'cover',
       position: 'center'
-    }).modulate({ saturation: 0.7 }); // Add mild desaturation (30% less saturation)
+    }).modulate({ saturation: 0.3 }).blur(2); // Stronger desaturation (70% less) and blur
     const avatar2 = sharp(player2Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
       fit: 'cover',
       position: 'center'
-    }).modulate({ saturation: 0.7 }); // Add mild desaturation (30% less saturation)
+    }).modulate({ saturation: 0.3 }).blur(2); // Stronger desaturation (70% less) and blur
 
     // Create seamless side-by-side layout
     const composite = await sharp({
@@ -86,6 +86,9 @@ export class SmashImageGenerator {
   static async generateResultImage(data: SmashImageData): Promise<Buffer> {
     const { player1Avatar, player2Avatar, player1Votes, player2Votes, winner } = data;
     
+    console.log('[Result Image] Generating result image');
+    console.log('[Result Image] No username text will be added to SVG');
+    
     const totalVotes = player1Votes + player2Votes;
     const player1Percent = totalVotes > 0 ? Math.round((player1Votes / totalVotes) * 100) : 0;
     const player2Percent = totalVotes > 0 ? Math.round((player2Votes / totalVotes) * 100) : 0;
@@ -94,11 +97,11 @@ export class SmashImageGenerator {
     const avatar1 = sharp(player1Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
       fit: 'cover',
       position: 'center'
-    }).modulate({ saturation: 0.7 }); // Add mild desaturation (30% less saturation)
+    }).modulate({ saturation: 0.3 }).blur(2); // Stronger desaturation (70% less) and blur
     const avatar2 = sharp(player2Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
       fit: 'cover',
       position: 'center'
-    }).modulate({ saturation: 0.7 }); // Add mild desaturation (30% less saturation)
+    }).modulate({ saturation: 0.3 }).blur(2); // Stronger desaturation (70% less) and blur
 
     // Create seamless side-by-side layout
     const composite = await sharp({
@@ -150,20 +153,20 @@ export class SmashImageGenerator {
       
       // Position overlays on respective avatars (centered on each half, 2x size)
       if (winner === 'player1' || winner === 'tie') {
-        overlays.push({ input: smashOverlay, left: 80, top: 80 }); // Center on player1 side (400/2 - 240/2 = 80)
-        console.log('[Image Generator] Adding smash overlay to player1 at (80, 80)');
+        overlays.push({ input: smashOverlay, left: 130, top: 80 }); // Center on player1 side (500/2 - 240/2 = 130)
+        console.log('[Image Generator] Adding smash overlay to player1 at (130, 80)');
       }
       if (winner === 'player2' || winner === 'tie') {
-        overlays.push({ input: smashOverlay, left: 480, top: 80 }); // Center on player2 side (400 + 400/2 - 240/2 = 480)
-        console.log('[Image Generator] Adding smash overlay to player2 at (480, 80)');
+        overlays.push({ input: smashOverlay, left: 630, top: 80 }); // Center on player2 side (500 + 500/2 - 240/2 = 630)
+        console.log('[Image Generator] Adding smash overlay to player2 at (630, 80)');
       }
       if (winner === 'player1') {
-        overlays.push({ input: passOverlay, left: 480, top: 80 }); // Pass on player2
-        console.log('[Image Generator] Adding pass overlay to player2 at (480, 80)');
+        overlays.push({ input: passOverlay, left: 630, top: 80 }); // Pass on player2
+        console.log('[Image Generator] Adding pass overlay to player2 at (630, 80)');
       }
       if (winner === 'player2') {
-        overlays.push({ input: passOverlay, left: 80, top: 80 }); // Pass on player1
-        console.log('[Image Generator] Adding pass overlay to player1 at (80, 80)');
+        overlays.push({ input: passOverlay, left: 130, top: 80 }); // Pass on player1
+        console.log('[Image Generator] Adding pass overlay to player1 at (130, 80)');
       }
       
       console.log('[Image Generator] Total overlays to apply:', overlays.length);
@@ -205,8 +208,8 @@ export class SmashImageGenerator {
     player1Percent: number,
     player2Percent: number
   ): string {
-    const player1BarWidth = (player1Percent / 100) * 350;
-    const player2BarWidth = (player2Percent / 100) * 350;
+    const player1BarWidth = (player1Percent / 100) * 450;
+    const player2BarWidth = (player2Percent / 100) * 450;
 
     return `
       <svg width="${this.IMAGE_WIDTH}" height="${this.IMAGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
@@ -214,20 +217,20 @@ export class SmashImageGenerator {
         <rect x="0" y="320" width="${this.IMAGE_WIDTH}" height="80" fill="rgba(0,0,0,0.7)" />
         
         <!-- Player 1 Info -->
-        <text x="200" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player1Votes} votes (${player1Percent}%)</text>
+        <text x="250" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player1Votes} votes (${player1Percent}%)</text>
         
         <!-- Player 1 Progress Bar Background -->
-        <rect x="25" y="355" width="350" height="${this.BAR_HEIGHT}" fill="#4752C4" rx="4" opacity="0.3" />
+        <rect x="25" y="355" width="450" height="${this.BAR_HEIGHT}" fill="#4752C4" rx="4" opacity="0.3" />
         <!-- Player 1 Progress Bar Fill -->
         <rect x="25" y="355" width="${player1BarWidth}" height="${this.BAR_HEIGHT}" fill="#5865F2" rx="4" />
 
         <!-- Player 2 Info -->
-        <text x="600" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player2Votes} votes (${player2Percent}%)</text>
+        <text x="750" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player2Votes} votes (${player2Percent}%)</text>
         
         <!-- Player 2 Progress Bar Background -->
-        <rect x="425" y="355" width="350" height="${this.BAR_HEIGHT}" fill="#C02C2F" rx="4" opacity="0.3" />
+        <rect x="525" y="355" width="450" height="${this.BAR_HEIGHT}" fill="#C02C2F" rx="4" opacity="0.3" />
         <!-- Player 2 Progress Bar Fill -->
-        <rect x="425" y="355" width="${player2BarWidth}" height="${this.BAR_HEIGHT}" fill="#ED4245" rx="4" />
+        <rect x="525" y="355" width="${player2BarWidth}" height="${this.BAR_HEIGHT}" fill="#ED4245" rx="4" />
       </svg>
     `;
   }
@@ -244,10 +247,10 @@ export class SmashImageGenerator {
         <rect x="0" y="320" width="${this.IMAGE_WIDTH}" height="80" fill="rgba(0,0,0,0.7)" />
         
         <!-- Player 1 Info -->
-        <text x="200" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player1Votes} votes (${player1Percent}%)</text>
+        <text x="250" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player1Votes} votes (${player1Percent}%)</text>
 
         <!-- Player 2 Info -->
-        <text x="600" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player2Votes} votes (${player2Percent}%)</text>
+        <text x="750" y="350" font-family="Arial, Helvetica, sans-serif" font-size="${this.FONT_SIZE}" fill="white" text-anchor="middle" font-weight="bold">${player2Votes} votes (${player2Percent}%)</text>
       </svg>
     `;
   }

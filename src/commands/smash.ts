@@ -11,8 +11,8 @@ interface VoteData {
   voters: Set<string>;
   messageId?: string;
   channelId?: string;
-  user1?: any;
-  user2?: any;
+  user1?: { id: string; displayName?: string; username: string };
+  user2?: { id: string; displayName?: string; username: string };
   player1AvatarBuffer?: Buffer;
   player2AvatarBuffer?: Buffer;
 }
@@ -278,8 +278,9 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
         resultContent = '🤝 Both are certified smashes!';
       } else {
         const winnerUser = winner === 'player1' ? voteData.user1 : voteData.user2;
-        const winnerName = winnerUser.displayName || winnerUser.username;
-        resultContent = `🏆 @${winnerName} is a total smash by public choice!`;
+        const winnerUserId = winnerUser.id; // Use actual Discord user ID for mention
+        resultContent = `🏆 <@${winnerUserId}> is a total smash by public choice!`;
+        console.log('[End Voting] Using Discord mention for user ID:', winnerUserId);
       }
 
       // Post as reply to the original voting message
