@@ -91,6 +91,7 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
 
     const embed = new EmbedBuilder()
       .setColor(0xFFD700)
+      .setDescription(`<@${user1.id}> vs <@${user2.id}> — here we go!`)
       .setImage('attachment://smash-voting.png')
       .setFooter({ text: '15 seconds to vote' });
 
@@ -194,6 +195,7 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
 
           const embed = new EmbedBuilder()
             .setColor(0xFFD700)
+            .setDescription(`<@${voteData.user1.id}> vs <@${voteData.user2.id}> — here we go!`)
             .setImage('attachment://smash-voting.png')
             .setFooter({ text: '15 seconds to vote' });
 
@@ -266,21 +268,22 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
       const resultImage = await SmashImageGenerator.generateResultImage(imageData);
       const attachment = new AttachmentBuilder(resultImage, { name: 'smash-result.png' });
 
-      const embed = new EmbedBuilder()
-        .setColor(winner === 'tie' ? 0xFFA500 : 0xFFD700)
-        .setImage('attachment://smash-result.png')
-        .setFooter({ text: 'Bob Kun 🍌' });
-
-      // Generate result content text
-      let resultContent: string;
+      // Generate result description text
+      let resultDescription: string;
       if (winner === 'tie') {
-        resultContent = '🤝 Both are certified smashes!';
+        resultDescription = '🤝 Both are certified smashes!';
       } else {
         const winnerUser = winner === 'player1' ? voteData.user1 : voteData.user2;
         const winnerUserId = winnerUser.id; // Use actual Discord user ID for mention
-        resultContent = `<a:pinkheartexclaim:1529443130104090734> <@${winnerUserId}> is a total smash by public choice!`;
+        resultDescription = `<a:pinkheartexclaim:1529443130104090734> <@${winnerUserId}> is a total smash by public choice!`;
         console.log('[End Voting] Using Discord mention for user ID:', winnerUserId);
       }
+
+      const embed = new EmbedBuilder()
+        .setColor(winner === 'tie' ? 0xFFA500 : 0xFFD700)
+        .setDescription(resultDescription)
+        .setImage('attachment://smash-result.png')
+        .setFooter({ text: 'Bob Kun 🍌' });
 
       // Post as reply to the original voting message
       if (channel && 'messages' in channel) {
@@ -288,7 +291,6 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
         await originalMessage.reply({
           files: [attachment],
           embeds: [embed],
-          content: resultContent,
         });
         console.log('[End Voting] Result message posted successfully');
       }
