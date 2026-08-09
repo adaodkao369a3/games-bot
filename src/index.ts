@@ -1,5 +1,4 @@
 import { DiscordClient } from './discord/client.js';
-import { closeDatabase } from './database/connection.js';
 import { config } from './config/index.js';
 
 async function main(): Promise<void> {
@@ -10,13 +9,11 @@ async function main(): Promise<void> {
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
       console.log('\n🍌 Bob Kun is shutting down...');
-      await closeDatabase();
       process.exit(0);
     });
 
     process.on('SIGTERM', async () => {
       console.log('\n🍌 Bob Kun is shutting down...');
-      await closeDatabase();
       process.exit(0);
     });
 

@@ -1,5 +1,4 @@
 import { Message, MessageComponentInteraction, AttachmentBuilder, EmbedBuilder } from 'discord.js';
-import { SmashRepository } from '../database/repositories/smash-repository.js';
 import { SmashUI, SmashUIData } from '../ui/smash-ui.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { SmashImageGenerator, SmashImageData } from '../utils/smash-image-generator.js';
