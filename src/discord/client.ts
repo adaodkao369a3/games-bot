@@ -1,17 +1,11 @@
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { config, validateConfig } from '../config/index.js';
 import { BobKunPersonality } from '../services/bob-kun-personality.js';
-import { ActivityTracker } from '../services/activity-tracker.js';
-import { RecentUserTracker } from '../services/recent-user-tracker.js';
-import { SmashScheduler } from '../services/smash-scheduler.js';
 import { ErrorHandler } from '../utils/error-handler.js';
-import { handleSmashCommand, handleSmashVote, setScheduler } from '../commands/smash.js';
+import { handleSmashCommand, handleSmashVote } from '../commands/smash.js';
 
 export class DiscordClient {
   private client: Client;
-  private activityTracker: ActivityTracker;
-  private recentUserTracker: RecentUserTracker;
-  private smashScheduler: SmashScheduler;
 
   constructor() {
     validateConfig();
@@ -29,13 +23,6 @@ export class DiscordClient {
         Partials.Reaction,
       ],
     });
-
-    this.activityTracker = new ActivityTracker();
-    this.recentUserTracker = new RecentUserTracker();
-    this.smashScheduler = new SmashScheduler();
-    
-    // Set the scheduler reference for the command
-    setScheduler(this.smashScheduler);
     
     this.setupEventHandlers();
   }
@@ -61,9 +48,6 @@ export class DiscordClient {
       return;
     }
 
-    const channelId = message.channelId;
-    const botId = this.client.user?.id || '';
-
     // Check for prefix command
     if (message.content.startsWith(config.prefix)) {
       const args = message.content.slice(config.prefix.length).trim().split(/\s+/);
@@ -73,25 +57,6 @@ export class DiscordClient {
         await handleSmashCommand(message, args);
         return;
       }
-    }
-
-    // Track recent user activity for selection pool
-    if (this.activityTracker.shouldTrackMessage(message.author.id, botId)) {
-      await this.recentUserTracker.recordUserActivity(
-        message.author.id,
-        message.author.displayName,
-        message.author.avatarURL(),
-        channelId
-      );
-    }
-
-    // Track activity for smart spawning
-    if (channelId && this.activityTracker.shouldTrackMessage(message.author.id, botId)) {
-      await this.activityTracker.recordActivity(channelId);
-      
-      // Check if we should spawn an automatic event
-      const guildId = message.guildId || '';
-      await this.smashScheduler.checkForAutomaticEvent(channelId, guildId, botId);
     }
   }
 

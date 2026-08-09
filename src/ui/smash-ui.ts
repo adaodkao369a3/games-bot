@@ -20,32 +20,14 @@ export interface SmashUIData {
 export class SmashUI {
   static createMatchupEmbed(data: SmashUIData): EmbedBuilder {
     const embed = new EmbedBuilder()
-      .setTitle(`${BobKunPersonality.emojis.banana} SMASH THIS!`)
-      .setDescription(`${BobKunPersonality.emojis.boom} Bob Kun demands a decision!`)
       .setColor(0xFFD700)
       .setTimestamp()
-      .setFooter({ text: 'Bob Kun 🍌 • 20 seconds to vote' });
+      .setFooter({ text: '15 seconds to vote' });
 
-    // Create visual layout with two player panels
-    // Discord embeds have limitations, but we can create a clean two-column layout
-    // Target: approximately 554px × 251px landscape with two equal player panels
-    // Avatar is the primary visual, one Smash button underneath each avatar
-    // No giant VS graphic in the center, keep center gap clean
-    embed.addFields([
-      {
-        name: `${BobKunPersonality.emojis.banana} ${data.player1Name}`,
-        value: `[Avatar](${data.player1Avatar})`,
-        inline: true,
-      },
-      {
-        name: `${BobKunPersonality.emojis.banana} ${data.player2Name}`,
-        value: `[Avatar](${data.player2Avatar})`,
-        inline: true,
-      },
-    ]);
-
-    // Set thumbnail to show one avatar (Discord limitation - can't show two images in embed)
-    embed.setThumbnail(data.player1Avatar);
+    // Simple layout: avatar1 | avatar2, username1 | username2
+    embed.setDescription(
+      `${data.player1Avatar} | ${data.player2Avatar}\n${data.player1Name} | ${data.player2Name}`
+    );
 
     return embed;
   }
@@ -56,13 +38,13 @@ export class SmashUI {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(`smash_vote_${eventId}_player1`)
-        .setLabel(`${BobKunPersonality.emojis.boom} SMASH`)
-        .setStyle(ButtonStyle.Danger),
+        .setLabel('Vote')
+        .setStyle(ButtonStyle.Primary),
       
       new ButtonBuilder()
         .setCustomId(`smash_vote_${eventId}_player2`)
-        .setLabel(`${BobKunPersonality.emojis.boom} SMASH`)
-        .setStyle(ButtonStyle.Danger)
+        .setLabel('Vote')
+        .setStyle(ButtonStyle.Primary)
     );
 
     return row;
