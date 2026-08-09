@@ -113,14 +113,14 @@ export class SmashScheduler {
       const user1Data = {
         userId: user1.id,
         displayName: user1.displayName || user1.username,
-        avatarUrl: user1.avatarURL() || user1.defaultAvatarURL,
+        avatarUrl: user1.displayAvatarURL(),
         channelId,
         lastActiveAt: Date.now(),
       };
       const user2Data = {
         userId: user2.id,
         displayName: user2.displayName || user2.username,
-        avatarUrl: user2.avatarURL() || user2.defaultAvatarURL,
+        avatarUrl: user2.displayAvatarURL(),
         channelId,
         lastActiveAt: Date.now(),
       };
