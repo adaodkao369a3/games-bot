@@ -109,8 +109,22 @@ export class SmashScheduler {
     let selectedUsers: { user1: any; user2: any } | null;
 
     if (user1 && user2) {
-      // Use the provided users
-      selectedUsers = { user1, user2 };
+      // Convert Discord User objects to RecentUserActivity format
+      const user1Data = {
+        userId: user1.id,
+        displayName: user1.displayName || user1.username,
+        avatarUrl: user1.avatarURL(),
+        channelId,
+        lastActiveAt: Date.now(),
+      };
+      const user2Data = {
+        userId: user2.id,
+        displayName: user2.displayName || user2.username,
+        avatarUrl: user2.avatarURL(),
+        channelId,
+        lastActiveAt: Date.now(),
+      };
+      selectedUsers = { user1: user1Data, user2: user2Data };
     } else {
       // Select two random recent users
       selectedUsers = this.recentUserTracker.selectTwoRandomUsers(channelId, botId);

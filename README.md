@@ -7,10 +7,10 @@ A cute, chaotic Minion-inspired gaming Discord bot for the Mi Bom3o server. Bob 
 - **Smash This**: A simple head-to-head voting game between two random recently active users
 - **Smart Activity-Based Spawning**: Events spawn automatically after periods of inactivity followed by renewed chat activity
 - **20-Second Voting**: Fast-paced voting periods with instant winner reveals
-- **Manual Trigger**: Force an event with `/smash` command
+- **Prefix Commands**: Use `,smash` to force an event immediately
 - **Recent Activity Selection**: Events feature people who have actually been active in the channel recently
 - **Random Delays**: Automatic events have a random 1-5 minute delay for surprise factor
-- **Persistent Data**: All event data and votes are stored in SQLite
+- **Persistent Data**: All event data and votes are stored in JSON
 - **Bob Kun Personality**: Cute, chaotic, Minion-inspired responses throughout
 
 ## Requirements
@@ -31,8 +31,7 @@ A cute, chaotic Minion-inspired gaming Discord bot for the Mi Bom3o server. Bob 
 In the Discord Developer Portal under your bot's "Bot" section, enable these privileged intents:
 
 - **Server Members Intent**
-- **Message Content Intent**
-- **Presence Intent** (optional, for enhanced features)
+- **Message Content Intent** (required for prefix commands and activity tracking)
 
 ### Required Bot Permissions
 
@@ -40,7 +39,6 @@ Invite the bot with these permissions:
 
 - Read Messages/View Channels
 - Send Messages
-- Use Slash Commands
 - Read Message History
 - Add Reactions
 - Embed Links
@@ -80,6 +78,7 @@ DISCORD_GUILD_ID=your_guild_id_here
 
 **Optional:**
 - `DATABASE_URL`: Path to JSON database file (default: `./data/bob-kun.json`)
+- `PREFIX`: Command prefix for bot commands (default: `,`)
 
 ### Activity-Based Spawning Behavior
 
@@ -103,19 +102,6 @@ Bob Kun uses intelligent activity-based spawning for Smash events:
 - An active event prevents another event from spawning
 - Fewer than two eligible recent users prevents spawning
 - Random 1-5 minute delay adds surprise factor
-
-## Register Slash Commands
-
-Before running the bot, register the slash commands:
-
-```bash
-npm run register-commands
-```
-
-This will register the following command:
-- `/smash` - Force Bob Kun to start a Smash This event immediately
-
-**Note**: During development, commands are registered to your specific guild (instant). For production, remove `DISCORD_GUILD_ID` from `.env` to register global commands (takes up to 1 hour to propagate).
 
 ## Running the Bot
 
@@ -161,11 +147,21 @@ Bob Kun automatically creates Smash events based on chat activity:
 
 ### Manual Trigger
 
-You can force an event immediately using `/smash`:
+You can force an event immediately using `,smash`:
 
-1. Use `/smash` command
+1. Use `,smash` command
 2. Bob Kun selects two random recently active users
 3. Event appears immediately (no delay)
+4. Normal 20-second voting period
+5. Winner revealed
+
+### Testing Specific Users
+
+You can specify users to smash:
+
+1. Use `,smash @User1 @User2` command
+2. Bob Kun validates both users are real members and not bots
+3. Event appears immediately with the specified users
 4. Normal 20-second voting period
 5. Winner revealed
 
@@ -200,10 +196,8 @@ You can force an event immediately using `/smash`:
 ### Production Deployment
 
 1. Build the project: `npm run build`
-2. Remove `DISCORD_GUILD_ID` from `.env` to use global commands
-3. Run `npm run register-commands` to register global commands
-4. Deploy the bot to your hosting service
-5. Start with `npm start`
+2. Deploy the bot to your hosting service
+3. Start with `npm start`
 
 ### Hosting Options
 
@@ -243,8 +237,8 @@ pm2 restart bob-kun
 ```
 bob-kun-discord-bot/
 ├── src/
-│   ├── commands/           # Slash command handlers
-│   │   └── smash.ts        # Single /smash command
+│   ├── commands/           # Prefix command handlers
+│   │   └── smash.ts        # ,smash command
 │   ├── games/              # Game modules
 │   │   └── smash-this/
 │   │       ├── smash-event.ts    # Event handler
@@ -268,8 +262,6 @@ bob-kun-discord-bot/
 │   │   └── error-handler.ts
 │   ├── config/             # Configuration
 │   │   └── index.ts
-│   ├── scripts/            # Utility scripts
-│   │   └── register-commands.ts
 │   └── index.ts            # Entry point
 ├── data/                   # Database files (gitignored)
 ├── .env.example            # Environment template
@@ -281,12 +273,12 @@ bob-kun-discord-bot/
 
 ## Troubleshooting
 
-### Commands not appearing
+### Commands not working
 
-- Make sure you ran `npm run register-commands`
-- Check that your bot has the "Use Slash Commands" permission
-- If using global commands, wait up to 1 hour for propagation
-- Try restarting your Discord client
+- Ensure your message starts with the configured prefix (default: `,`)
+- Check that Message Content Intent is enabled in Discord Developer Portal
+- Verify bot has permission to read messages in the channel
+- Try restarting the bot if prefix commands aren't responding
 
 ### Database errors
 
@@ -308,12 +300,13 @@ bob-kun-discord-bot/
 - Users need to have sent messages recently (within 7 days) to be eligible
 - Check that the random 1-5 minute delay hasn't made it seem like spawning isn't working
 
-### `/smash` command fails
+### `,smash` command fails
 
 - Ensure there are at least 2 recently active users in the channel
 - Check that users have sent messages recently (within 7 days)
 - Verify bot has permission to send messages in the channel
 - Check that there isn't already an active Smash event in the channel
+- When using `,@User1 @User2`, ensure both tags are valid server members and not bots
 
 ## Adding More Games
 
@@ -321,9 +314,8 @@ The architecture is designed for easy game addition:
 
 1. Create a new game module in `src/games/your-game/`
 2. Implement game logic, UI, and data models
-3. Add slash commands in `src/commands/`
-4. Register commands in `src/scripts/register-commands.ts`
-5. Integrate with the activity tracker if needed
+3. Add prefix commands in `src/commands/`
+4. Integrate with the activity tracker if needed
 
 ## Security Notes
 

@@ -65,6 +65,16 @@ export class ErrorHandler {
     }
   }
 
+  static async handleMessageError(message: any, error: unknown, context: string): Promise<void> {
+    const errorMessage = this.handle(error, context);
+    
+    try {
+      await message.reply({ content: errorMessage });
+    } catch (replyError) {
+      Logger.error('Failed to send error message:', replyError);
+    }
+  }
+
   static isDatabaseError(error: unknown): boolean {
     if (error instanceof Error) {
       return error.message.includes('database') || 

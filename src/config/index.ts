@@ -12,6 +12,7 @@ export const config = {
   database: {
     url: process.env.DATABASE_URL || './data/bob-kun.json',
   },
+  prefix: process.env.PREFIX || ',',
 };
 
 export function validateConfig(): void {

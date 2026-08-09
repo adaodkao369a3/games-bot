@@ -5,7 +5,7 @@ import { ActivityTracker } from '../services/activity-tracker.js';
 import { RecentUserTracker } from '../services/recent-user-tracker.js';
 import { SmashScheduler } from '../services/smash-scheduler.js';
 import { ErrorHandler } from '../utils/error-handler.js';
-import { handleSmash, smashCommand, handleSmashVote, setScheduler } from '../commands/smash.js';
+import { handleSmashCommand, handleSmashVote, setScheduler } from '../commands/smash.js';
 
 export class DiscordClient {
   private client: Client;
@@ -64,6 +64,17 @@ export class DiscordClient {
     const channelId = message.channelId;
     const botId = this.client.user?.id || '';
 
+    // Check for prefix command
+    if (message.content.startsWith(config.prefix)) {
+      const args = message.content.slice(config.prefix.length).trim().split(/\s+/);
+      const command = args.shift()?.toLowerCase();
+
+      if (command === 'smash') {
+        await handleSmashCommand(message, args);
+        return;
+      }
+    }
+
     // Track recent user activity for selection pool
     if (this.activityTracker.shouldTrackMessage(message.author.id, botId)) {
       await this.recentUserTracker.recordUserActivity(
@@ -86,28 +97,11 @@ export class DiscordClient {
 
   private async onInteractionCreate(interaction: any): Promise<void> {
     try {
-      if (interaction.isChatInputCommand()) {
-        await this.handleSlashCommand(interaction);
-      } else if (interaction.isMessageComponent()) {
+      if (interaction.isMessageComponent()) {
         await this.handleButtonInteraction(interaction);
       }
     } catch (error) {
       await ErrorHandler.handleInteractionError(interaction, error, 'interaction handler');
-    }
-  }
-
-  private async handleSlashCommand(interaction: any): Promise<void> {
-    const { commandName } = interaction;
-
-    switch (commandName) {
-      case smashCommand.name:
-        await handleSmash(interaction);
-        break;
-      default:
-        await interaction.reply({
-          content: `${BobKunPersonality.emojis.confused} Bob Kun doesn't know this command!`,
-          ephemeral: true,
-        });
     }
   }
 
