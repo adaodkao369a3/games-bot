@@ -15,36 +15,63 @@ export interface SmashUIData {
   matchupId: string;
   round: number;
   totalRounds: number;
+  player1Votes?: number;
+  player2Votes?: number;
 }
 
 export class SmashUI {
   static createMatchupEmbed(data: SmashUIData): EmbedBuilder {
+    const player1Votes = data.player1Votes || 0;
+    const player2Votes = data.player2Votes || 0;
+    const totalVotes = player1Votes + player2Votes;
+    
+    const player1Percent = totalVotes > 0 ? Math.round((player1Votes / totalVotes) * 100) : 0;
+    const player2Percent = totalVotes > 0 ? Math.round((player2Votes / totalVotes) * 100) : 0;
+    
+    // Create progress bars
+    const player1Bar = this.createProgressBar(player1Percent, '🔵');
+    const player2Bar = this.createProgressBar(player2Percent, '🔴');
+
     const embed = new EmbedBuilder()
       .setColor(0xFFD700)
       .setTimestamp()
-      .setFooter({ text: '15 seconds to vote' });
+      .setFooter({ text: '15 seconds to vote' })
+      .setThumbnail(data.player1Avatar)
+      .setImage(data.player2Avatar);
 
-    // Simple layout: avatar1 | avatar2, username1 | username2
+    // Create the description with vote counts and percentages
     embed.setDescription(
-      `${data.player1Avatar} | ${data.player2Avatar}\n${data.player1Name} | ${data.player2Name}`
+      `**${data.player1Name}** ⚔️ **${data.player2Name}**\n\n` +
+      `${BobKunPersonality.emojis.trophy} **Vote Counts:**\n` +
+      `${data.player1Name}: ${player1Votes} votes (${player1Percent}%)\n` +
+      `${data.player2Name}: ${player2Votes} votes (${player2Percent}%)\n\n` +
+      `${player1Bar}\n` +
+      `${player2Bar}`
     );
 
     return embed;
   }
 
-  static createActionRow(eventId: string): ActionRowBuilder<ButtonBuilder> {
+  private static createProgressBar(percentage: number, emoji: string): string {
+    const filledBlocks = Math.round(percentage / 10);
+    const emptyBlocks = 10 - filledBlocks;
+    const bar = '█'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
+    return `${emoji} ${bar} ${percentage}%`;
+  }
+
+  static createActionRow(eventId: string, player1Name: string, player2Name: string): ActionRowBuilder<ButtonBuilder> {
     const row = new ActionRowBuilder<ButtonBuilder>();
 
     row.addComponents(
       new ButtonBuilder()
-        .setCustomId(`smash_vote_${eventId}_player1`)
-        .setLabel('Vote')
-        .setStyle(ButtonStyle.Primary),
+        .setCustomId(`${eventId}_player1`)
+        .setLabel(`Vote for ${player1Name}`)
+        .setStyle(ButtonStyle.Primary), // Blue
       
       new ButtonBuilder()
-        .setCustomId(`smash_vote_${eventId}_player2`)
-        .setLabel('Vote')
-        .setStyle(ButtonStyle.Primary)
+        .setCustomId(`${eventId}_player2`)
+        .setLabel(`Vote for ${player2Name}`)
+        .setStyle(ButtonStyle.Danger) // Red
     );
 
     return row;
@@ -56,14 +83,14 @@ export class SmashUI {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('smash_disabled_player1')
-        .setLabel(`${BobKunPersonality.emojis.boom} SMASH`)
-        .setStyle(ButtonStyle.Danger)
+        .setLabel('Voting Ended')
+        .setStyle(ButtonStyle.Primary)
         .setDisabled(true),
       
       new ButtonBuilder()
         .setCustomId('smash_disabled_player2')
-        .setLabel(`${BobKunPersonality.emojis.boom} SMASH`)
-        .setStyle(ButtonStyle.Danger)
+        .setLabel('Voting Ended')
+        .setStyle(ButtonStyle.Primary)
         .setDisabled(true)
     );
 
@@ -80,8 +107,9 @@ export class SmashUI {
       .setTitle(`${BobKunPersonality.emojis.banana} BOB KUN HAS SPOKEN`)
       .setDescription(
         `${BobKunPersonality.emojis.boom} **${winnerName} WINS!**\n\n` +
-        `${winnerName} — ${player1Votes} votes\n` +
-        `${player1Votes > player2Votes ? 'Opponent' : 'Opponent'} — ${player2Votes} votes`
+        `Final Score:\n` +
+        `${winnerName} — ${Math.max(player1Votes, player2Votes)} votes\n` +
+        `Opponent — ${Math.min(player1Votes, player2Votes)} votes`
       )
       .setThumbnail(winnerAvatar)
       .setColor(0xFFD700)

@@ -13,6 +13,7 @@ export class BobKunPersonality {
     wave: '👋',
     heart: '❤️',
     star: '⭐',
+    trophy: '🏆',
   };
 
   private static readonly MESSAGES = {
