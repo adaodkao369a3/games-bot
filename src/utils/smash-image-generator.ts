@@ -1,12 +1,24 @@
 import sharp from 'sharp';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { cwd } from 'process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = cwd(); // Use current working directory instead of calculated path
+
+// Load font file as base64 for embedding in SVG
+const fontPath = join(PROJECT_ROOT, 'assets', 'fonts', 'Roboto-Bold.ttf');
+let fontBase64 = '';
+try {
+  if (existsSync(fontPath)) {
+    const fontBuffer = readFileSync(fontPath);
+    fontBase64 = fontBuffer.toString('base64');
+  }
+} catch (error) {
+  console.warn('[Image Generator] Could not load font file:', error);
+}
 
 export interface SmashImageData {
   player1Name: string;
@@ -216,15 +228,27 @@ export class SmashImageGenerator {
     player1Votes: number,
     player2Votes: number
   ): string {
-    const voteCountFontSize = 96; // Large heading size for vote counts
+    const voteCountFontSize = 140; // Increased for better readability on large canvas
+
+    // Include embedded font if available, otherwise fall back to system fonts
+    const fontFace = fontBase64 ? `
+      <style>
+        @font-face {
+          font-family: 'Roboto-Bold';
+          src: url('data:font/truetype;charset=utf-8;base64,${fontBase64}') format('truetype');
+        }
+        .vote-text { font-family: 'Roboto-Bold', Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif; }
+      </style>
+    ` : '';
 
     return `
       <svg width="${this.IMAGE_WIDTH}" height="${this.IMAGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+        ${fontFace}
         <!-- Player 1 Vote Count - Top Left Corner -->
-        <text x="60" y="100" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${voteCountFontSize}" fill="white" text-anchor="start" font-weight="bold">${player1Votes}</text>
+        <text x="60" y="100" class="vote-text" font-size="${voteCountFontSize}" fill="white" text-anchor="start" font-weight="bold">${player1Votes}</text>
         
         <!-- Player 2 Vote Count - Top Right Corner -->
-        <text x="${this.IMAGE_WIDTH - 60}" y="100" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${voteCountFontSize}" fill="white" text-anchor="end" font-weight="bold">${player2Votes}</text>
+        <text x="${this.IMAGE_WIDTH - 60}" y="100" class="vote-text" font-size="${voteCountFontSize}" fill="white" text-anchor="end" font-weight="bold">${player2Votes}</text>
       </svg>
     `;
   }
@@ -233,15 +257,27 @@ export class SmashImageGenerator {
     player1Votes: number,
     player2Votes: number
   ): string {
-    const voteCountFontSize = 96; // Large heading size for vote counts
+    const voteCountFontSize = 140; // Increased for better readability on large canvas
+
+    // Include embedded font if available, otherwise fall back to system fonts
+    const fontFace = fontBase64 ? `
+      <style>
+        @font-face {
+          font-family: 'Roboto-Bold';
+          src: url('data:font/truetype;charset=utf-8;base64,${fontBase64}') format('truetype');
+        }
+        .vote-text { font-family: 'Roboto-Bold', Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif; }
+      </style>
+    ` : '';
 
     return `
       <svg width="${this.IMAGE_WIDTH}" height="${this.IMAGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+        ${fontFace}
         <!-- Player 1 Vote Count - Top Left Corner -->
-        <text x="60" y="100" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${voteCountFontSize}" fill="white" text-anchor="start" font-weight="bold">${player1Votes}</text>
+        <text x="60" y="100" class="vote-text" font-size="${voteCountFontSize}" fill="white" text-anchor="start" font-weight="bold">${player1Votes}</text>
         
         <!-- Player 2 Vote Count - Top Right Corner -->
-        <text x="${this.IMAGE_WIDTH - 60}" y="100" font-family="Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif" font-size="${voteCountFontSize}" fill="white" text-anchor="end" font-weight="bold">${player2Votes}</text>
+        <text x="${this.IMAGE_WIDTH - 60}" y="100" class="vote-text" font-size="${voteCountFontSize}" fill="white" text-anchor="end" font-weight="bold">${player2Votes}</text>
       </svg>
     `;
   }
