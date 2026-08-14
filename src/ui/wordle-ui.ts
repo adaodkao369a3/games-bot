@@ -122,7 +122,9 @@ export class WordleUI {
     };
     
     const imageBuffer = await WordleRenderer.generateBoard(boardData);
-    return new AttachmentBuilder(imageBuffer, { name: 'wordle-board.png' });
+    // Use unique filename to prevent Discord caching
+    const timestamp = Date.now();
+    return new AttachmentBuilder(imageBuffer, { name: `wordle-board-${timestamp}.png` });
   }
   
   /**
@@ -140,8 +142,8 @@ export class WordleUI {
     
     const attachment = await this.generateBoardAttachment(data);
     
-    // Add image to embed
-    embed.setImage('attachment://wordle-board.png');
+    // Add image to embed with dynamic filename
+    embed.setImage(`attachment://${attachment.name}`);
     
     // Add legend to description
     const currentDescription = embed.data.description || '';

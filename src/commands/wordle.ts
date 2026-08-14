@@ -190,7 +190,7 @@ async function announceWinner(game: WordleGame, channel: any, winner: string, se
       const attachment = await WordleUI.generateBoardAttachment(uiData);
       
       const winEmbed = WordleUI.createWinEmbed(winner, secretWord, game.getGuessCount());
-      winEmbed.setImage('attachment://wordle-board.png');
+      winEmbed.setImage(`attachment://${attachment.name}`);
       
       await message.edit({
         files: [attachment],
@@ -229,7 +229,7 @@ async function announceGameOver(game: WordleGame, channel: any, secretWord: stri
       const attachment = await WordleUI.generateBoardAttachment(uiData);
       
       const gameOverEmbed = WordleUI.createGameOverEmbed(secretWord, game.getGuessCount());
-      gameOverEmbed.setImage('attachment://wordle-board.png');
+      gameOverEmbed.setImage(`attachment://${attachment.name}`);
       
       await message.edit({
         files: [attachment],

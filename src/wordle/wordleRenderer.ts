@@ -1,8 +1,35 @@
 import sharp from 'sharp';
 import { LetterState, EvaluatedGuess } from './wordleEvaluator.js';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
-// We'll use system fonts instead of embedding to avoid large SVG files
-// Railway should have standard fonts available
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Cache base64 font to avoid repeated file reads
+let cachedBase64Font: string | null = null;
+
+/**
+ * Get base64-encoded font for embedding in SVG
+ */
+async function getBase64Font(): Promise<string> {
+  if (cachedBase64Font) {
+    return cachedBase64Font;
+  }
+
+  try {
+    const fontPath = join(__dirname, '../../assets/fonts/Roboto-Bold.ttf');
+    console.log('[WordleRenderer] Loading font from:', fontPath);
+    const fontBuffer = await readFile(fontPath);
+    cachedBase64Font = fontBuffer.toString('base64');
+    console.log('[WordleRenderer] Font loaded, base64 length:', cachedBase64Font.length);
+    return cachedBase64Font;
+  } catch (error) {
+    console.error('[WordleRenderer] Failed to load font:', error);
+    throw error;
+  }
+}
 
 export interface WordleBoardData {
   guesses: EvaluatedGuess[];
@@ -43,8 +70,11 @@ export class WordleRenderer {
     
     console.log('[WordleRenderer] Generating board with', guesses.length, 'guesses');
     
+    // Load font for embedding
+    const base64Font = await getBase64Font();
+    
     // Create SVG with board and keyboard
-    const svg = this.createBoardSVG(guesses, maxGuesses, wordLength, keyboardStates);
+    const svg = this.createBoardSVG(guesses, maxGuesses, wordLength, keyboardStates, base64Font);
     
     // Convert SVG to PNG using Sharp
     const image = await sharp(Buffer.from(svg))
@@ -63,7 +93,8 @@ export class WordleRenderer {
     guesses: EvaluatedGuess[],
     maxGuesses: number,
     wordLength: number,
-    keyboardStates: Map<string, LetterState>
+    keyboardStates: Map<string, LetterState>,
+    base64Font: string
   ): string {
     const boardWidth = wordLength * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_PADDING;
     const boardHeight = maxGuesses * (this.CELL_SIZE + this.CELL_PADDING) + this.BOARD_TOP_PADDING;
@@ -72,7 +103,12 @@ export class WordleRenderer {
     
     const fontFace = `
       <style>
-        .letter { font-family: 'Arial', 'Helvetica', 'DejaVu Sans', 'Liberation Sans', sans-serif; font-weight: bold; }
+        @font-face {
+          font-family: 'Roboto';
+          src: url('data:font/truetype;charset=utf-8;base64,${base64Font}') format('truetype');
+          font-weight: bold;
+        }
+        .letter { font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', 'Liberation Sans', sans-serif; font-weight: bold; }
       </style>
     `;
     
@@ -95,6 +131,8 @@ export class WordleRenderer {
           const guess = guesses[row];
           letter = guess.word[col].toUpperCase();
           const state = guess.result.letters[col];
+          
+          console.log('[WordleRenderer] Row:', row, 'Col:', col, 'Letter:', letter, 'State:', state);
           
           switch (state) {
             case LetterState.CORRECT:
@@ -127,7 +165,7 @@ export class WordleRenderer {
     }
     
     // Draw keyboard
-    svg += WordleRenderer.createKeyboardSVG(keyboardStates, boardWidth, boardHeight + 20);
+    svg += WordleRenderer.createKeyboardSVG(keyboardStates, boardWidth, boardHeight + 20, base64Font);
     
     svg += '</svg>';
     
@@ -140,7 +178,8 @@ export class WordleRenderer {
   static createKeyboardSVG(
     keyboardStates: Map<string, LetterState>,
     boardWidth: number,
-    startY: number
+    startY: number,
+    base64Font: string
   ): string {
     const rows = [
       'QWERTYUIOP',
@@ -151,6 +190,18 @@ export class WordleRenderer {
     const keySize = 30;
     const keyPadding = 4;
     let svg = '';
+    
+    // Add font-face for keyboard text
+    svg += `
+      <style>
+        @font-face {
+          font-family: 'Roboto';
+          src: url('data:font/truetype;charset=utf-8;base64,${base64Font}') format('truetype');
+          font-weight: bold;
+        }
+        .letter { font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', 'Liberation Sans', sans-serif; font-weight: bold; }
+      </style>
+    `;
     
     let currentY = startY;
     
