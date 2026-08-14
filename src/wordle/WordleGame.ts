@@ -81,6 +81,15 @@ export class WordleGame {
       return { isValid: false, error: 'Not a valid word' };
     }
     
+    // Check if this word was already guessed
+    const alreadyGuessed = this.state.guesses.some(
+      existing => existing.word === normalizedGuess
+    );
+    
+    if (alreadyGuessed) {
+      return { isValid: false, error: "You've already guessed that word! 🔁" };
+    }
+    
     // Evaluate the guess
     const result = WordleEvaluator.evaluate(normalizedGuess, this.state.secretWord);
     
