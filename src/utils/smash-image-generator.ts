@@ -103,8 +103,10 @@ export class SmashImageGenerator {
     const avatar2 = await loadImage(player2Avatar);
 
     // Apply treatments based on winner
-    const avatar1IsWinner = winner === 'player1' || (winner === 'tie' && !isZeroVoteTie);
-    const avatar2IsWinner = winner === 'player2' || (winner === 'tie' && !isZeroVoteTie);
+    // In a tie (including 0-0), both players are winners (full color)
+    const isTie = winner === 'tie';
+    const avatar1IsWinner = isTie || winner === 'player1';
+    const avatar2IsWinner = isTie || winner === 'player2';
 
     // Draw avatars with cover cropping and treatments
     this.drawCoverImageWithTreatment(ctx, avatar1, 0, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT, avatar1IsWinner);
@@ -221,20 +223,14 @@ export class SmashImageGenerator {
     // Save context state
     ctx.save();
 
-    // Draw the image with cover cropping
-    this.drawCoverImage(ctx, image, destX, destY, destWidth, destHeight);
-
-    // Apply treatment using Canvas filters
     if (isWinner) {
-      // Winner: lighter treatment (similar to saturation: 0.3)
-      ctx.filter = 'saturate(30%) brightness(110%)';
+      // Winner: draw normally (full color, no filter)
+      this.drawCoverImage(ctx, image, destX, destY, destWidth, destHeight);
     } else {
-      // Loser: darker treatment (similar to saturation: 0.1, brightness: 0.7)
-      ctx.filter = 'saturate(10%) brightness(70%)';
+      // Loser: apply grayscale/dimmed treatment
+      ctx.filter = 'grayscale(100%) brightness(60%)';
+      this.drawCoverImage(ctx, image, destX, destY, destWidth, destHeight);
     }
-
-    // Re-draw the image with filter applied
-    this.drawCoverImage(ctx, image, destX, destY, destWidth, destHeight);
 
     // Restore context state
     ctx.restore();
