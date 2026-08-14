@@ -3,7 +3,9 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { cwd } from 'process';
 import { existsSync } from 'fs';
-import { GIFEncoder, quantize, applyPalette } from 'gifenc';
+import pkg from 'gifenc';
+
+const { GIFEncoder, quantize, applyPalette } = pkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
