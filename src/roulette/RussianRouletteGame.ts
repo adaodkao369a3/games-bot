@@ -136,9 +136,6 @@ export class RussianRouletteGame {
       embeds: [embed],
     });
 
-    // Transition pause before first turn
-    await this.delay(2000);
-
     // Check if game is still active
     if (this.state.isGameOver) return;
 
@@ -412,7 +409,7 @@ export class RussianRouletteGame {
 
     const embed = new EmbedBuilder()
       .setTitle('🔁 DOUBLE TURN')
-      .setDescription(`🔁 <@${currentPlayer.id}> used their DOUBLE TURN!\n\nThey get another shot...`)
+      .setDescription(`🔁 <@${currentPlayer.id}> used their DOUBLE TURN!\n\nTaking first shot...`)
       .setColor(0xFFD700)
       .setThumbnail(currentPlayer.avatar);
 
@@ -420,10 +417,30 @@ export class RussianRouletteGame {
       embeds: [embed],
     });
 
-    await this.delay(2000);
+    await this.delay(1500);
 
-    // Show barrel spin again
-    await this.showBarrelSpin(currentPlayer);
+    // Take the first shot
+    await this.pullTrigger();
+
+    // If player survived the first shot, they get a second shot with barrel spin
+    if (!currentPlayer.isEliminated && !this.state.isGameOver) {
+      await this.delay(1500);
+
+      const secondShotEmbed = new EmbedBuilder()
+        .setTitle('🔁 SECOND SHOT')
+        .setDescription(`🔁 <@${currentPlayer.id}> survived!\n\nBarrel spinning for second shot...`)
+        .setColor(0xFFD700)
+        .setThumbnail(currentPlayer.avatar);
+
+      await this.currentMessage?.edit({
+        embeds: [secondShotEmbed],
+      });
+
+      await this.delay(1500);
+
+      // Show barrel spin for second shot
+      await this.showBarrelSpin(currentPlayer);
+    }
   }
 
   /**
