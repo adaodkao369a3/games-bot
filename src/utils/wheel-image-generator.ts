@@ -70,7 +70,7 @@ export class WheelImageGenerator {
   private static readonly DEFAULT_FRAME_COUNT = 110; // Smoother animation with more frames
   private static readonly OPTION_COUNT = 8; // Always exactly 8 options
   private static readonly SLICE_ANGLE = (Math.PI * 2) / this.OPTION_COUNT; // 45 degrees in radians
-  private static readonly SLICE_CENTER_OFFSET = -Math.PI / 2; // Pointer points down from top (12 o'clock position in canvas coords)
+  private static readonly SLICE_CENTER_OFFSET = -Math.PI / 2; // Option 0 starts at top
   private static readonly SAFETY_MARGIN = 0.15; // 15% safety margin from slice boundaries
   
   // Wheel asset geometry (actual circular region within wheel.png)
@@ -283,16 +283,13 @@ export class WheelImageGenerator {
     // Restore context (undo rotation and translation)
     ctx.restore();
 
-    // Draw fixed pointer at the top center (doesn't rotate with wheel)
-    // Scale pointer to be proportional to wheel
-    const pointerScale = wheelSize / this.WHEEL_SOURCE_SIZE * 0.25; // Pointer is 25% of wheel size
+    // Draw fixed pointer at top center (doesn't rotate with wheel)
+    const pointerScale = wheelSize / this.WHEEL_SOURCE_SIZE * 0.25;
     const pointerDrawWidth = this.POINTER_WIDTH * pointerScale;
     const pointerDrawHeight = this.POINTER_HEIGHT * pointerScale;
     
-    // Position pointer at top center of canvas, pointing down into the wheel
-    // Center horizontally, position so the pointer tip aligns with wheel top
     const pointerDrawX = centerX - pointerDrawWidth / 2;
-    const pointerDrawY = centerY - wheelSize / 2 - pointerDrawHeight + 30; // Position above wheel with overlap
+    const pointerDrawY = 0;
     
     ctx.drawImage(
       pointerImage,
