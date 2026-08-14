@@ -67,10 +67,11 @@ export interface WheelResultConfig {
 export class WheelImageGenerator {
   private static readonly DEFAULT_CANVAS_SIZE = 800;
   private static readonly DEFAULT_DURATION = 5; // seconds
-  private static readonly DEFAULT_FRAME_COUNT = 40;
+  private static readonly DEFAULT_FRAME_COUNT = 75; // Increased for smoother animation
   private static readonly OPTION_COUNT = 8; // Always exactly 8 options
   private static readonly SLICE_ANGLE = (Math.PI * 2) / this.OPTION_COUNT; // 45 degrees in radians
   private static readonly SLICE_CENTER_OFFSET = -Math.PI / 2; // Option 0 starts at top
+  private static readonly SAFETY_MARGIN = 0.15; // 15% safety margin from slice boundaries
   
   // Wheel asset geometry (actual circular region within wheel.png)
   private static readonly WHEEL_SOURCE_X = 181;
@@ -114,7 +115,8 @@ export class WheelImageGenerator {
     const gif = new GIFEncoder();
 
     // Calculate frame delay in centiseconds (gifenc uses centiseconds)
-    const frameDelay = Math.round((duration * 1000) / frameCount / 10);
+    // Use 30ms delay for smooth animation (3 centiseconds)
+    const frameDelay = 3;
 
     // Generate frames with easing
     for (let i = 0; i < frameCount; i++) {
@@ -199,18 +201,29 @@ export class WheelImageGenerator {
   /**
    * Calculate target rotation to land on selected option
    * The pointer points UP (at SLICE_CENTER_OFFSET)
+   * Uses safety margin to ensure pointer never lands on slice boundary
    */
   private static calculateTargetRotation(selectedIndex: number): number {
-    // Add multiple full rotations for visual effect (5 rotations)
-    const baseRotations = 5 * Math.PI * 2;
+    // Add random full rotations for natural spin (5-7 rotations)
+    const fullSpins = 5 + Math.floor(Math.random() * 3);
+    const baseRotations = fullSpins * Math.PI * 2;
     
-    // Calculate angle needed to put selected option under the pointer
-    // The center of the selected option should align with SLICE_CENTER_OFFSET (top/upward)
-    const optionCenterAngle = this.SLICE_CENTER_OFFSET + selectedIndex * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
+    // Calculate the center angle of the winning slice
+    const sliceCenterAngle = selectedIndex * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
     
-    // Calculate rotation needed: we want optionCenterAngle + rotation = SLICE_CENTER_OFFSET
-    // So rotation = SLICE_CENTER_OFFSET - optionCenterAngle
-    const targetAngle = this.SLICE_CENTER_OFFSET - optionCenterAngle;
+    // Add safety margin from slice boundaries (15% of slice width)
+    const safeMargin = this.SLICE_ANGLE * this.SAFETY_MARGIN;
+    const maxOffset = (this.SLICE_ANGLE / 2) - safeMargin;
+    
+    // Add random offset within safe range for natural feel
+    const randomOffset = (Math.random() * 2 - 1) * maxOffset;
+    
+    // The final target angle for the slice center
+    const targetSliceAngle = sliceCenterAngle + randomOffset;
+    
+    // Calculate rotation needed: we want targetSliceAngle + rotation = SLICE_CENTER_OFFSET
+    // So rotation = SLICE_CENTER_OFFSET - targetSliceAngle
+    const targetAngle = this.SLICE_CENTER_OFFSET - targetSliceAngle;
     
     // Add base rotations
     const totalRotation = baseRotations + targetAngle;
@@ -330,9 +343,9 @@ export class WheelImageGenerator {
     wheelRotation: number
   ): void {
     const radius = wheelSize / 2;
-    const textRadius = radius * 0.67; // Position text at 67% of radius for better slice centering
+    const textRadius = radius * 0.65; // Position text at 65% of radius for better slice centering
     const maxFontSize = 28;
-    const minFontSize = 16;
+    const minFontSize = 12;
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -374,14 +387,17 @@ export class WheelImageGenerator {
         textRotation += Math.PI * 2;
       }
       
+      // Calculate available arc width for text (70% of slice arc width)
+      const availableArcWidth = textRadius * this.SLICE_ANGLE * 0.70;
+      
       // Save context for text rotation
       ctx.save();
       ctx.translate(textX, textY);
       ctx.rotate(textRotation);
       
-      // Fit text to slice width
+      // Fit text to available arc width
       const label = option.label;
-      const fittedFontSize = this.fitTextToWidth(ctx, label, maxFontSize, minFontSize, this.SLICE_ANGLE * textRadius * 0.8);
+      const fittedFontSize = this.fitTextToWidth(ctx, label, maxFontSize, minFontSize, availableArcWidth);
       
       ctx.font = `bold ${fittedFontSize}px Roboto`;
       ctx.fillStyle = '#FFFFFF';
@@ -391,7 +407,7 @@ export class WheelImageGenerator {
       ctx.shadowOffsetY = 1;
       
       // Check if text needs to be split
-      if (ctx.measureText(label).width > this.SLICE_ANGLE * textRadius * 0.8) {
+      if (ctx.measureText(label).width > availableArcWidth) {
         // Split into two lines
         const words = label.split(' ');
         if (words.length >= 2) {
