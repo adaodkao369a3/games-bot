@@ -1,43 +1,32 @@
-import sharp from 'sharp';
+import { createCanvas, GlobalFonts, SKRSContext2D } from '@napi-rs/canvas';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { existsSync, readFileSync } from 'fs';
 import { cwd } from 'process';
+import { existsSync } from 'fs';
 import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = cwd();
 
-// Load font files as base64 for embedding in SVG
-const robotoBoldPath = join(PROJECT_ROOT, 'assets', 'fonts', 'Roboto-Bold.ttf');
-const robotoRegularPath = join(PROJECT_ROOT, 'assets', 'fonts', 'Roboto-Regular.ttf');
-
-let robotoBoldBase64 = '';
-let robotoRegularBase64 = '';
+// Font loading using GlobalFonts
+const fontPath = join(PROJECT_ROOT, 'assets', 'fonts', 'Roboto-Bold.ttf');
+let fontLoaded = false;
 
 try {
-  if (existsSync(robotoBoldPath)) {
-    const fontBuffer = readFileSync(robotoBoldPath);
-    robotoBoldBase64 = fontBuffer.toString('base64');
-    console.log('[Font Diagnostic] Loaded Roboto-Bold.ttf');
+  if (existsSync(fontPath)) {
+    const success = GlobalFonts.registerFromPath(fontPath, 'Roboto');
+    if (success) {
+      fontLoaded = true;
+      console.log('[Font Diagnostic] Font loaded: assets/fonts/Roboto-Bold.ttf');
+    } else {
+      console.error('[Font Diagnostic] Font registration failed');
+    }
   } else {
-    console.log('[Font Diagnostic] Roboto-Bold.ttf not found');
+    console.error('[Font Diagnostic] Font file not found: assets/fonts/Roboto-Bold.ttf');
   }
 } catch (error) {
-  console.warn('[Font Diagnostic] Could not load Roboto-Bold.ttf:', error);
-}
-
-try {
-  if (existsSync(robotoRegularPath)) {
-    const fontBuffer = readFileSync(robotoRegularPath);
-    robotoRegularBase64 = fontBuffer.toString('base64');
-    console.log('[Font Diagnostic] Loaded Roboto-Regular.ttf');
-  } else {
-    console.log('[Font Diagnostic] Roboto-Regular.ttf not found');
-  }
-} catch (error) {
-  console.warn('[Font Diagnostic] Could not load Roboto-Regular.ttf:', error);
+  console.error('[Font Diagnostic] Failed to load font:', error);
 }
 
 export interface FontDiagnosticResult {
@@ -55,7 +44,7 @@ export class FontDiagnostic {
   private static readonly PADDING = 20;
 
   /**
-   * Generate comprehensive font diagnostic image
+   * Generate comprehensive font diagnostic image using Canvas
    */
   static async generateDiagnostic(): Promise<FontDiagnosticResult> {
     console.log('=== FONT DIAGNOSTIC START ===');
@@ -63,105 +52,45 @@ export class FontDiagnostic {
     const environmentInfo = this.getEnvironmentInfo();
     console.log('Environment Info:', environmentInfo);
     
-    let svg = this.createSVGHeader();
-    let currentY = this.PADDING;
     let consoleLog = 'FONT DIAGNOSTIC LOG\n';
     consoleLog += environmentInfo + '\n\n';
 
-    // Test 1: DejaVu Sans (plain system font)
-    console.log('FONT TEST: DejaVu Sans');
-    const test1SVG = this.createFontTestSection(
-      'TEST 1: DejaVu Sans',
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\nWORDLE PLANET',
-      'DejaVu Sans',
+    // Calculate total height
+    const sectionCount = 3; // Canvas test, Wordle cells, Metadata
+    const totalHeight = this.PADDING + (sectionCount * this.SECTION_HEIGHT) + 200;
+    
+    // Create canvas
+    const canvas = createCanvas(this.IMAGE_WIDTH, totalHeight);
+    const ctx = canvas.getContext('2d');
+    
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, this.IMAGE_WIDTH, totalHeight);
+    
+    let currentY = this.PADDING;
+
+    // Test 1: Canvas text rendering with Roboto
+    console.log('FONT TEST: Canvas Roboto');
+    const test1Log = this.createCanvasTextSection(
+      ctx,
+      'TEST 1: Canvas Roboto Font',
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\nWORDLE\nPLANET',
       currentY
     );
-    svg += test1SVG.svg;
     currentY += this.SECTION_HEIGHT;
-    consoleLog += test1SVG.log + '\n';
+    consoleLog += test1Log + '\n';
 
-    // Test 2: Arial fallback
-    console.log('FONT TEST: Arial');
-    const test2SVG = this.createFontTestSection(
-      'TEST 2: Arial',
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\nWORDLE PLANET',
-      'Arial, sans-serif',
-      currentY
-    );
-    svg += test2SVG.svg;
-    currentY += this.SECTION_HEIGHT;
-    consoleLog += test2SVG.log + '\n';
-
-    // Test 3: Embedded Roboto (same as Wordle renderer)
-    console.log('FONT TEST: Embedded Roboto');
-    const test3SVG = this.createEmbeddedRobotoSection(
-      'TEST 3: Embedded Roboto',
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZ\nWORDLE PLANET',
-      currentY
-    );
-    svg += test3SVG.svg;
-    currentY += this.SECTION_HEIGHT;
-    consoleLog += test3SVG.log + '\n';
-
-    // Test 4: Roboto Regular (if available)
-    if (robotoRegularBase64) {
-      console.log('FONT TEST: Roboto Regular');
-      const test4SVG = this.createEmbeddedFontSection(
-        'TEST 4: Roboto Regular',
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZ\nWORDLE PLANET',
-        'Roboto-Regular',
-        robotoRegularBase64,
-        currentY
-      );
-      svg += test4SVG.svg;
-      currentY += this.SECTION_HEIGHT;
-      consoleLog += test4SVG.log + '\n';
-    } else {
-      console.log('FONT TEST: Roboto Regular - SKIPPED (font file not found)');
-      const skipSVG = this.createSkipSection('TEST 4: Roboto Regular (font file not found)', currentY);
-      svg += skipSVG;
-      currentY += this.SECTION_HEIGHT;
-      consoleLog += 'TEST 4: Roboto Regular - SKIPPED (font file not found)\n';
-    }
-
-    // Test 5: Roboto Bold (if available)
-    if (robotoBoldBase64) {
-      console.log('FONT TEST: Roboto Bold');
-      const test5SVG = this.createEmbeddedFontSection(
-        'TEST 5: Roboto Bold',
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZ\nWORDLE PLANET',
-        'Roboto-Bold',
-        robotoBoldBase64,
-        currentY
-      );
-      svg += test5SVG.svg;
-      currentY += this.SECTION_HEIGHT;
-      consoleLog += test5SVG.log + '\n';
-    } else {
-      console.log('FONT TEST: Roboto Bold - SKIPPED (font file not found)');
-      const skipSVG = this.createSkipSection('TEST 5: Roboto Bold (font file not found)', currentY);
-      svg += skipSVG;
-      currentY += this.SECTION_HEIGHT;
-      consoleLog += 'TEST 5: Roboto Bold - SKIPPED (font file not found)\n';
-    }
-
-    // Test 6: Wordle-style cells
+    // Test 2: Wordle-style cells with Canvas
     console.log('FONT TEST: Wordle-style cells');
-    const test6SVG = this.createWordleCellSection('TEST 6: Wordle-style cells', 'PLANET', currentY);
-    svg += test6SVG.svg;
+    const test2Log = this.createWordleCellSection(ctx, 'TEST 2: Wordle-style cells', 'PLANET', currentY);
     currentY += this.SECTION_HEIGHT + 50;
-    consoleLog += test6SVG.log + '\n';
+    consoleLog += test2Log + '\n';
 
     // Environment metadata section
-    const metadataSVG = this.createMetadataSection(environmentInfo, currentY);
-    svg += metadataSVG;
+    this.createMetadataSection(ctx, environmentInfo, currentY);
 
-    svg += '</svg>';
-
-    console.log('=== CONVERTING SVG TO PNG ===');
-    const image = await sharp(Buffer.from(svg))
-      .png()
-      .toBuffer();
+    // Convert to buffer
+    const image = canvas.toBuffer('image/png');
 
     console.log('=== FONT DIAGNOSTIC COMPLETE ===');
     console.log('Generated image buffer size:', image.length);
@@ -182,20 +111,16 @@ export class FontDiagnostic {
     info.push(`Platform: ${process.platform}`);
     info.push(`Architecture: ${process.arch}`);
     info.push(`CWD: ${process.cwd()}`);
+    info.push(`@napi-rs/canvas: INSTALLED`);
+    info.push(`Font loaded: ${fontLoaded ? 'YES' : 'NO'}`);
     
-    // Sharp version
-    try {
-      const sharpVersion = sharp.versions;
-      info.push(`Sharp version: ${sharpVersion.sharp}`);
-      info.push(`Sharp libvips: ${sharpVersion.vips}`);
-    } catch (error) {
-      info.push('Sharp version: ERROR');
+    if (fontLoaded) {
+      info.push(`Available font families: ${GlobalFonts.families.map(f => f.family).join(', ')}`);
     }
 
     // Available font files
     const fontFiles = [];
-    if (existsSync(robotoBoldPath)) fontFiles.push('Roboto-Bold.ttf');
-    if (existsSync(robotoRegularPath)) fontFiles.push('Roboto-Regular.ttf');
+    if (existsSync(fontPath)) fontFiles.push('Roboto-Bold.ttf');
     info.push(`Available font files: ${fontFiles.length > 0 ? fontFiles.join(', ') : 'None'}`);
 
     // Fontconfig detection
@@ -221,166 +146,74 @@ export class FontDiagnostic {
   }
 
   /**
-   * Create SVG header
+   * Create Canvas text section
    */
-  private static createSVGHeader(): string {
-    return `
-      <svg width="${this.IMAGE_WIDTH}" height="${this.IMAGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="100%" fill="#ffffff"/>
-    `;
-  }
-
-  /**
-   * Create a font test section with plain system font
-   */
-  private static createFontTestSection(
-    label: string,
-    text: string,
-    fontFamily: string,
-    startY: number
-  ): { svg: string; log: string } {
-    const lines = text.split('\n');
-    let svg = `
-      <rect x="${this.PADDING}" y="${startY}" width="${this.IMAGE_WIDTH - 2 * this.PADDING}" height="${this.SECTION_HEIGHT}" 
-            fill="#f0f0f0" stroke="#cccccc" stroke-width="1"/>
-      <text x="${this.PADDING + 10}" y="${startY + 25}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#333333">${label}</text>
-    `;
-
-    let currentY = startY + 50;
-    for (const line of lines) {
-      svg += `
-        <text x="${this.PADDING + 10}" y="${currentY}" font-family="${fontFamily}" font-size="18" fill="#000000">${line}</text>
-      `;
-      currentY += 25;
-    }
-
-    const log = `Font: ${fontFamily}\nText: ${text}\nSVG text element: <text font-family="${fontFamily}">${text}</text>`;
-
-    return { svg, log };
-  }
-
-  /**
-   * Create embedded Roboto section (same as Wordle renderer)
-   */
-  private static createEmbeddedRobotoSection(
+  private static createCanvasTextSection(
+    ctx: SKRSContext2D,
     label: string,
     text: string,
     startY: number
-  ): { svg: string; log: string } {
+  ): string {
     const lines = text.split('\n');
-    const fontFace = robotoBoldBase64 ? `
-      <style>
-        @font-face {
-          font-family: 'Roboto-Bold';
-          src: url('data:font/truetype;charset=utf-8;base64,${robotoBoldBase64}') format('truetype');
-        }
-        .test-text { font-family: 'Roboto-Bold', Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif; }
-      </style>
-    ` : '';
-
-    let svg = `
-      <rect x="${this.PADDING}" y="${startY}" width="${this.IMAGE_WIDTH - 2 * this.PADDING}" height="${this.SECTION_HEIGHT}" 
-            fill="#f0f0f0" stroke="#cccccc" stroke-width="1"/>
-      ${fontFace}
-      <text x="${this.PADDING + 10}" y="${startY + 25}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#333333">${label}</text>
-    `;
-
-    let currentY = startY + 50;
+    
+    // Background
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(this.PADDING, startY, this.IMAGE_WIDTH - 2 * this.PADDING, this.SECTION_HEIGHT);
+    ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.PADDING, startY, this.IMAGE_WIDTH - 2 * this.PADDING, this.SECTION_HEIGHT);
+    
+    // Label
+    ctx.fillStyle = '#333333';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, this.PADDING + 10, startY + 10);
+    
+    // Text lines
+    let currentY = startY + 40;
     for (const line of lines) {
-      svg += `
-        <text x="${this.PADDING + 10}" y="${currentY}" class="test-text" font-size="18" fill="#000000">${line}</text>
-      `;
+      ctx.fillStyle = '#000000';
+      ctx.font = fontLoaded ? 'bold 18px Roboto' : 'bold 18px Arial';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(line, this.PADDING + 10, currentY);
       currentY += 25;
     }
 
-    const log = `Font: Embedded Roboto-Bold (same as Wordle renderer)\nText: ${text}\nSVG: @font-face with data URI, fallback to system fonts`;
+    const log = `Font: ${fontLoaded ? 'Roboto (Canvas)' : 'Arial (fallback)'}\nText: ${text}\nCanvas text rendering with bundled font`;
 
-    return { svg, log };
+    return log;
   }
 
   /**
-   * Create embedded font section with custom font
-   */
-  private static createEmbeddedFontSection(
-    label: string,
-    text: string,
-    fontName: string,
-    fontBase64: string,
-    startY: number
-  ): { svg: string; log: string } {
-    const lines = text.split('\n');
-    const fontFace = `
-      <style>
-        @font-face {
-          font-family: '${fontName}';
-          src: url('data:font/truetype;charset=utf-8;base64,${fontBase64}') format('truetype');
-        }
-        .test-text { font-family: '${fontName}', Arial, sans-serif; }
-      </style>
-    `;
-
-    let svg = `
-      <rect x="${this.PADDING}" y="${startY}" width="${this.IMAGE_WIDTH - 2 * this.PADDING}" height="${this.SECTION_HEIGHT}" 
-            fill="#f0f0f0" stroke="#cccccc" stroke-width="1"/>
-      ${fontFace}
-      <text x="${this.PADDING + 10}" y="${startY + 25}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#333333">${label}</text>
-    `;
-
-    let currentY = startY + 50;
-    for (const line of lines) {
-      svg += `
-        <text x="${this.PADDING + 10}" y="${currentY}" class="test-text" font-size="18" fill="#000000">${line}</text>
-      `;
-      currentY += 25;
-    }
-
-    const log = `Font: Embedded ${fontName}\nText: ${text}\nSVG: @font-face with data URI`;
-
-    return { svg, log };
-  }
-
-  /**
-   * Create skip section for missing fonts
-   */
-  private static createSkipSection(label: string, startY: number): string {
-    return `
-      <rect x="${this.PADDING}" y="${startY}" width="${this.IMAGE_WIDTH - 2 * this.PADDING}" height="${this.SECTION_HEIGHT}" 
-            fill="#f0f0f0" stroke="#cccccc" stroke-width="1"/>
-      <text x="${this.PADDING + 10}" y="${startY + 25}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#333333">${label}</text>
-      <text x="${this.PADDING + 10}" y="${startY + 60}" font-family="Arial, sans-serif" font-size="16" fill="#666666">Test skipped - font file not available</text>
-    `;
-  }
-
-  /**
-   * Create Wordle-style cell section
+   * Create Wordle-style cell section using Canvas
    */
   private static createWordleCellSection(
+    ctx: SKRSContext2D,
     label: string,
     word: string,
     startY: number
-  ): { svg: string; log: string } {
+  ): string {
     const cellSize = 60;
     const cellPadding = 5;
     const wordLength = word.length;
     const totalWidth = wordLength * (cellSize + cellPadding) + cellPadding;
     const startX = (this.IMAGE_WIDTH - totalWidth) / 2;
 
-    // Use the same font setup as Wordle renderer
-    const fontStyle = `
-      <style>
-        .letter {
-          font-family: "DejaVu Sans", "Liberation Sans", "Arial", sans-serif;
-          font-weight: 700;
-        }
-      </style>
-    `;
-
-    let svg = `
-      <rect x="${this.PADDING}" y="${startY}" width="${this.IMAGE_WIDTH - 2 * this.PADDING}" height="${this.SECTION_HEIGHT + 50}" 
-            fill="#f0f0f0" stroke="#cccccc" stroke-width="1"/>
-      ${fontStyle}
-      <text x="${this.PADDING + 10}" y="${startY + 25}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#333333">${label}</text>
-    `;
+    // Background
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(this.PADDING, startY, this.IMAGE_WIDTH - 2 * this.PADDING, this.SECTION_HEIGHT + 50);
+    ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.PADDING, startY, this.IMAGE_WIDTH - 2 * this.PADDING, this.SECTION_HEIGHT + 50);
+    
+    // Label
+    ctx.fillStyle = '#333333';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, this.PADDING + 10, startY + 10);
 
     // Create cells with different colors (like Wordle)
     const colors = ['#538d4e', '#b59f3b', '#3a3a3c', '#538d4e', '#b59f3b', '#3a3a3c'];
@@ -391,39 +224,86 @@ export class FontDiagnostic {
       const color = colors[i % colors.length];
       const letter = word[i];
 
-      svg += `
-        <rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" 
-              fill="${color}" stroke="#3a3a3c" stroke-width="2" rx="4"/>
-        <text x="${x + cellSize / 2}" y="${y + cellSize / 2}" class="letter" 
-              font-size="36" fill="#ffffff" 
-              text-anchor="middle" dominant-baseline="middle">${letter}</text>
-      `;
+      // Draw cell
+      ctx.fillStyle = color;
+      this.roundRect(ctx, x, y, cellSize, cellSize, 4);
+      ctx.fill();
+      
+      // Draw border
+      ctx.strokeStyle = '#3a3a3c';
+      ctx.lineWidth = 2;
+      this.roundRect(ctx, x, y, cellSize, cellSize, 4);
+      ctx.stroke();
+      
+      // Draw letter
+      const centerX = x + cellSize / 2;
+      const centerY = y + cellSize / 2;
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.font = fontLoaded ? 'bold 36px Roboto' : 'bold 36px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(letter, centerX, centerY);
     }
 
-    const log = `Font: DejaVu Sans (same as Wordle renderer)\nText: ${word}\nSVG: Wordle-style cells with current renderer font setup`;
+    const log = `Font: ${fontLoaded ? 'Roboto (Canvas)' : 'Arial (fallback)'}\nText: ${word}\nCanvas Wordle-style cells with bundled font`;
 
-    return { svg, log };
+    return log;
   }
 
   /**
-   * Create metadata section
+   * Create metadata section using Canvas
    */
-  private static createMetadataSection(environmentInfo: string, startY: number): string {
+  private static createMetadataSection(ctx: SKRSContext2D, environmentInfo: string, startY: number): void {
     const lines = environmentInfo.split('\n');
-    let svg = `
-      <rect x="${this.PADDING}" y="${startY}" width="${this.IMAGE_WIDTH - 2 * this.PADDING}" height="${lines.length * 20 + 40}" 
-            fill="#e8e8e8" stroke="#999999" stroke-width="1"/>
-      <text x="${this.PADDING + 10}" y="${startY + 20}" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333333">ENVIRONMENT METADATA</text>
-    `;
-
-    let currentY = startY + 40;
+    
+    // Background
+    ctx.fillStyle = '#e8e8e8';
+    ctx.fillRect(this.PADDING, startY, this.IMAGE_WIDTH - 2 * this.PADDING, lines.length * 20 + 40);
+    ctx.strokeStyle = '#999999';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.PADDING, startY, this.IMAGE_WIDTH - 2 * this.PADDING, lines.length * 20 + 40);
+    
+    // Title
+    ctx.fillStyle = '#333333';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('ENVIRONMENT METADATA', this.PADDING + 10, startY + 10);
+    
+    // Info lines
+    let currentY = startY + 30;
     for (const line of lines) {
-      svg += `
-        <text x="${this.PADDING + 10}" y="${currentY}" font-family="Arial, sans-serif" font-size="10" fill="#333333">${line}</text>
-      `;
+      ctx.fillStyle = '#333333';
+      ctx.font = '10px Arial';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(line, this.PADDING + 10, currentY);
       currentY += 15;
     }
+  }
 
-    return svg;
+  /**
+   * Helper method to draw rounded rectangles
+   */
+  private static roundRect(
+    ctx: SKRSContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+  ): void {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
   }
 }

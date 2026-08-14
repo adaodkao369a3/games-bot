@@ -1,5 +1,34 @@
-import sharp from 'sharp';
+import { createCanvas, GlobalFonts, SKRSContext2D } from '@napi-rs/canvas';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { cwd } from 'process';
+import { existsSync } from 'fs';
 import { LetterState, EvaluatedGuess } from './wordleEvaluator.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = cwd();
+
+// Font loading using GlobalFonts
+const fontPath = join(PROJECT_ROOT, 'assets', 'fonts', 'Roboto-Bold.ttf');
+let fontLoaded = false;
+
+try {
+  if (existsSync(fontPath)) {
+    const success = GlobalFonts.registerFromPath(fontPath, 'Roboto');
+    if (success) {
+      fontLoaded = true;
+      console.log('[WordleRenderer] Font loaded: assets/fonts/Roboto-Bold.ttf');
+      console.log('[WordleRenderer] Available font families:', GlobalFonts.families.map(f => f.family));
+    } else {
+      console.error('[WordleRenderer] Font registration failed');
+    }
+  } else {
+    console.error('[WordleRenderer] Font file not found: assets/fonts/Roboto-Bold.ttf');
+  }
+} catch (error) {
+  console.error('[WordleRenderer] Failed to load font:', error);
+}
 
 export interface WordleBoardData {
   guesses: EvaluatedGuess[];
@@ -11,7 +40,7 @@ export interface WordleBoardData {
 }
 
 /**
- * Renders Wordle game boards using Sharp
+ * Renders Wordle game boards using @napi-rs/canvas
  */
 export class WordleRenderer {
   private static readonly BOARD_WIDTH = 600;
@@ -33,54 +62,34 @@ export class WordleRenderer {
   };
   
   /**
-   * Generate a Wordle board image
+   * Generate a Wordle board image using Canvas
    */
   static async generateBoard(data: WordleBoardData): Promise<Buffer> {
     const { guesses, maxGuesses, wordLength, keyboardStates, isGameOver, guessCount } = data;
     
     console.log('[WordleRenderer] Generating board with', guesses.length, 'guesses');
     
-    // Create SVG with board and keyboard
-    const svg = this.createBoardSVG(guesses, maxGuesses, wordLength, keyboardStates);
+    // Check if font is loaded
+    if (!fontLoaded) {
+      throw new Error('[WordleRenderer] Font not loaded - cannot render board');
+    }
     
-    // Convert SVG to PNG using Sharp
-    const image = await sharp(Buffer.from(svg))
-      .png()
-      .toBuffer();
-    
-    console.log('[WordleRenderer] Generated image buffer size:', image.length);
-    
-    return image;
-  }
-  
-  /**
-   * Create SVG for the Wordle board
-   */
-  static createBoardSVG(
-    guesses: EvaluatedGuess[],
-    maxGuesses: number,
-    wordLength: number,
-    keyboardStates: Map<string, LetterState>
-  ): string {
+    // Calculate dimensions
     const boardWidth = wordLength * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_PADDING;
     const boardHeight = maxGuesses * (this.CELL_SIZE + this.CELL_PADDING) + this.BOARD_TOP_PADDING;
     const keyboardHeight = 100;
     const totalHeight = boardHeight + keyboardHeight + 20;
     
-    const fontStyle = `
-      <style>
-        .letter {
-          font-family: "DejaVu Sans", "Liberation Sans", "Arial", sans-serif;
-          font-weight: 700;
-        }
-      </style>
-    `;
+    // Create canvas
+    const canvas = createCanvas(boardWidth, totalHeight);
+    const ctx = canvas.getContext('2d');
     
-    let svg = `
-      <svg width="${boardWidth}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="100%" fill="${this.COLORS.background}"/>
-        ${fontStyle}
-    `;
+    // Set font for rendering
+    ctx.font = 'bold 36px Roboto';
+    
+    // Draw background
+    ctx.fillStyle = this.COLORS.background;
+    ctx.fillRect(0, 0, boardWidth, totalHeight);
     
     // Draw board cells
     for (let row = 0; row < maxGuesses; row++) {
@@ -111,39 +120,51 @@ export class WordleRenderer {
           }
         }
         
-        svg += `
-          <rect x="${x}" y="${y}" width="${this.CELL_SIZE}" height="${this.CELL_SIZE}" 
-                fill="${fillColor}" stroke="${this.COLORS.border}" stroke-width="2" rx="4"/>
-        `;
+        // Draw cell
+        ctx.fillStyle = fillColor;
+        this.roundRect(ctx, x, y, this.CELL_SIZE, this.CELL_SIZE, 4);
+        ctx.fill();
         
+        // Draw border
+        ctx.strokeStyle = this.COLORS.border;
+        ctx.lineWidth = 2;
+        this.roundRect(ctx, x, y, this.CELL_SIZE, this.CELL_SIZE, 4);
+        ctx.stroke();
+        
+        // Draw letter
         if (letter) {
           const centerX = x + this.CELL_SIZE / 2;
           const centerY = y + this.CELL_SIZE / 2;
-          svg += `
-            <text x="${centerX}" y="${centerY}" class="letter" 
-                  font-size="36" fill="${this.COLORS.text}" 
-                  text-anchor="middle" dominant-baseline="middle">${letter}</text>
-          `;
+          
+          ctx.fillStyle = this.COLORS.text;
+          ctx.font = 'bold 36px Roboto';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(letter, centerX, centerY);
         }
       }
     }
     
     // Draw keyboard
-    svg += WordleRenderer.createKeyboardSVG(keyboardStates, boardWidth, boardHeight + 20);
+    this.drawKeyboard(ctx, keyboardStates, boardWidth, boardHeight + 20);
     
-    svg += '</svg>';
+    // Convert to buffer
+    const buffer = canvas.toBuffer('image/png');
     
-    return svg;
+    console.log('[WordleRenderer] Generated image buffer size:', buffer.length);
+    
+    return buffer;
   }
   
   /**
-   * Create SVG for the keyboard
+   * Draw keyboard using Canvas
    */
-  static createKeyboardSVG(
+  private static drawKeyboard(
+    ctx: SKRSContext2D,
     keyboardStates: Map<string, LetterState>,
     boardWidth: number,
     startY: number
-  ): string {
+  ): void {
     const rows = [
       'QWERTYUIOP',
       'ASDFGHJKL',
@@ -152,7 +173,6 @@ export class WordleRenderer {
     
     const keySize = 30;
     const keyPadding = 4;
-    let svg = '';
     
     let currentY = startY;
     
@@ -181,24 +201,54 @@ export class WordleRenderer {
           }
         }
         
-        svg += `
-          <rect x="${x}" y="${currentY}" width="${keySize}" height="${keySize}" 
-                fill="${fillColor}" stroke="${this.COLORS.border}" stroke-width="1" rx="3"/>
-        `;
+        // Draw key
+        ctx.fillStyle = fillColor;
+        this.roundRect(ctx, x, currentY, keySize, keySize, 3);
+        ctx.fill();
         
+        // Draw border
+        ctx.strokeStyle = this.COLORS.border;
+        ctx.lineWidth = 1;
+        this.roundRect(ctx, x, currentY, keySize, keySize, 3);
+        ctx.stroke();
+        
+        // Draw letter
         const centerX = x + keySize / 2;
         const centerY = currentY + keySize / 2;
-        svg += `
-          <text x="${centerX}" y="${centerY}" class="letter" 
-                font-size="16" fill="${this.COLORS.text}" 
-                text-anchor="middle" dominant-baseline="middle">${letter}</text>
-        `;
+        
+        ctx.fillStyle = this.COLORS.text;
+        ctx.font = 'bold 16px Roboto';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(letter, centerX, centerY);
       }
       
       currentY += keySize + keyPadding;
     }
-    
-    return svg;
+  }
+  
+  /**
+   * Helper method to draw rounded rectangles
+   */
+  private static roundRect(
+    ctx: SKRSContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+  ): void {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
   }
   
   /**
