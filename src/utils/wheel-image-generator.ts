@@ -272,16 +272,16 @@ export class WheelImageGenerator {
       wheelSize
     );
 
-    // Draw highlight if specified (in wheel-local coordinates)
-    if (highlightIndex !== undefined) {
-      this.drawSliceHighlight(ctx, wheelSize, highlightIndex);
-    }
-
     // Draw option labels (in wheel-local coordinates, passing rotation for proper angle calculation)
     this.drawOptionLabels(ctx, options, wheelSize, rotation);
 
     // Restore context (undo rotation and translation)
     ctx.restore();
+
+    // Draw highlight if specified (in canvas coordinates, centered at upward direction)
+    if (highlightIndex !== undefined) {
+      this.drawSliceHighlight(ctx, wheelSize, highlightIndex, rotation);
+    }
 
     // Draw fixed pointer at center of wheel (doesn't rotate with wheel)
     const pointerScale = wheelSize / this.WHEEL_SOURCE_SIZE * 0.25;
@@ -301,25 +301,37 @@ export class WheelImageGenerator {
   }
 
   /**
-   * Draw highlight around winning slice (in wheel-local coordinates)
+   * Draw highlight around winning slice (in canvas coordinates, centered at upward direction)
    */
   private static drawSliceHighlight(
     ctx: SKRSContext2D,
     wheelSize: number,
-    highlightIndex: number
+    highlightIndex: number,
+    wheelRotation: number
   ): void {
+    const centerX = ctx.canvas.width / 2;
+    const centerY = ctx.canvas.height / 2;
     const radius = wheelSize / 2;
     const innerRadius = radius * 0.2; // Don't highlight center hub
     
-    // Calculate angles for the highlighted slice
-    // Slice starts at index * SLICE_ANGLE and spans SLICE_ANGLE
-    const startAngle = highlightIndex * this.SLICE_ANGLE;
-    const endAngle = startAngle + this.SLICE_ANGLE;
+    // Calculate the winning slice's center angle in wheel coordinates
+    const sliceCenterAngle = highlightIndex * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
     
-    // Draw highlight arc (context is already at wheel center)
+    // The winning slice's final angle after wheel rotation
+    const finalSliceAngle = sliceCenterAngle + wheelRotation;
+    
+    // The highlight should be centered at the upward direction (-Math.PI / 2)
+    // Calculate the rotation needed to center the highlight at upward direction
+    const highlightCenterAngle = -Math.PI / 2;
+    
+    // The highlight spans exactly one slice width
+    const highlightStart = highlightCenterAngle - this.SLICE_ANGLE / 2;
+    const highlightEnd = highlightCenterAngle + this.SLICE_ANGLE / 2;
+    
+    // Draw highlight arc in canvas coordinates
     ctx.beginPath();
-    ctx.arc(0, 0, radius, startAngle, endAngle);
-    ctx.arc(0, 0, innerRadius, endAngle, startAngle, true);
+    ctx.arc(centerX, centerY, radius, highlightStart, highlightEnd);
+    ctx.arc(centerX, centerY, innerRadius, highlightEnd, highlightStart, true);
     ctx.closePath();
     
     // Bright gold/white border
