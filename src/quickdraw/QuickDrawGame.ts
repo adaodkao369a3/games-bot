@@ -7,6 +7,8 @@ export interface QuickDrawState {
   player2Id: string;
   player1Name: string;
   player2Name: string;
+  player1Avatar: string;
+  player2Avatar: string;
   isGameOver: boolean;
   winner?: string;
   loser?: string;
@@ -40,7 +42,9 @@ export class QuickDrawGame {
     player1Id: string,
     player1Name: string,
     player2Id: string,
-    player2Name: string
+    player2Name: string,
+    player1Avatar: string,
+    player2Avatar: string
   ) {
     this.state = {
       channelId,
@@ -49,6 +53,8 @@ export class QuickDrawGame {
       player2Id,
       player1Name,
       player2Name,
+      player1Avatar,
+      player2Avatar,
       isGameOver: false,
       setupStartTime: Date.now(),
     };
@@ -276,32 +282,59 @@ export class QuickDrawGame {
   private createInitialEmbed() {
     return {
       title: '🤠 QUICK DRAW',
-      description: `<@${this.state.player1Id}> VS <@${this.state.player2Id}>\n\nGet ready...`,
+      description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\nGet ready...`,
       color: 0xFFD700,
+      thumbnail: {
+        url: this.state.player1Avatar,
+      },
+      image: {
+        url: this.state.player2Avatar,
+      },
+      footer: {
+        text: 'First to draw wins.',
+      },
     };
   }
 
   private createSuspenseEmbed(suspenseText: string) {
     return {
       title: '🤠 QUICK DRAW',
-      description: `<@${this.state.player1Id}> VS <@${this.state.player2Id}>\n\n${suspenseText}`,
+      description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n${suspenseText}`,
       color: 0xFFD700,
+      thumbnail: {
+        url: this.state.player1Avatar,
+      },
+      image: {
+        url: this.state.player2Avatar,
+      },
     };
   }
 
   private createDrawEmbed() {
     return {
-      title: '🤠 QUICK DRAW',
-      description: `<@${this.state.player1Id}> VS <@${this.state.player2Id}>\n\n🔫 DRAW!`,
+      title: '🔫 QUICK DRAW',
+      description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n# 🔫 DRAW!`,
       color: 0xFF0000,
+      thumbnail: {
+        url: this.state.player1Avatar,
+      },
+      image: {
+        url: this.state.player2Avatar,
+      },
     };
   }
 
   private createShotFiredEmbed() {
     return {
-      title: '🔫 QUICK DRAW',
-      description: `💥 Shot fired...\n\n<@${this.state.winner}> VS <@${this.state.loser}>`,
+      title: '� QUICK DRAW',
+      description: `<@${this.state.winner}> **VS** <@${this.state.loser}>\n\n💥 Shot fired...`,
       color: 0xFF4500,
+      thumbnail: {
+        url: this.state.winner === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar,
+      },
+      image: {
+        url: this.state.loser === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar,
+      },
     };
   }
 
@@ -312,16 +345,28 @@ export class QuickDrawGame {
     
     return {
       title: '🔫 WHO SHOT WHO?',
-      description: `💥 <@${this.state.winner}> shot <@${this.state.loser}>!${reactionTimeText}`,
+      description: `🏆 <@${this.state.winner}>\n**shot**\n💀 <@${this.state.loser}>${reactionTimeText}`,
       color: 0xFFD700,
+      thumbnail: {
+        url: this.state.winner === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar,
+      },
+      image: {
+        url: this.state.loser === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar,
+      },
     };
   }
 
   private createTimeoutEmbed() {
     return {
       title: '🤠 QUICK DRAW',
-      description: `<@${this.state.player1Id}> VS <@${this.state.player2Id}>\n\n⏰ Time's up! No one drew.`,
+      description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n⏰ Time's up! No one drew.`,
       color: 0x808080,
+      thumbnail: {
+        url: this.state.player1Avatar,
+      },
+      image: {
+        url: this.state.player2Avatar,
+      },
     };
   }
 

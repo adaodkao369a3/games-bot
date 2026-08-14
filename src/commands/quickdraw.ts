@@ -62,8 +62,10 @@ export async function handleQuickDrawCommand(message: Message, args: string[]): 
     
     const player1Id = message.author.id;
     const player1Name = message.author.displayName || message.author.username;
+    const player1Avatar = message.author.displayAvatarURL({ size: 256 }) || message.author.defaultAvatarURL;
     const player2Id = mentionedUser.id;
     const player2Name = mentionedUser.displayName || mentionedUser.username;
+    const player2Avatar = mentionedUser.displayAvatarURL({ size: 256 }) || mentionedUser.defaultAvatarURL;
     
     // Create new game instance
     const game = new QuickDrawGame(
@@ -72,7 +74,9 @@ export async function handleQuickDrawCommand(message: Message, args: string[]): 
       player1Id,
       player1Name,
       player2Id,
-      player2Name
+      player2Name,
+      player1Avatar,
+      player2Avatar
     );
     
     // Store in active games
