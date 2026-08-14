@@ -70,7 +70,7 @@ export class WheelImageGenerator {
   private static readonly DEFAULT_FRAME_COUNT = 110; // Smoother animation with more frames
   private static readonly OPTION_COUNT = 8; // Always exactly 8 options
   private static readonly SLICE_ANGLE = (Math.PI * 2) / this.OPTION_COUNT; // 45 degrees in radians
-  private static readonly SLICE_CENTER_OFFSET = 0; // Option 0 is centered at the top
+  private static readonly SLICE_CENTER_OFFSET = -Math.PI / 2; // Pointer points down from top (12 o'clock position in canvas coords)
   private static readonly SAFETY_MARGIN = 0.15; // 15% safety margin from slice boundaries
   
   // Wheel asset geometry (actual circular region within wheel.png)
@@ -290,9 +290,9 @@ export class WheelImageGenerator {
     const pointerDrawHeight = this.POINTER_HEIGHT * pointerScale;
     
     // Position pointer at top center of canvas, pointing down into the wheel
-    // Center horizontally, position at top with some padding
+    // Center horizontally, position so the pointer tip aligns with wheel top
     const pointerDrawX = centerX - pointerDrawWidth / 2;
-    const pointerDrawY = 20; // Top padding from canvas edge
+    const pointerDrawY = centerY - wheelSize / 2 - pointerDrawHeight + 30; // Position above wheel with overlap
     
     ctx.drawImage(
       pointerImage,
@@ -315,6 +315,7 @@ export class WheelImageGenerator {
     const innerRadius = radius * 0.2; // Don't highlight center hub
     
     // Calculate angles for the highlighted slice using consistent coordinate system
+    // Slice starts at SLICE_CENTER_OFFSET and spans SLICE_ANGLE
     const startAngle = this.SLICE_CENTER_OFFSET + highlightIndex * this.SLICE_ANGLE;
     const endAngle = startAngle + this.SLICE_ANGLE;
     
