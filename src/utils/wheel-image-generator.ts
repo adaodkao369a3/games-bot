@@ -32,9 +32,6 @@ try {
 }
 
 // Asset paths - check both project root and dist directory
-const wheelPath = existsSync(join(PROJECT_ROOT, 'wheel.png')) 
-  ? join(PROJECT_ROOT, 'wheel.png') 
-  : join(PROJECT_ROOT, 'dist', 'wheel.png');
 const pointerPath = existsSync(join(PROJECT_ROOT, 'pointer.png')) 
   ? join(PROJECT_ROOT, 'pointer.png') 
   : join(PROJECT_ROOT, 'dist', 'pointer.png');
@@ -70,17 +67,22 @@ export class WheelImageGenerator {
   private static readonly DEFAULT_FRAME_COUNT = 110; // Smoother animation with more frames
   private static readonly OPTION_COUNT = 8; // Always exactly 8 options
   private static readonly SLICE_ANGLE = (Math.PI * 2) / this.OPTION_COUNT; // 45 degrees in radians
-  private static readonly SLICE_CENTER_OFFSET = 0; // Wheel asset starts at 0 radians
+  private static readonly BASE_ANGLE = -Math.PI / 2; // Wheel starts at 12 o'clock
   private static readonly SAFETY_MARGIN = 0.15; // 15% safety margin from slice boundaries
   
-  // Wheel asset geometry (actual circular region within wheel.png)
-  private static readonly WHEEL_SOURCE_X = 181;
-  private static readonly WHEEL_SOURCE_Y = 0;
-  private static readonly WHEEL_SOURCE_SIZE = 835;
+  // Slice colors for 8 options
+  private static readonly SLICE_COLORS = [
+    '#FF6B6B', // Red
+    '#4ECDC4', // Teal
+    '#45B7D1', // Blue
+    '#96CEB4', // Green
+    '#FFEAA7', // Yellow
+    '#DDA0DD', // Plum
+    '#98D8C8', // Mint
+    '#F7DC6F', // Light Yellow
+  ];
   
-  // Pointer asset geometry (hub center within pointer.png)
-  private static readonly POINTER_HUB_CENTER_X = 448;
-  private static readonly POINTER_HUB_CENTER_Y = 618;
+  // Pointer asset geometry
   private static readonly POINTER_WIDTH = 924;
   private static readonly POINTER_HEIGHT = 1024;
 
@@ -94,10 +96,7 @@ export class WheelImageGenerator {
       throw new Error('[WheelImageGenerator] Font not loaded - cannot render wheel');
     }
 
-    // Check assets exist
-    if (!existsSync(wheelPath)) {
-      throw new Error(`Wheel asset missing: ${wheelPath}`);
-    }
+    // Check pointer asset exists
     if (!existsSync(pointerPath)) {
       throw new Error(`Pointer asset missing: ${pointerPath}`);
     }
@@ -107,8 +106,7 @@ export class WheelImageGenerator {
     // Calculate target rotation
     const targetRotation = this.calculateTargetRotation(selectedIndex);
 
-    // Load wheel and pointer images
-    const wheelImage = await loadImage(wheelPath);
+    // Load pointer image
     const pointerImage = await loadImage(pointerPath);
 
     // Create GIF encoder
@@ -129,7 +127,7 @@ export class WheelImageGenerator {
       const ctx = canvas.getContext('2d');
 
       // Draw wheel frame
-      await this.drawWheelFrame(ctx, wheelImage, pointerImage, options, currentRotation, canvasSize);
+      await this.drawWheelFrame(ctx, pointerImage, options, currentRotation, canvasSize);
 
       // Get RGBA data
       const imageData = ctx.getImageData(0, 0, canvasSize, canvasSize);
@@ -170,18 +168,14 @@ export class WheelImageGenerator {
       throw new Error('[WheelImageGenerator] Font not loaded - cannot render wheel');
     }
 
-    // Check assets exist
-    if (!existsSync(wheelPath)) {
-      throw new Error(`Wheel asset missing: ${wheelPath}`);
-    }
+    // Check pointer asset exists
     if (!existsSync(pointerPath)) {
       throw new Error(`Pointer asset missing: ${pointerPath}`);
     }
 
     console.log('[WheelImageGenerator] Generating result PNG for option', selectedIndex);
 
-    // Load wheel and pointer images
-    const wheelImage = await loadImage(wheelPath);
+    // Load pointer image
     const pointerImage = await loadImage(pointerPath);
 
     // Create canvas
@@ -189,7 +183,7 @@ export class WheelImageGenerator {
     const ctx = canvas.getContext('2d');
 
     // Draw wheel with final rotation and highlight
-    await this.drawWheelFrame(ctx, wheelImage, pointerImage, options, finalRotation, canvasSize, selectedIndex);
+    await this.drawWheelFrame(ctx, pointerImage, options, finalRotation, canvasSize, selectedIndex);
 
     // Convert to buffer
     const buffer = canvas.toBuffer('image/png');
@@ -208,8 +202,9 @@ export class WheelImageGenerator {
     const fullSpins = 5 + Math.floor(Math.random() * 3);
     const baseRotations = fullSpins * Math.PI * 2;
     
-    // Calculate the center angle of the winning slice
-    const sliceCenterAngle = selectedIndex * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
+    // Calculate the center angle of the winning slice using BASE_ANGLE
+    const sliceStartAngle = this.BASE_ANGLE + selectedIndex * this.SLICE_ANGLE;
+    const sliceCenterAngle = sliceStartAngle + this.SLICE_ANGLE / 2;
     
     // Add safety margin from slice boundaries (15% of slice width)
     const safeMargin = this.SLICE_ANGLE * this.SAFETY_MARGIN;
@@ -236,7 +231,6 @@ export class WheelImageGenerator {
    */
   private static async drawWheelFrame(
     ctx: SKRSContext2D,
-    wheelImage: any,
     pointerImage: any,
     options: WheelOption[],
     rotation: number,
@@ -256,21 +250,11 @@ export class WheelImageGenerator {
     ctx.translate(centerX, centerY);
     ctx.rotate(rotation);
 
-    // Draw wheel image (cropped to actual circular region)
-    // Source: crop from 181,0 with size 835x835 (the actual circular wheel)
-    // Destination: centered on wheel coordinate system
+    // Draw wheel slices dynamically
     const wheelSize = canvasSize * 0.9; // Wheel is 90% of canvas
-    ctx.drawImage(
-      wheelImage,
-      this.WHEEL_SOURCE_X,
-      this.WHEEL_SOURCE_Y,
-      this.WHEEL_SOURCE_SIZE,
-      this.WHEEL_SOURCE_SIZE,
-      -wheelSize / 2,
-      -wheelSize / 2,
-      wheelSize,
-      wheelSize
-    );
+    const radius = wheelSize / 2;
+    
+    this.drawColoredSlices(ctx, radius, options.length);
 
     // Draw option labels (in wheel-local coordinates, passing rotation for proper angle calculation)
     this.drawOptionLabels(ctx, options, wheelSize, rotation);
@@ -284,7 +268,7 @@ export class WheelImageGenerator {
     }
 
     // Draw fixed pointer at center of wheel (doesn't rotate with wheel)
-    const pointerScale = wheelSize / this.WHEEL_SOURCE_SIZE * 0.25;
+    const pointerScale = wheelSize / this.POINTER_WIDTH * 0.25;
     const pointerDrawWidth = this.POINTER_WIDTH * pointerScale;
     const pointerDrawHeight = this.POINTER_HEIGHT * pointerScale;
     
@@ -298,6 +282,33 @@ export class WheelImageGenerator {
       pointerDrawWidth,
       pointerDrawHeight
     );
+  }
+
+  /**
+   * Draw colored wheel slices dynamically
+   */
+  private static drawColoredSlices(
+    ctx: SKRSContext2D,
+    radius: number,
+    sliceCount: number
+  ): void {
+    for (let i = 0; i < sliceCount; i++) {
+      const startAngle = this.BASE_ANGLE + i * this.SLICE_ANGLE;
+      const endAngle = startAngle + this.SLICE_ANGLE;
+      
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, radius, startAngle, endAngle);
+      ctx.closePath();
+      
+      ctx.fillStyle = this.SLICE_COLORS[i % this.SLICE_COLORS.length];
+      ctx.fill();
+      
+      // Draw slice separator
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
   }
 
   /**
@@ -315,6 +326,7 @@ export class WheelImageGenerator {
     const innerRadius = 0; // Extend all the way to center
     
     // The highlight should be centered at the upward direction (-Math.PI / 2)
+    // This matches the pointer direction and uses the same coordinate system
     const highlightCenterAngle = -Math.PI / 2;
     
     // The highlight spans exactly one slice width
@@ -357,10 +369,8 @@ export class WheelImageGenerator {
     for (let i = 0; i < options.length; i++) {
       const option = options[i];
       
-      // Calculate slice center angle including wheel rotation
-      // The wheel is already rotated by wheelRotation in the parent context
-      // So we calculate the slice position in the rotated wheel's coordinate system
-      const sliceStartAngle = i * this.SLICE_ANGLE;
+      // Calculate slice center angle using BASE_ANGLE (single source of truth)
+      const sliceStartAngle = this.BASE_ANGLE + i * this.SLICE_ANGLE;
       const sliceCenterAngle = sliceStartAngle + this.SLICE_ANGLE / 2;
       
       // Calculate text position in wheel-local coordinates (context is at wheel center)
