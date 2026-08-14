@@ -86,11 +86,17 @@ export async function handleRouletteCommand(message: Message): Promise<void> {
     // Send initial message
     const initialMessage = await message.reply('🔫 Loading Russian Roulette...');
 
+    // Create cleanup callback
+    const onGameEnd = () => {
+      activeGames.delete(channelId);
+    };
+
     // Create game instance
     const game = new RussianRouletteGame(
       channelId,
       guildId || undefined,
-      participants
+      participants,
+      onGameEnd
     );
 
     // Store game
@@ -98,9 +104,6 @@ export async function handleRouletteCommand(message: Message): Promise<void> {
 
     // Start game
     await game.start(initialMessage);
-
-    // Cleanup when game ends
-    game.getState(); // This will be used to check game state
   } catch (error) {
     activeGames.delete(channelId);
     await ErrorHandler.handleMessageError(message, error, 'roulette command');
@@ -124,11 +127,6 @@ export async function handleRouletteInteraction(interaction: MessageComponentInt
 
   try {
     await game.handleInteraction(interaction);
-
-    // Cleanup if game is finished
-    if (game.isFinished()) {
-      activeGames.delete(channelId);
-    }
   } catch (error) {
     await ErrorHandler.handleInteractionError(interaction, error, 'roulette interaction');
   }

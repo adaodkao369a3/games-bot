@@ -35,6 +35,7 @@ export class RussianRouletteGame {
   private state: RouletteState;
   private currentMessage?: Message;
   private timers: NodeJS.Timeout[] = [];
+  private onGameEnd?: () => void;
 
   // GIF URLs
   private static readonly STARTING_PLAYER_GIF = 'https://c.tenor.com/sjaTtq5lHVwAAAAd/tenor.gif';
@@ -45,7 +46,8 @@ export class RussianRouletteGame {
   constructor(
     channelId: string,
     guildId: string | undefined,
-    players: RoulettePlayer[]
+    players: RoulettePlayer[],
+    onGameEnd?: () => void
   ) {
     this.state = {
       channelId,
@@ -58,6 +60,7 @@ export class RussianRouletteGame {
       chambers: this.initializeChambers(6, 1),
       currentChamberIndex: 0,
     };
+    this.onGameEnd = onGameEnd;
   }
 
   /**
@@ -104,8 +107,11 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    // Wait for GIF to play
-    await this.delay(3000);
+    // Wait for GIF to play (4 seconds)
+    await this.delay(4000);
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
 
     // Randomly select starting player
     this.state.currentPlayerIndex = Math.floor(Math.random() * this.state.players.length);
@@ -131,6 +137,9 @@ export class RussianRouletteGame {
     });
 
     await this.delay(2000);
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
 
     // Start the first turn
     await this.startTurn();
@@ -169,7 +178,11 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    await this.delay(2500);
+    // Wait for GIF to play (3.5 seconds)
+    await this.delay(3500);
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
 
     // Show trigger state
     await this.showTriggerState(player);
@@ -323,7 +336,11 @@ export class RussianRouletteGame {
       components: [],
     });
 
+    // Wait for GIF to play (3 seconds)
     await this.delay(3000);
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
 
     // Move to next player
     this.moveToNextPlayer();
@@ -349,7 +366,11 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    await this.delay(3000);
+    // Wait for GIF to play (3.5 seconds)
+    await this.delay(3500);
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
 
     // Move to next player
     this.moveToNextPlayer();
@@ -425,6 +446,11 @@ export class RussianRouletteGame {
       embeds: [embed],
       components: [],
     });
+
+    // Call cleanup callback to remove game from active games
+    if (this.onGameEnd) {
+      this.onGameEnd();
+    }
   }
 
   /**
