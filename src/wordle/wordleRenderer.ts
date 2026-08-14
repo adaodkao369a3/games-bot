@@ -58,6 +58,7 @@ export class WordleRenderer {
     correct: '#538d4e',    // Green
     wrong_position: '#b59f3b', // Yellow
     not_found: '#3a3a3c',  // Gray
+    unused: '#818384',     // Light gray for unused keys
     text: '#ffffff',
   };
   
@@ -77,7 +78,7 @@ export class WordleRenderer {
     // Calculate dimensions
     const boardWidth = wordLength * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_PADDING;
     const boardHeight = maxGuesses * (this.CELL_SIZE + this.CELL_PADDING) + this.BOARD_TOP_PADDING;
-    const keyboardHeight = 100;
+    const keyboardHeight = 130; // Increased for larger keys
     const totalHeight = boardHeight + keyboardHeight + 20;
     
     // Create canvas
@@ -171,20 +172,26 @@ export class WordleRenderer {
       'ZXCVBNM'
     ];
     
-    const keySize = 30;
-    const keyPadding = 4;
+    const keySize = 35;
+    const keyPadding = 6;
+    const rowOffset = 8; // Extra offset for middle and bottom rows
     
     let currentY = startY;
     
-    for (const row of rows) {
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      const row = rows[rowIndex];
       const rowWidth = row.length * (keySize + keyPadding) + keyPadding;
       const startX = (boardWidth - rowWidth) / 2;
       
+      // Add offset for middle and bottom rows to match Wordle layout
+      const rowOffsetX = rowIndex === 1 ? rowOffset : (rowIndex === 2 ? rowOffset * 2 : 0);
+      
       for (let i = 0; i < row.length; i++) {
         const letter = row[i];
-        const x = startX + i * (keySize + keyPadding);
+        const x = startX + i * (keySize + keyPadding) + rowOffsetX;
         
-        let fillColor = this.COLORS.empty;
+        // Determine key color based on state with proper priority
+        let fillColor = this.COLORS.unused; // Default to unused (light gray)
         const state = keyboardStates.get(letter);
         
         if (state) {
@@ -201,23 +208,25 @@ export class WordleRenderer {
           }
         }
         
-        // Draw key
+        // Draw key background
         ctx.fillStyle = fillColor;
-        this.roundRect(ctx, x, currentY, keySize, keySize, 3);
+        this.roundRect(ctx, x, currentY, keySize, keySize, 4);
         ctx.fill();
         
-        // Draw border
-        ctx.strokeStyle = this.COLORS.border;
-        ctx.lineWidth = 1;
-        this.roundRect(ctx, x, currentY, keySize, keySize, 3);
-        ctx.stroke();
+        // Draw border (only for unused keys to match Wordle style)
+        if (!state) {
+          ctx.strokeStyle = this.COLORS.border;
+          ctx.lineWidth = 2;
+          this.roundRect(ctx, x, currentY, keySize, keySize, 4);
+          ctx.stroke();
+        }
         
         // Draw letter
         const centerX = x + keySize / 2;
         const centerY = currentY + keySize / 2;
         
         ctx.fillStyle = this.COLORS.text;
-        ctx.font = 'bold 16px Roboto';
+        ctx.font = 'bold 18px Roboto';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(letter, centerX, centerY);
@@ -263,7 +272,7 @@ export class WordleRenderer {
       case LetterState.NOT_FOUND:
         return this.COLORS.not_found;
       default:
-        return this.COLORS.empty;
+        return this.COLORS.unused;
     }
   }
   
