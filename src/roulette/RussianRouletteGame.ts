@@ -107,8 +107,8 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    // Wait for GIF to play (4 seconds)
-    await this.delay(4000);
+    // Wait for GIF to play (5 seconds minimum)
+    await this.delay(5000);
 
     // Check if game is still active
     if (this.state.isGameOver) return;
@@ -136,6 +136,7 @@ export class RussianRouletteGame {
       embeds: [embed],
     });
 
+    // Transition pause before first turn
     await this.delay(2000);
 
     // Check if game is still active
@@ -178,8 +179,14 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    // Wait for GIF to play (3.5 seconds)
-    await this.delay(3500);
+    // Wait for GIF to play (4 seconds minimum)
+    await this.delay(4000);
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
+
+    // Transition pause before trigger state
+    await this.delay(1500);
 
     // Check if game is still active
     if (this.state.isGameOver) return;
@@ -312,6 +319,12 @@ export class RussianRouletteGame {
 
     this.state.currentChamberIndex++;
 
+    // Suspense before revealing result
+    await this.delay(1500);
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
+
     if (hasBullet) {
       await this.showBulletResult(currentPlayer);
     } else {
@@ -336,8 +349,14 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    // Wait for GIF to play (3 seconds)
-    await this.delay(3000);
+    // Wait for GIF to play (4 seconds minimum)
+    await this.delay(4000);
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
+
+    // Transition pause before next player
+    await this.delay(2000);
 
     // Check if game is still active
     if (this.state.isGameOver) return;
@@ -366,11 +385,24 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    // Wait for GIF to play (3.5 seconds)
-    await this.delay(3500);
+    // Wait for GIF to play (5 seconds minimum)
+    await this.delay(5000);
 
     // Check if game is still active
     if (this.state.isGameOver) return;
+
+    // Transition pause after elimination
+    await this.delay(2000);
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
+
+    // Check win condition BEFORE moving to next player
+    // This ensures the death GIF plays fully before winner is shown
+    if (this.checkWinCondition()) {
+      await this.showWinner();
+      return;
+    }
 
     // Move to next player
     this.moveToNextPlayer();
