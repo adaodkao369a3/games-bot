@@ -6,6 +6,9 @@ import { handleSmashCommand, handleSmashVote } from '../commands/smash.js';
 import { handleWordleCommand, handleWordleGuess } from '../commands/wordle.js';
 import { handleFontTestCommand } from '../commands/fontTest.js';
 import { handleSmashTestCommand } from '../commands/smashTest.js';
+import { handleWheelCommand } from '../commands/wheel.js';
+import { handleWheelFontTestCommand } from '../commands/wheelFontTest.js';
+import { handleWheelTestCommand } from '../commands/wheelTest.js';
 
 export class DiscordClient {
   private client: Client;
@@ -73,6 +76,21 @@ export class DiscordClient {
 
       if (command === 'smashtest') {
         await handleSmashTestCommand(message);
+        return;
+      }
+
+      if (command === 'wheel') {
+        await handleWheelCommand(message, args);
+        return;
+      }
+
+      if (command === 'wheeltest') {
+        await handleWheelTestCommand(message);
+        return;
+      }
+
+      if (command === 'wheelfonttest') {
+        await handleWheelFontTestCommand(message);
         return;
       }
     }
