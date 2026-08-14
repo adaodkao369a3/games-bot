@@ -107,8 +107,8 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    // Wait for GIF to play (5 seconds minimum)
-    await this.delay(5000);
+    // Wait for GIF to play (exactly 11 seconds)
+    await this.delay(11000);
 
     // Check if game is still active
     if (this.state.isGameOver) return;
@@ -179,7 +179,7 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    // Wait for GIF to play (4 seconds minimum)
+    // Wait for GIF to play (exactly 4 seconds)
     await this.delay(4000);
 
     // Check if game is still active
@@ -349,7 +349,7 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    // Wait for GIF to play (4 seconds minimum)
+    // Wait for GIF to play (exactly 4 seconds)
     await this.delay(4000);
 
     // Check if game is still active
@@ -385,8 +385,8 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    // Wait for GIF to play (5 seconds minimum)
-    await this.delay(5000);
+    // Wait for GIF to play (exactly 8 seconds)
+    await this.delay(8000);
 
     // Check if game is still active
     if (this.state.isGameOver) return;
