@@ -70,7 +70,7 @@ export class WheelImageGenerator {
   private static readonly DEFAULT_FRAME_COUNT = 110; // Smoother animation with more frames
   private static readonly OPTION_COUNT = 8; // Always exactly 8 options
   private static readonly SLICE_ANGLE = (Math.PI * 2) / this.OPTION_COUNT; // 45 degrees in radians
-  private static readonly SLICE_CENTER_OFFSET = -Math.PI / 2; // Option 0 starts at top
+  private static readonly SLICE_CENTER_OFFSET = 0; // Option 0 is centered at the top
   private static readonly SAFETY_MARGIN = 0.15; // 15% safety margin from slice boundaries
   
   // Wheel asset geometry (actual circular region within wheel.png)
