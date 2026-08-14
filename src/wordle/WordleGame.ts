@@ -1,5 +1,6 @@
 import { WordleEvaluator, LetterState, EvaluatedGuess } from './wordleEvaluator.js';
 import { WordProvider } from './wordProvider.js';
+import { Message } from 'discord.js';
 
 export interface WordleGameState {
   channelId: string;
@@ -26,6 +27,8 @@ export interface GuessValidationResult {
 export class WordleGame {
   private state: WordleGameState;
   private wordProvider: WordProvider;
+  private currentMessage?: Message;
+  private updateLock: Promise<any> = Promise.resolve();
   
   constructor(
     channelId: string,
@@ -159,6 +162,40 @@ export class WordleGame {
    */
   setMessageId(messageId: string): void {
     this.state.messageId = messageId;
+  }
+
+  /**
+   * Set the current Discord message object
+   */
+  setCurrentMessage(message: Message): void {
+    this.currentMessage = message;
+    this.state.messageId = message.id;
+  }
+
+  /**
+   * Get the current Discord message object
+   */
+  getCurrentMessage(): Message | undefined {
+    return this.currentMessage;
+  }
+
+  /**
+   * Run an update with concurrency safety
+   */
+  async runUpdate<T>(updateFn: () => Promise<T>): Promise<T> {
+    // Wait for any previous update to complete
+    await this.updateLock;
+    
+    // Create a new lock for this update
+    const currentUpdate = updateFn().finally(() => {
+      // Release the lock when done
+      if (this.updateLock === currentUpdate) {
+        this.updateLock = Promise.resolve();
+      }
+    });
+    
+    this.updateLock = currentUpdate;
+    return currentUpdate;
   }
   
   /**

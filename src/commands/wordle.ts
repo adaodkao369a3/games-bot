@@ -63,8 +63,8 @@ export async function handleWordleCommand(message: Message, args: string[]): Pro
       embeds: [embed],
     });
     
-    // Store the message ID for updates
-    game.setMessageId(replyMessage.id);
+    // Store the message object for updates
+    game.setCurrentMessage(replyMessage);
     
   } catch (error) {
     await ErrorHandler.handleMessageError(message, error, 'wordle');
@@ -140,51 +140,59 @@ export async function handleWordleGuess(message: Message): Promise<void> {
  * Update the game message with new board state
  */
 async function updateGameMessage(game: WordleGame, channel: any, lastPlayer: string): Promise<void> {
-  const messageId = game.getMessageId();
-  const channelId = game.getChannelId();
-  
-  if (!messageId || !channelId) {
-    console.error('[Wordle Update] Missing message ID or channel ID');
-    return;
-  }
-  
-  try {
-    const msgChannel = await channel.client.channels.fetch(channelId);
-    if (msgChannel && 'messages' in msgChannel) {
-      const message = await msgChannel.messages.fetch(messageId);
-      
+  await game.runUpdate(async () => {
+    const oldMessage = game.getCurrentMessage();
+    const channelId = game.getChannelId();
+    
+    if (!channelId) {
+      console.error('[Wordle Update] Missing channel ID');
+      return;
+    }
+    
+    try {
       const uiData = createUIDataFromGame(game);
       const { embed, attachment } = await WordleUI.createGameMessage(uiData, lastPlayer);
       
-      await message.edit({
+      // Send new message
+      const newMessage = await channel.send({
         files: [attachment],
         embeds: [embed],
       });
       
-      console.log('[Wordle Update] Board updated successfully');
+      // Store new message as current
+      game.setCurrentMessage(newMessage);
+      
+      // Delete old message if it exists
+      if (oldMessage) {
+        try {
+          await oldMessage.delete();
+          console.log('[Wordle Update] Previous board message deleted');
+        } catch (error) {
+          console.warn('[Wordle Update] Could not delete previous board message:', error);
+        }
+      }
+      
+      console.log('[Wordle Update] Board updated successfully with new message');
+    } catch (error) {
+      console.error('[Wordle Update] Failed to update message:', error);
     }
-  } catch (error) {
-    console.error('[Wordle Update] Failed to update message:', error);
-  }
+  });
 }
 
 /**
  * Announce the winner
  */
 async function announceWinner(game: WordleGame, channel: any, winner: string, secretWord: string): Promise<void> {
-  const messageId = game.getMessageId();
-  const channelId = game.getChannelId();
-  
-  if (!messageId || !channelId) {
-    console.error('[Wordle Winner] Missing message ID or channel ID');
-    return;
-  }
-  
-  try {
-    const msgChannel = await channel.client.channels.fetch(channelId);
-    if (msgChannel && 'messages' in msgChannel) {
-      const message = await msgChannel.messages.fetch(messageId);
-      
+  await game.runUpdate(async () => {
+    const oldMessage = game.getCurrentMessage();
+    const channelId = game.getChannelId();
+    
+    if (!channelId) {
+      console.error('[Wordle Winner] Missing channel ID');
+      return;
+    }
+    
+    try {
       // Generate final board image
       const uiData = createUIDataFromGame(game);
       const attachment = await WordleUI.generateBoardAttachment(uiData);
@@ -192,38 +200,49 @@ async function announceWinner(game: WordleGame, channel: any, winner: string, se
       const winEmbed = WordleUI.createWinEmbed(winner, secretWord, game.getGuessCount());
       winEmbed.setImage(`attachment://${attachment.name}`);
       
-      await message.edit({
+      // Send new message
+      const newMessage = await channel.send({
         files: [attachment],
         embeds: [winEmbed],
       });
+      
+      // Store new message as current
+      game.setCurrentMessage(newMessage);
+      
+      // Delete old message if it exists
+      if (oldMessage) {
+        try {
+          await oldMessage.delete();
+          console.log('[Wordle Winner] Previous board message deleted');
+        } catch (error) {
+          console.warn('[Wordle Winner] Could not delete previous board message:', error);
+        }
+      }
       
       // Send a congratulatory message
       await channel.send(BobKunPersonality.wordleWinner(winner, secretWord));
       
       console.log('[Wordle Winner] Winner announced successfully');
+    } catch (error) {
+      console.error('[Wordle Winner] Failed to announce winner:', error);
     }
-  } catch (error) {
-    console.error('[Wordle Winner] Failed to announce winner:', error);
-  }
+  });
 }
 
 /**
  * Announce game over
  */
 async function announceGameOver(game: WordleGame, channel: any, secretWord: string): Promise<void> {
-  const messageId = game.getMessageId();
-  const channelId = game.getChannelId();
-  
-  if (!messageId || !channelId) {
-    console.error('[Wordle GameOver] Missing message ID or channel ID');
-    return;
-  }
-  
-  try {
-    const msgChannel = await channel.client.channels.fetch(channelId);
-    if (msgChannel && 'messages' in msgChannel) {
-      const message = await msgChannel.messages.fetch(messageId);
-      
+  await game.runUpdate(async () => {
+    const oldMessage = game.getCurrentMessage();
+    const channelId = game.getChannelId();
+    
+    if (!channelId) {
+      console.error('[Wordle GameOver] Missing channel ID');
+      return;
+    }
+    
+    try {
       // Generate final board image
       const uiData = createUIDataFromGame(game);
       const attachment = await WordleUI.generateBoardAttachment(uiData);
@@ -231,19 +250,33 @@ async function announceGameOver(game: WordleGame, channel: any, secretWord: stri
       const gameOverEmbed = WordleUI.createGameOverEmbed(secretWord, game.getGuessCount());
       gameOverEmbed.setImage(`attachment://${attachment.name}`);
       
-      await message.edit({
+      // Send new message
+      const newMessage = await channel.send({
         files: [attachment],
         embeds: [gameOverEmbed],
       });
+      
+      // Store new message as current
+      game.setCurrentMessage(newMessage);
+      
+      // Delete old message if it exists
+      if (oldMessage) {
+        try {
+          await oldMessage.delete();
+          console.log('[Wordle GameOver] Previous board message deleted');
+        } catch (error) {
+          console.warn('[Wordle GameOver] Could not delete previous board message:', error);
+        }
+      }
       
       // Send a game over message
       await channel.send(BobKunPersonality.wordleGameOver(secretWord));
       
       console.log('[Wordle GameOver] Game over announced successfully');
+    } catch (error) {
+      console.error('[Wordle GameOver] Failed to announce game over:', error);
     }
-  } catch (error) {
-    console.error('[Wordle GameOver] Failed to announce game over:', error);
-  }
+  });
 }
 
 /**
