@@ -353,15 +353,13 @@ export class QuickDrawGame {
   private createResultEmbed() {
     const reactionTime = this.state.reactionTime || 0;
     const formattedSeconds = (reactionTime / 1000).toFixed(3);
-    const winnerAvatar = this.state.winner === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar;
-    const loserAvatar = this.state.loser === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar;
     const winGif = this.state.winner === this.state.player1Id ? QuickDrawGame.PLAYER1_WIN_GIF : QuickDrawGame.PLAYER2_WIN_GIF;
 
     return new EmbedBuilder()
       .setTitle('🏆 QUICK DRAW RESULTS')
       .setColor(0xFFD700)
-      .setThumbnail(winnerAvatar)
       .setDescription(
+        `🔫 <@${this.state.winner}> VS <@${this.state.loser}>\n\n` +
         `### 🥇 <@${this.state.winner}> is the fastest gun!\n\n` +
         `🎯 **Reaction Time:** \`${formattedSeconds}s\` (${reactionTime}ms)\n` +
         `💀 **Fallen Cowboy:** <@${this.state.loser}>`
