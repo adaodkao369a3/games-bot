@@ -1,4 +1,4 @@
-import { Message, AttachmentBuilder } from 'discord.js';
+import { Message, AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import { WheelImageGenerator, WheelOption } from '../utils/wheel-image-generator.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
@@ -30,11 +30,9 @@ export async function handleWheelTestCommand(message: Message): Promise<void> {
     // Calculate final rotation
     const finalRotation = WheelImageGenerator.getFinalRotation(selectedIndex);
 
-    // Send initial message
-    const initialContent = `🧪 <@${message.author.id}> is testing the wheel...`;
-    const replyMessage = await message.reply({
-      content: initialContent,
-    });
+    // Send initial message with embed
+    const timestamp = Date.now();
+    const gifFilename = `wheel-test-spin-${timestamp}.gif`;
 
     // Generate animated GIF
     console.log('[WheelTest] Generating spinning GIF...');
@@ -46,12 +44,14 @@ export async function handleWheelTestCommand(message: Message): Promise<void> {
       frameCount: 40,
     });
 
-    // Create attachment
-    const gifAttachment = new AttachmentBuilder(gifBuffer, { name: 'wheel-test-spin.gif' });
+    // Create attachment and embed
+    const gifAttachment = new AttachmentBuilder(gifBuffer, { name: gifFilename });
+    const initialEmbed = new EmbedBuilder()
+      .setDescription(`🧪 <@${message.author.id}> is testing the wheel...`)
+      .setImage(`attachment://${gifFilename}`);
 
-    // Edit message with GIF
-    await replyMessage.edit({
-      content: initialContent,
+    const replyMessage = await message.reply({
+      embeds: [initialEmbed],
       files: [gifAttachment],
     });
 
@@ -62,6 +62,7 @@ export async function handleWheelTestCommand(message: Message): Promise<void> {
 
     // Generate final result PNG
     console.log('[WheelTest] Generating final result PNG...');
+    const pngFilename = `wheel-test-result-${Date.now()}.png`;
     const pngBuffer = await WheelImageGenerator.generateResultPNG({
       options: testOptions,
       selectedIndex,
@@ -69,15 +70,20 @@ export async function handleWheelTestCommand(message: Message): Promise<void> {
       canvasSize: 800,
     });
 
-    // Create final attachment
-    const pngAttachment = new AttachmentBuilder(pngBuffer, { name: 'wheel-test-result.png' });
-
-    // Create final message content
-    const finalContent = `🧪 <@${message.author.id}> tested the wheel!\n\n**${selectedOption.label}**\n\n${selectedOption.description}`;
+    // Create final attachment and embed
+    const pngAttachment = new AttachmentBuilder(pngBuffer, { name: pngFilename });
+    const finalEmbed = new EmbedBuilder()
+      .setDescription(
+        `🧪 <@${message.author.id}> tested the wheel!\n\n` +
+        `🎯 **${selectedOption.label}**\n\n` +
+        `${selectedOption.description}`
+      )
+      .setImage(`attachment://${pngFilename}`);
 
     // Edit message with final result
     await replyMessage.edit({
-      content: finalContent,
+      content: '',
+      embeds: [finalEmbed],
       files: [pngAttachment],
     });
 

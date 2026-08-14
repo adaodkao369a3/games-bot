@@ -70,6 +70,18 @@ export class WheelImageGenerator {
   private static readonly DEFAULT_FRAME_COUNT = 40;
   private static readonly OPTION_COUNT = 8; // Always exactly 8 options
   private static readonly SLICE_ANGLE = (Math.PI * 2) / this.OPTION_COUNT; // 45 degrees in radians
+  private static readonly SLICE_CENTER_OFFSET = -Math.PI / 2; // Option 0 starts at top
+  
+  // Wheel asset geometry (actual circular region within wheel.png)
+  private static readonly WHEEL_SOURCE_X = 181;
+  private static readonly WHEEL_SOURCE_Y = 0;
+  private static readonly WHEEL_SOURCE_SIZE = 835;
+  
+  // Pointer asset geometry (hub center within pointer.png)
+  private static readonly POINTER_HUB_CENTER_X = 448;
+  private static readonly POINTER_HUB_CENTER_Y = 618;
+  private static readonly POINTER_WIDTH = 924;
+  private static readonly POINTER_HEIGHT = 1024;
 
   /**
    * Generate animated GIF of wheel spinning
@@ -186,29 +198,22 @@ export class WheelImageGenerator {
 
   /**
    * Calculate target rotation to land on selected option
-   * The pointer points UP (270 degrees or -90 degrees in canvas coordinates)
+   * The pointer points UP (at SLICE_CENTER_OFFSET)
    */
   private static calculateTargetRotation(selectedIndex: number): number {
     // Add multiple full rotations for visual effect (5 rotations)
     const baseRotations = 5 * Math.PI * 2;
     
     // Calculate angle needed to put selected option under the pointer
-    // Pointer is at top (270 degrees / -90 degrees / 3π/2 radians)
-    const pointerAngle = (3 * Math.PI) / 2;
+    // The center of the selected option should align with SLICE_CENTER_OFFSET (top/upward)
+    const optionCenterAngle = this.SLICE_CENTER_OFFSET + selectedIndex * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
     
-    // Each option occupies SLICE_ANGLE radians
-    // The center of the selected option should align with pointerAngle
-    const optionCenterAngle = selectedIndex * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
+    // Calculate rotation needed: we want optionCenterAngle + rotation = SLICE_CENTER_OFFSET
+    // So rotation = SLICE_CENTER_OFFSET - optionCenterAngle
+    const targetAngle = this.SLICE_CENTER_OFFSET - optionCenterAngle;
     
-    // Calculate rotation needed: we want optionCenterAngle + rotation = pointerAngle
-    // So rotation = pointerAngle - optionCenterAngle
-    const targetAngle = pointerAngle - optionCenterAngle;
-    
-    // Add base rotations and normalize to positive
+    // Add base rotations
     const totalRotation = baseRotations + targetAngle;
-    
-    // Normalize to 0-2π range for the final position
-    const normalizedRotation = totalRotation % (Math.PI * 2);
     
     return totalRotation; // Return full rotation including spins
   }
@@ -234,56 +239,72 @@ export class WheelImageGenerator {
     // Save context for wheel rotation
     ctx.save();
     
-    // Translate to center, rotate, translate back
+    // Translate to center and rotate
     ctx.translate(centerX, centerY);
     ctx.rotate(rotation);
-    ctx.translate(-centerX, -centerY);
 
-    // Draw wheel image
+    // Draw wheel image (cropped to actual circular region)
+    // Source: crop from 181,0 with size 835x835 (the actual circular wheel)
+    // Destination: centered on wheel coordinate system
     const wheelSize = canvasSize * 0.9; // Wheel is 90% of canvas
-    const wheelX = (canvasSize - wheelSize) / 2;
-    const wheelY = (canvasSize - wheelSize) / 2;
-    ctx.drawImage(wheelImage, wheelX, wheelY, wheelSize, wheelSize);
+    ctx.drawImage(
+      wheelImage,
+      this.WHEEL_SOURCE_X,
+      this.WHEEL_SOURCE_Y,
+      this.WHEEL_SOURCE_SIZE,
+      this.WHEEL_SOURCE_SIZE,
+      -wheelSize / 2,
+      -wheelSize / 2,
+      wheelSize,
+      wheelSize
+    );
 
-    // Draw highlight if specified
+    // Draw highlight if specified (in wheel-local coordinates)
     if (highlightIndex !== undefined) {
-      this.drawSliceHighlight(ctx, centerX, centerY, wheelSize, highlightIndex);
+      this.drawSliceHighlight(ctx, wheelSize, highlightIndex);
     }
 
-    // Draw option labels
-    this.drawOptionLabels(ctx, options, centerX, centerY, wheelSize);
+    // Draw option labels (in wheel-local coordinates)
+    this.drawOptionLabels(ctx, options, wheelSize);
 
-    // Restore context (undo rotation)
+    // Restore context (undo rotation and translation)
     ctx.restore();
 
-    // Draw fixed pointer on top (doesn't rotate)
-    const pointerSize = canvasSize * 0.15; // Pointer is 15% of canvas
-    const pointerX = centerX - pointerSize / 2;
-    const pointerY = 20; // Position at top with some padding
-    ctx.drawImage(pointerImage, pointerX, pointerY, pointerSize, pointerSize);
+    // Draw fixed pointer/hub on top (doesn't rotate)
+    // Scale pointer to be proportional to wheel
+    const pointerScale = wheelSize / this.WHEEL_SOURCE_SIZE * 0.25; // Pointer is 25% of wheel size
+    const pointerDrawWidth = this.POINTER_WIDTH * pointerScale;
+    const pointerDrawHeight = this.POINTER_HEIGHT * pointerScale;
+    
+    // Position pointer so its hub center is exactly at wheel center
+    const pointerDrawX = centerX - this.POINTER_HUB_CENTER_X * pointerScale;
+    const pointerDrawY = centerY - this.POINTER_HUB_CENTER_Y * pointerScale;
+    
+    ctx.drawImage(
+      pointerImage,
+      pointerDrawX,
+      pointerDrawY,
+      pointerDrawWidth,
+      pointerDrawHeight
+    );
   }
 
   /**
-   * Draw highlight around winning slice
+   * Draw highlight around winning slice (in wheel-local coordinates)
    */
   private static drawSliceHighlight(
     ctx: SKRSContext2D,
-    centerX: number,
-    centerY: number,
     wheelSize: number,
     highlightIndex: number
   ): void {
     const radius = wheelSize / 2;
     const innerRadius = radius * 0.2; // Don't highlight center hub
     
-    // Calculate angles for the highlighted slice
-    const startAngle = highlightIndex * this.SLICE_ANGLE;
+    // Calculate angles for the highlighted slice using consistent coordinate system
+    const startAngle = this.SLICE_CENTER_OFFSET + highlightIndex * this.SLICE_ANGLE;
     const endAngle = startAngle + this.SLICE_ANGLE;
     
-    ctx.save();
-    ctx.translate(centerX, centerY);
-    
-    // Draw highlight arc
+    // Draw highlight arc (context is already at wheel center)
     ctx.beginPath();
     ctx.arc(0, 0, radius, startAngle, endAngle);
     ctx.arc(0, 0, innerRadius, endAngle, startAngle, true);
@@ -297,18 +318,14 @@ export class WheelImageGenerator {
     // Subtle glow overlay
     ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
     ctx.fill();
-    
-    ctx.restore();
   }
 
   /**
-   * Draw option labels rotating with the wheel
+   * Draw option labels rotating with the wheel (in wheel-local coordinates)
    */
   private static drawOptionLabels(
     ctx: SKRSContext2D,
     options: WheelOption[],
-    centerX: number,
-    centerY: number,
     wheelSize: number
   ): void {
     const radius = wheelSize / 2;
@@ -322,12 +339,12 @@ export class WheelImageGenerator {
     for (let i = 0; i < options.length; i++) {
       const option = options[i];
       
-      // Calculate angle for this option's center
-      const textAngle = i * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
+      // Calculate angle for this option's center using consistent coordinate system
+      const textAngle = this.SLICE_CENTER_OFFSET + i * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
       
-      // Calculate text position
-      const textX = centerX + Math.cos(textAngle) * textRadius;
-      const textY = centerY + Math.sin(textAngle) * textRadius;
+      // Calculate text position in wheel-local coordinates (context is at wheel center)
+      const textX = Math.cos(textAngle) * textRadius;
+      const textY = Math.sin(textAngle) * textRadius;
       
       // Save context for text rotation
       ctx.save();

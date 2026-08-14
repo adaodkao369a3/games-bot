@@ -1,4 +1,4 @@
-import { Message, AttachmentBuilder } from 'discord.js';
+import { Message, AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import { WheelImageGenerator } from '../utils/wheel-image-generator.js';
 import { getWheelCategories, getWheelOptions, isValidCategory, wheelCategories } from '../utils/wheel-data.js';
 import { ErrorHandler } from '../utils/error-handler.js';
@@ -96,12 +96,10 @@ async function startWheelSpin(message: Message, category: string, options: any[]
     // Calculate final rotation
     const finalRotation = WheelImageGenerator.getFinalRotation(selectedIndex);
 
-    // Send initial spinning message
-    const initialContent = `🎡 <@${message.author.id}> is spinning the wheel...`;
-    const replyMessage = await message.reply({
-      content: initialContent,
-    });
-
+    // Send initial spinning message with embed
+    const timestamp = Date.now();
+    const gifFilename = `wheel-spin-${timestamp}.gif`;
+    
     // Generate animated GIF
     console.log('[Wheel] Generating spinning GIF...');
     const gifBuffer = await WheelImageGenerator.generateSpinningGIF({
@@ -112,12 +110,14 @@ async function startWheelSpin(message: Message, category: string, options: any[]
       frameCount: 40,
     });
 
-    // Create attachment
-    const gifAttachment = new AttachmentBuilder(gifBuffer, { name: 'wheel-spin.gif' });
+    // Create attachment and embed
+    const gifAttachment = new AttachmentBuilder(gifBuffer, { name: gifFilename });
+    const initialEmbed = new EmbedBuilder()
+      .setDescription(`🎡 <@${message.author.id}> is spinning the wheel...`)
+      .setImage(`attachment://${gifFilename}`);
 
-    // Edit message with GIF
-    await replyMessage.edit({
-      content: initialContent,
+    const replyMessage = await message.reply({
+      embeds: [initialEmbed],
       files: [gifAttachment],
     });
 
@@ -128,6 +128,7 @@ async function startWheelSpin(message: Message, category: string, options: any[]
 
     // Generate final result PNG
     console.log('[Wheel] Generating final result PNG...');
+    const pngFilename = `wheel-result-${Date.now()}.png`;
     const pngBuffer = await WheelImageGenerator.generateResultPNG({
       options,
       selectedIndex,
@@ -135,15 +136,21 @@ async function startWheelSpin(message: Message, category: string, options: any[]
       canvasSize: 800,
     });
 
-    // Create final attachment
-    const pngAttachment = new AttachmentBuilder(pngBuffer, { name: 'wheel-result.png' });
-
-    // Create final message content
-    const finalContent = `🎡 <@${message.author.id}> spun the wheel!\n\n**${selectedOption.label}**\n\n${selectedOption.description}\n\n⏳ Wheel cooldown: 2 minutes`;
+    // Create final attachment and embed
+    const pngAttachment = new AttachmentBuilder(pngBuffer, { name: pngFilename });
+    const finalEmbed = new EmbedBuilder()
+      .setDescription(
+        `🎡 <@${message.author.id}> spun the wheel!\n\n` +
+        `🎯 **${selectedOption.label}**\n\n` +
+        `${selectedOption.description}\n\n` +
+        `⏳ Wheel cooldown: 2 minutes`
+      )
+      .setImage(`attachment://${pngFilename}`);
 
     // Edit message with final result
     await replyMessage.edit({
-      content: finalContent,
+      content: '',
+      embeds: [finalEmbed],
       files: [pngAttachment],
     });
 
