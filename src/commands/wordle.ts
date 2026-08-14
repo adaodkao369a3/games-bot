@@ -35,7 +35,7 @@ export async function handleWordleCommand(message: Message, args: string[]): Pro
     }
     
     // Create new game instance
-    const game = new WordleGame(channelId, guildId, wordProvider, 6, 5);
+    const game = new WordleGame(channelId, guildId, wordProvider, 6, 8);
     
     // Initialize the game (fetch secret word)
     try {

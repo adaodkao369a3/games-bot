@@ -48,7 +48,7 @@ export class WordleRenderer {
   private static readonly CELL_SIZE = 60;
   private static readonly CELL_PADDING = 5;
   private static readonly BOARD_TOP_PADDING = 20;
-  private static readonly KEYBOARD_TOP_PADDING = 350;
+  private static readonly KEYBOARD_TOP_PADDING = 560;
   
   // Colors
   private static readonly COLORS = {

@@ -12,6 +12,7 @@ export interface WordleGameState {
   winner?: string;
   messageId?: string;
   startTime: number;
+  playerCooldowns: Map<string, number>;
 }
 
 export interface GuessValidationResult {
@@ -31,7 +32,7 @@ export class WordleGame {
     guildId: string | undefined,
     wordProvider: WordProvider,
     wordLength: number = 6,
-    maxGuesses: number = 5
+    maxGuesses: number = 8
   ) {
     this.wordProvider = wordProvider;
     this.state = {
@@ -43,6 +44,7 @@ export class WordleGame {
       wordLength,
       isGameOver: false,
       startTime: Date.now(),
+      playerCooldowns: new Map<string, number>(),
     };
   }
   
@@ -66,6 +68,15 @@ export class WordleGame {
     // Check if max guesses reached
     if (this.state.guesses.length >= this.state.maxGuesses) {
       return { isValid: false, error: 'Maximum guesses reached' };
+    }
+    
+    // Check player cooldown
+    const cooldownUntil = this.state.playerCooldowns.get(playerId);
+    if (cooldownUntil && cooldownUntil > Date.now()) {
+      const remainingMs = cooldownUntil - Date.now();
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      const timeText = remainingSeconds === 1 ? 'second' : 'seconds';
+      return { isValid: false, error: `⏳ You need to wait ${remainingSeconds} ${timeText} before guessing again.` };
     }
     
     // Validate format
@@ -103,6 +114,9 @@ export class WordleGame {
       player: playerName,
       timestamp: Date.now(),
     });
+    
+    // Set player cooldown for 25 seconds
+    this.state.playerCooldowns.set(playerId, Date.now() + 25_000);
     
     // Log keyboard state after this guess
     const keyboardStates = this.getKeyboardStates();
