@@ -5,6 +5,7 @@ import { ErrorHandler } from '../utils/error-handler.js';
 import { handleSmashCommand, handleSmashVote } from '../commands/smash.js';
 import { handleWordleCommand, handleWordleGuess } from '../commands/wordle.js';
 import { handleFontTestCommand } from '../commands/fontTest.js';
+import { handleSmashTestCommand } from '../commands/smashTest.js';
 
 export class DiscordClient {
   private client: Client;
@@ -67,6 +68,11 @@ export class DiscordClient {
 
       if (command === 'fonttest') {
         await handleFontTestCommand(message, args);
+        return;
+      }
+
+      if (command === 'smashtest') {
+        await handleSmashTestCommand(message);
         return;
       }
     }

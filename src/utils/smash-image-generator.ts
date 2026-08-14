@@ -1,23 +1,31 @@
-import sharp from 'sharp';
+import { createCanvas, GlobalFonts, loadImage, SKRSContext2D } from '@napi-rs/canvas';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { existsSync, readFileSync } from 'fs';
 import { cwd } from 'process';
+import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const PROJECT_ROOT = cwd(); // Use current working directory instead of calculated path
+const PROJECT_ROOT = cwd();
 
-// Load font file as base64 for embedding in SVG
+// Font loading using GlobalFonts (same approach as Wordle)
 const fontPath = join(PROJECT_ROOT, 'assets', 'fonts', 'Roboto-Bold.ttf');
-let fontBase64 = '';
+let fontLoaded = false;
+
 try {
   if (existsSync(fontPath)) {
-    const fontBuffer = readFileSync(fontPath);
-    fontBase64 = fontBuffer.toString('base64');
+    const success = GlobalFonts.registerFromPath(fontPath, 'Roboto');
+    if (success) {
+      fontLoaded = true;
+      console.log('[SmashImageGenerator] Font loaded: assets/fonts/Roboto-Bold.ttf');
+    } else {
+      console.error('[SmashImageGenerator] Font registration failed');
+    }
+  } else {
+    console.error('[SmashImageGenerator] Font file not found: assets/fonts/Roboto-Bold.ttf');
   }
 } catch (error) {
-  console.warn('[Image Generator] Could not load font file:', error);
+  console.error('[SmashImageGenerator] Failed to load font:', error);
 }
 
 export interface SmashImageData {
@@ -32,187 +40,129 @@ export interface SmashImageData {
 }
 
 export class SmashImageGenerator {
-  private static readonly IMAGE_WIDTH = 1800; // Two 900x900 avatars side by side (increased for larger display)
-  private static readonly IMAGE_HEIGHT = 900; // Height matches avatar height
-  private static readonly AVATAR_WIDTH = 900; // Square avatar width
-  private static readonly AVATAR_HEIGHT = 900; // Square avatar height
+  private static readonly IMAGE_WIDTH = 1800;
+  private static readonly IMAGE_HEIGHT = 900;
+  private static readonly AVATAR_WIDTH = 900;
+  private static readonly AVATAR_HEIGHT = 900;
+  private static readonly OVERLAY_SIZE = 540;
 
   /**
    * Generate a voting state image with vote counts
    */
   static async generateVotingImage(data: SmashImageData): Promise<Buffer> {
-    const { player1Avatar, player2Avatar, player1Votes, player2Votes } = data;
+    const { player1Avatar, player2Avatar, player1Votes, player2Votes, player1Name, player2Name } = data;
 
-    // Resize avatars to half-width each for seamless layout (no effects for voting stage)
-    const avatar1 = sharp(player1Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
-      fit: 'cover',
-      position: 'center'
-    });
-    const avatar2 = sharp(player2Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
-      fit: 'cover',
-      position: 'center'
-    });
+    if (!fontLoaded) {
+      throw new Error('[SmashImageGenerator] Font not loaded - cannot render image');
+    }
 
-    // Create seamless side-by-side layout
-    const composite = await sharp({
-      create: {
-        width: this.IMAGE_WIDTH,
-        height: this.IMAGE_HEIGHT,
-        channels: 4,
-        background: { r: 54, g: 57, b: 63, alpha: 1 }
-      }
-    })
-    .composite([
-      { input: await avatar1.png().toBuffer(), left: 0, top: 0 },
-      { input: await avatar2.png().toBuffer(), left: this.AVATAR_WIDTH, top: 0 }
-    ])
-    .png()
-    .toBuffer();
+    // Create canvas
+    const canvas = createCanvas(this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
+    const ctx = canvas.getContext('2d');
 
-    // Add text overlays using sharp's text rendering
-    const finalImage = sharp(composite);
-    
-    // Add text overlays using sharp's composite with SVG
-    const svgText = this.createVotingSVG(
-      player1Votes, 
-      player2Votes
-    );
+    // Load avatars
+    const avatar1 = await loadImage(player1Avatar);
+    const avatar2 = await loadImage(player2Avatar);
 
-    return await finalImage
-      .composite([{ input: Buffer.from(svgText), left: 0, top: 0 }])
-      .png()
-      .toBuffer();
+    // Draw avatars with cover cropping
+    this.drawCoverImage(ctx, avatar1, 0, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT);
+    this.drawCoverImage(ctx, avatar2, this.AVATAR_WIDTH, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT);
+
+    // Draw vote counts
+    this.drawVoteCount(ctx, player1Votes, 60, 100, 'left');
+    this.drawVoteCount(ctx, player2Votes, this.IMAGE_WIDTH - 60, 100, 'right');
+
+    // Draw usernames
+    this.drawUsername(ctx, player1Name, this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
+    this.drawUsername(ctx, player2Name, this.AVATAR_WIDTH + this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
+
+    return canvas.toBuffer('image/png');
   }
 
   /**
    * Generate a result image with smash/pass PNG overlays
    */
   static async generateResultImage(data: SmashImageData): Promise<Buffer> {
-    const { player1Avatar, player2Avatar, player1Votes, player2Votes, winner } = data;
-    
-    console.log('[Result Image] Generating result image');
-    
-    const totalVotes = player1Votes + player2Votes;
+    if (!fontLoaded) {
+      throw new Error('[SmashImageGenerator] Font not loaded - cannot render image');
+    }
 
-    // Determine if this is a 0-0 tie (no votes cast) vs a genuine tie with votes
+    const { player1Avatar, player2Avatar, player1Votes, player2Votes, winner, player1Name, player2Name } = data;
+
+    console.log('[SmashImageGenerator] Generating result image');
+
+    const totalVotes = player1Votes + player2Votes;
     const isZeroVoteTie = totalVotes === 0;
 
-    // Apply different avatar treatments based on winner
-    // Winner: lighter treatment (saturation: 0.3, blur: 2)
-    // Loser: darker treatment (saturation: 0.1, brightness: 0.7, blur: 2)
-    // Tie with votes: both get winner treatment
-    const avatar1Treatment = winner === 'player1' || (winner === 'tie' && !isZeroVoteTie) 
-      ? { saturation: 0.3, blur: 2 } // Winner or tie with votes - lighter
-      : { saturation: 0.1, brightness: 0.7, blur: 2 }; // Loser - darker
-    
-    const avatar2Treatment = winner === 'player2' || (winner === 'tie' && !isZeroVoteTie)
-      ? { saturation: 0.3, blur: 2 } // Winner or tie with votes - lighter
-      : { saturation: 0.1, brightness: 0.7, blur: 2 }; // Loser - darker
+    // Create canvas
+    const canvas = createCanvas(this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
+    const ctx = canvas.getContext('2d');
 
-    // Resize avatars to half-width each for seamless layout
-    const avatar1 = sharp(player1Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
-      fit: 'cover',
-      position: 'center'
-    }).modulate(avatar1Treatment);
-    const avatar2 = sharp(player2Avatar).resize(this.AVATAR_WIDTH, this.AVATAR_HEIGHT, {
-      fit: 'cover',
-      position: 'center'
-    }).modulate(avatar2Treatment);
+    // Load avatars
+    const avatar1 = await loadImage(player1Avatar);
+    const avatar2 = await loadImage(player2Avatar);
 
-    // Create seamless side-by-side layout
-    const composite = await sharp({
-      create: {
-        width: this.IMAGE_WIDTH,
-        height: this.IMAGE_HEIGHT,
-        channels: 4,
-        background: { r: 54, g: 57, b: 63, alpha: 1 }
-      }
-    })
-    .composite([
-      { input: await avatar1.png().toBuffer(), left: 0, top: 0 },
-      { input: await avatar2.png().toBuffer(), left: this.AVATAR_WIDTH, top: 0 }
-    ])
-    .png()
-    .toBuffer();
+    // Apply treatments based on winner
+    const avatar1IsWinner = winner === 'player1' || (winner === 'tie' && !isZeroVoteTie);
+    const avatar2IsWinner = winner === 'player2' || (winner === 'tie' && !isZeroVoteTie);
 
-    // Add PNG overlays and text
-    const overlays = [];
-    
-    // Add smash/pass PNG overlays
+    // Draw avatars with cover cropping and treatments
+    this.drawCoverImageWithTreatment(ctx, avatar1, 0, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT, avatar1IsWinner);
+    this.drawCoverImageWithTreatment(ctx, avatar2, this.AVATAR_WIDTH, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT, avatar2IsWinner);
+
+    // Load and draw overlays
     try {
       const smashPath = join(PROJECT_ROOT, 'smash.png');
       const passPath = join(PROJECT_ROOT, 'pass.png');
-      
-      console.log('[Image Generator] Project root:', PROJECT_ROOT);
-      console.log('[Image Generator] Smash path:', smashPath);
-      console.log('[Image Generator] Pass path:', passPath);
-      console.log('[Image Generator] Smash exists:', existsSync(smashPath));
-      console.log('[Image Generator] Pass exists:', existsSync(passPath));
-      console.log('[Image Generator] Current working directory:', process.cwd());
-      
+
       if (!existsSync(smashPath)) {
-        console.error('[Image Generator] smash.png not found at:', smashPath);
         throw new Error(`smash.png not found at ${smashPath}`);
       }
       if (!existsSync(passPath)) {
-        console.error('[Image Generator] pass.png not found at:', passPath);
         throw new Error(`pass.png not found at ${passPath}`);
       }
-      
-      // Load and resize overlay images (scaled up 1.8x for larger canvas)
-      const smashOverlay = await sharp(smashPath).resize(540, 540).png().toBuffer();
-      const passOverlay = await sharp(passPath).resize(540, 540).png().toBuffer();
-      
-      console.log('[Image Generator] Overlay images loaded successfully');
-      console.log('[Image Generator] Smash overlay size:', smashOverlay.length, 'bytes');
-      console.log('[Image Generator] Pass overlay size:', passOverlay.length, 'bytes');
-      
-      // Position overlays on respective avatars (centered on each half)
-      // Special case: 0-0 tie means both get "pass" instead of "smash"
+
+      const smashOverlay = await loadImage(smashPath);
+      const passOverlay = await loadImage(passPath);
+
+      // Position overlays (centered on each half: 900/2 - 540/2 = 180)
+      const overlayX1 = 180;
+      const overlayX2 = 1080; // 900 + 180
+      const overlayY = 180;
+
       if (isZeroVoteTie) {
-        overlays.push({ input: passOverlay, left: 180, top: 180 }); // Pass on player1 (900/2 - 540/2 = 180)
-        overlays.push({ input: passOverlay, left: 1080, top: 180 }); // Pass on player2 (900 + 900/2 - 540/2 = 1080)
-        console.log('[Image Generator] 0-0 tie: adding pass overlay to both players');
+        // Both get pass
+        ctx.drawImage(passOverlay, overlayX1, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
+        ctx.drawImage(passOverlay, overlayX2, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
       } else {
         // Normal winner/loser or genuine tie with votes
         if (winner === 'player1' || winner === 'tie') {
-          overlays.push({ input: smashOverlay, left: 180, top: 180 }); // Center on player1 side (900/2 - 540/2 = 180)
-          console.log('[Image Generator] Adding smash overlay to player1 at (180, 180)');
+          ctx.drawImage(smashOverlay, overlayX1, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
         }
         if (winner === 'player2' || winner === 'tie') {
-          overlays.push({ input: smashOverlay, left: 1080, top: 180 }); // Center on player2 side (900 + 900/2 - 540/2 = 1080)
-          console.log('[Image Generator] Adding smash overlay to player2 at (1080, 180)');
+          ctx.drawImage(smashOverlay, overlayX2, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
         }
         if (winner === 'player1') {
-          overlays.push({ input: passOverlay, left: 1080, top: 180 }); // Pass on player2
-          console.log('[Image Generator] Adding pass overlay to player2 at (1080, 180)');
+          ctx.drawImage(passOverlay, overlayX2, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
         }
         if (winner === 'player2') {
-          overlays.push({ input: passOverlay, left: 180, top: 180 }); // Pass on player1
-          console.log('[Image Generator] Adding pass overlay to player1 at (180, 180)');
+          ctx.drawImage(passOverlay, overlayX1, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
         }
       }
-      
-      console.log('[Image Generator] Total overlays to apply:', overlays.length);
     } catch (error) {
-      console.error('[Image Generator] Failed to load overlay images:', error);
-      if (error instanceof Error) {
-        console.error('[Image Generator] Error details:', error.message);
-      }
-      throw error; // Re-throw to ensure the error is visible
+      console.error('[SmashImageGenerator] Failed to load overlay images:', error);
+      throw error;
     }
 
-    // Add SVG text overlay
-    const svgText = this.createResultSVG(
-      player1Votes, 
-      player2Votes
-    );
-    overlays.push({ input: Buffer.from(svgText), left: 0, top: 0 });
+    // Draw vote counts
+    this.drawVoteCount(ctx, player1Votes, 60, 100, 'left');
+    this.drawVoteCount(ctx, player2Votes, this.IMAGE_WIDTH - 60, 100, 'right');
 
-    return await sharp(composite)
-      .composite(overlays)
-      .png()
-      .toBuffer();
+    // Draw usernames
+    this.drawUsername(ctx, player1Name, this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
+    this.drawUsername(ctx, player2Name, this.AVATAR_WIDTH + this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
+
+    return canvas.toBuffer('image/png');
   }
 
   /**
@@ -224,61 +174,154 @@ export class SmashImageGenerator {
     return Buffer.from(arrayBuffer);
   }
 
-  private static createVotingSVG(
-    player1Votes: number,
-    player2Votes: number
-  ): string {
-    const voteCountFontSize = 140; // Increased for better readability on large canvas
+  /**
+   * Draw image with cover cropping (object-fit: cover behavior)
+   */
+  private static drawCoverImage(
+    ctx: any,
+    image: any,
+    destX: number,
+    destY: number,
+    destWidth: number,
+    destHeight: number
+  ): void {
+    const imgRatio = image.width / image.height;
+    const destRatio = destWidth / destHeight;
 
-    // Include embedded font if available, otherwise fall back to system fonts
-    const fontFace = fontBase64 ? `
-      <style>
-        @font-face {
-          font-family: 'Roboto-Bold';
-          src: url('data:font/truetype;charset=utf-8;base64,${fontBase64}') format('truetype');
-        }
-        .vote-text { font-family: 'Roboto-Bold', Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif; }
-      </style>
-    ` : '';
+    let sourceX = 0;
+    let sourceY = 0;
+    let sourceWidth = image.width;
+    let sourceHeight = image.height;
 
-    return `
-      <svg width="${this.IMAGE_WIDTH}" height="${this.IMAGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-        ${fontFace}
-        <!-- Player 1 Vote Count - Top Left Corner -->
-        <text x="60" y="100" class="vote-text" font-size="${voteCountFontSize}" fill="white" text-anchor="start" font-weight="bold">${player1Votes}</text>
-        
-        <!-- Player 2 Vote Count - Top Right Corner -->
-        <text x="${this.IMAGE_WIDTH - 60}" y="100" class="vote-text" font-size="${voteCountFontSize}" fill="white" text-anchor="end" font-weight="bold">${player2Votes}</text>
-      </svg>
-    `;
+    if (imgRatio > destRatio) {
+      // Image is wider than destination - crop sides
+      sourceWidth = image.height * destRatio;
+      sourceX = (image.width - sourceWidth) / 2;
+    } else {
+      // Image is taller than destination - crop top/bottom
+      sourceHeight = image.width / destRatio;
+      sourceY = (image.height - sourceHeight) / 2;
+    }
+
+    ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, destX, destY, destWidth, destHeight);
   }
 
-  private static createResultSVG(
-    player1Votes: number,
-    player2Votes: number
-  ): string {
-    const voteCountFontSize = 140; // Increased for better readability on large canvas
+  /**
+   * Draw image with cover cropping and winner/loser treatment
+   */
+  private static drawCoverImageWithTreatment(
+    ctx: any,
+    image: any,
+    destX: number,
+    destY: number,
+    destWidth: number,
+    destHeight: number,
+    isWinner: boolean
+  ): void {
+    // Save context state
+    ctx.save();
 
-    // Include embedded font if available, otherwise fall back to system fonts
-    const fontFace = fontBase64 ? `
-      <style>
-        @font-face {
-          font-family: 'Roboto-Bold';
-          src: url('data:font/truetype;charset=utf-8;base64,${fontBase64}') format('truetype');
-        }
-        .vote-text { font-family: 'Roboto-Bold', Ubuntu, Cantarell, DejaVu Sans, Liberation Sans, Helvetica, Arial, sans-serif; }
-      </style>
-    ` : '';
+    // Draw the image with cover cropping
+    this.drawCoverImage(ctx, image, destX, destY, destWidth, destHeight);
 
-    return `
-      <svg width="${this.IMAGE_WIDTH}" height="${this.IMAGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-        ${fontFace}
-        <!-- Player 1 Vote Count - Top Left Corner -->
-        <text x="60" y="100" class="vote-text" font-size="${voteCountFontSize}" fill="white" text-anchor="start" font-weight="bold">${player1Votes}</text>
-        
-        <!-- Player 2 Vote Count - Top Right Corner -->
-        <text x="${this.IMAGE_WIDTH - 60}" y="100" class="vote-text" font-size="${voteCountFontSize}" fill="white" text-anchor="end" font-weight="bold">${player2Votes}</text>
-      </svg>
-    `;
+    // Apply treatment using Canvas filters
+    if (isWinner) {
+      // Winner: lighter treatment (similar to saturation: 0.3)
+      ctx.filter = 'saturate(30%) brightness(110%)';
+    } else {
+      // Loser: darker treatment (similar to saturation: 0.1, brightness: 0.7)
+      ctx.filter = 'saturate(10%) brightness(70%)';
+    }
+
+    // Re-draw the image with filter applied
+    this.drawCoverImage(ctx, image, destX, destY, destWidth, destHeight);
+
+    // Restore context state
+    ctx.restore();
+  }
+
+  /**
+   * Draw vote count with text shadow for readability
+   */
+  private static drawVoteCount(
+    ctx: any,
+    votes: number,
+    x: number,
+    y: number,
+    align: 'left' | 'right'
+  ): void {
+    const fontSize = 140;
+    const text = votes.toString();
+    const voteLabel = votes === 1 ? 'vote' : 'votes';
+
+    ctx.font = `bold ${fontSize}px Roboto`;
+    ctx.textAlign = align;
+    ctx.textBaseline = 'middle';
+
+    // Draw shadow for readability
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+
+    // Draw vote count
+    ctx.fillStyle = 'white';
+    ctx.fillText(text, x, y);
+
+    // Draw vote label (smaller)
+    const labelFontSize = 40;
+    ctx.font = `bold ${labelFontSize}px Roboto`;
+    const labelY = y + fontSize / 2 + labelFontSize / 2 + 10;
+    ctx.fillText(voteLabel, x, labelY);
+
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  }
+
+  /**
+   * Draw username with dynamic font sizing to fit within max width
+   */
+  private static drawUsername(
+    ctx: any,
+    name: string,
+    centerX: number,
+    y: number,
+    maxWidth: number
+  ): void {
+    const maxFontSize = 50;
+    const minFontSize = 20;
+    let fontSize = maxFontSize;
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+
+    // Find appropriate font size
+    while (fontSize > minFontSize) {
+      ctx.font = `bold ${fontSize}px Roboto`;
+      const metrics = ctx.measureText(name);
+      if (metrics.width <= maxWidth) {
+        break;
+      }
+      fontSize -= 2;
+    }
+
+    // Draw shadow for readability
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+
+    // Draw username
+    ctx.fillStyle = 'white';
+    ctx.fillText(name, centerX, y);
+
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
   }
 }
