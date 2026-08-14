@@ -1,4 +1,5 @@
-import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction } from 'discord.js';
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder } from 'discord.js';
+import { QuickDrawImageGenerator } from '../utils/quickdraw-image-generator.js';
 
 export interface QuickDrawState {
   channelId: string;
@@ -67,10 +68,11 @@ export class QuickDrawGame {
     this.currentMessage = message;
     
     // Initial duel message
-    const initialEmbed = this.createInitialEmbed();
+    const initialEmbed = await this.createInitialEmbed();
     await this.currentMessage.edit({
       content: null,
-      embeds: [initialEmbed],
+      embeds: [initialEmbed.embed],
+      files: initialEmbed.files,
       components: [],
     });
     
@@ -82,22 +84,45 @@ export class QuickDrawGame {
    * Run the suspense sequence before DRAW
    */
   private async runSuspenseSequence(): Promise<void> {
+    // Countdown phase (3, 2, 1)
+    for (let countdown = 3; countdown >= 1; countdown--) {
+      if (this.state.isGameOver) return;
+      
+      const headerBuffer = await QuickDrawImageGenerator.generateDuelHeader({
+        player1Avatar: this.state.player1Avatar,
+        player2Avatar: this.state.player2Avatar,
+        countdown,
+      });
+      
+      const countdownData = this.createCountdownEmbed(headerBuffer, countdown);
+      await this.currentMessage?.edit({
+        embeds: [countdownData.embed],
+        files: countdownData.files,
+      });
+      
+      await this.delay(1000);
+    }
+    
+    // Suspense phase
     const suspenseMessages = [
       '👀 Don\'t blink...',
       '🤫 ...',
       '⚠️ WAIT...',
     ];
     
-    // Initial setup delay (2-3 seconds)
-    await this.delay(2000 + Math.random() * 1000);
-    
     // Show suspense messages
     for (const suspenseText of suspenseMessages) {
       if (this.state.isGameOver) return;
       
-      const suspenseEmbed = this.createSuspenseEmbed(suspenseText);
+      const headerBuffer = await QuickDrawImageGenerator.generateDuelHeader({
+        player1Avatar: this.state.player1Avatar,
+        player2Avatar: this.state.player2Avatar,
+      });
+      
+      const suspenseData = this.createSuspenseEmbed(headerBuffer, suspenseText);
       await this.currentMessage?.edit({
-        embeds: [suspenseEmbed],
+        embeds: [suspenseData.embed],
+        files: suspenseData.files,
       });
       
       await this.delay(1500 + Math.random() * 1000);
@@ -121,7 +146,7 @@ export class QuickDrawGame {
     
     this.state.drawStartTime = Date.now();
     
-    const drawEmbed = this.createDrawEmbed();
+    const drawData = await this.createDrawEmbed();
     const row = new ActionRowBuilder<ButtonBuilder>()
       .addComponents(
         new ButtonBuilder()
@@ -131,7 +156,8 @@ export class QuickDrawGame {
       );
     
     await this.currentMessage.edit({
-      embeds: [drawEmbed],
+      embeds: [drawData.embed],
+      files: drawData.files,
       components: [row],
     });
     
@@ -189,57 +215,19 @@ export class QuickDrawGame {
           .setDisabled(true)
       );
     
-    await this.currentMessage?.edit({
+    // Create victory embed with GIF embedded
+    const victoryEmbed = this.createResultEmbed();
+    
+    await interaction.update({
+      embeds: [victoryEmbed],
       components: [row],
     });
-    
-    await interaction.deferUpdate();
-    
-    // Show suspense after shot
-    await this.showShotFiredSuspense();
-    
-    // Show final result
-    await this.showFinalResult();
     
     return {
       winner,
       loser,
       reactionTime,
     };
-  }
-
-  /**
-   * Show suspense after shot is fired
-   */
-  private async showShotFiredSuspense(): Promise<void> {
-    const suspenseEmbed = this.createShotFiredEmbed();
-    await this.currentMessage?.edit({
-      embeds: [suspenseEmbed],
-    });
-    
-    await this.delay(2000);
-  }
-
-  /**
-   * Show final result with GIF
-   */
-  private async showFinalResult(): Promise<void> {
-    const resultEmbed = this.createResultEmbed();
-    const gifUrl = this.state.winner === this.state.player1Id 
-      ? QuickDrawGame.PLAYER1_WIN_GIF 
-      : QuickDrawGame.PLAYER2_WIN_GIF;
-    
-    await this.currentMessage?.edit({
-      embeds: [resultEmbed],
-      files: [],
-    });
-    
-    // Send GIF as separate message (only if channel supports it)
-    if (this.currentMessage && 'send' in this.currentMessage.channel) {
-      await this.currentMessage.channel.send({
-        content: gifUrl,
-      });
-    }
   }
 
   /**
@@ -279,48 +267,72 @@ export class QuickDrawGame {
   }
 
   // Embed creation methods
-  private createInitialEmbed() {
+  private async createInitialEmbed(): Promise<{ embed: any; files: any[] }> {
+    const headerBuffer = await QuickDrawImageGenerator.generateDuelHeader({
+      player1Avatar: this.state.player1Avatar,
+      player2Avatar: this.state.player2Avatar,
+    });
+
     return {
-      title: '🤠 QUICK DRAW',
-      description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\nGet ready...`,
-      color: 0xFFD700,
-      thumbnail: {
-        url: this.state.player1Avatar,
+      embed: {
+        title: '🤠 QUICK DRAW',
+        description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\nGet ready...`,
+        color: 0xFFD700,
+        image: {
+          url: 'attachment://header.png',
+        },
+        footer: {
+          text: 'First to draw wins.',
+        },
       },
-      image: {
-        url: this.state.player2Avatar,
-      },
-      footer: {
-        text: 'First to draw wins.',
-      },
+      files: [{ attachment: headerBuffer, name: 'header.png' }],
     };
   }
 
-  private createSuspenseEmbed(suspenseText: string) {
+  private createCountdownEmbed(headerBuffer: Buffer, countdown: number): { embed: any; files: any[] } {
     return {
-      title: '🤠 QUICK DRAW',
-      description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n${suspenseText}`,
-      color: 0xFFD700,
-      thumbnail: {
-        url: this.state.player1Avatar,
+      embed: {
+        title: '🤠 QUICK DRAW',
+        description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>`,
+        color: 0xFFD700,
+        image: {
+          url: 'attachment://header.png',
+        },
       },
-      image: {
-        url: this.state.player2Avatar,
-      },
+      files: [{ attachment: headerBuffer, name: 'header.png' }],
     };
   }
 
-  private createDrawEmbed() {
+  private createSuspenseEmbed(headerBuffer: Buffer, suspenseText: string): { embed: any; files: any[] } {
     return {
-      title: '🔫 QUICK DRAW',
-      description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n# 🔫 DRAW!`,
-      color: 0xFF0000,
-      thumbnail: {
-        url: this.state.player1Avatar,
+      embed: {
+        title: '🤠 QUICK DRAW',
+        description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n${suspenseText}`,
+        color: 0xFFD700,
+        image: {
+          url: 'attachment://header.png',
+        },
       },
-      image: {
-        url: this.state.player2Avatar,
+      files: [{ attachment: headerBuffer, name: 'header.png' }],
+    };
+  }
+
+  private async createDrawEmbed(): Promise<{ embed: any; files: any[] }> {
+    const headerBuffer = await QuickDrawImageGenerator.generateDuelHeader({
+      player1Avatar: this.state.player1Avatar,
+      player2Avatar: this.state.player2Avatar,
+    });
+
+    return {
+      embed: {
+        title: '🔫 QUICK DRAW',
+        description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n# 🔫 DRAW!`,
+        color: 0xFF0000,
+        image: {
+          url: 'attachment://header.png',
+        },
       },
+      files: [{ attachment: headerBuffer, name: 'header.png' }],
     };
   }
 
@@ -339,21 +351,23 @@ export class QuickDrawGame {
   }
 
   private createResultEmbed() {
-    const reactionTimeText = this.state.reactionTime 
-      ? `\n⚡ Reaction time: ${this.state.reactionTime}ms` 
-      : '';
-    
-    return {
-      title: '🔫 WHO SHOT WHO?',
-      description: `🏆 <@${this.state.winner}>\n**shot**\n💀 <@${this.state.loser}>${reactionTimeText}`,
-      color: 0xFFD700,
-      thumbnail: {
-        url: this.state.winner === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar,
-      },
-      image: {
-        url: this.state.loser === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar,
-      },
-    };
+    const reactionTime = this.state.reactionTime || 0;
+    const formattedSeconds = (reactionTime / 1000).toFixed(3);
+    const winnerAvatar = this.state.winner === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar;
+    const loserAvatar = this.state.loser === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar;
+    const winGif = this.state.winner === this.state.player1Id ? QuickDrawGame.PLAYER1_WIN_GIF : QuickDrawGame.PLAYER2_WIN_GIF;
+
+    return new EmbedBuilder()
+      .setTitle('🏆 QUICK DRAW RESULTS')
+      .setColor(0xFFD700)
+      .setThumbnail(winnerAvatar)
+      .setDescription(
+        `### 🥇 <@${this.state.winner}> is the fastest gun!\n\n` +
+        `🎯 **Reaction Time:** \`${formattedSeconds}s\` (${reactionTime}ms)\n` +
+        `💀 **Fallen Cowboy:** <@${this.state.loser}>`
+      )
+      .setImage(winGif)
+      .setFooter({ text: 'Fastest trigger finger in the server!' });
   }
 
   private createTimeoutEmbed() {
