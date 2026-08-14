@@ -4,6 +4,7 @@ import { BobKunPersonality } from '../services/bob-kun-personality.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { handleSmashCommand, handleSmashVote } from '../commands/smash.js';
 import { handleWordleCommand, handleWordleGuess } from '../commands/wordle.js';
+import { handleFontTestCommand } from '../commands/fontTest.js';
 
 export class DiscordClient {
   private client: Client;
@@ -40,7 +41,7 @@ export class DiscordClient {
     console.log(`Logged in as ${this.client.user?.tag}`);
     
     // Set bot status
-    this.client.user?.setActivity('Smash This & Wordle', { type: 3 as any });
+    this.client.user?.setActivity('googoo gaga niggas', { type: 3 as any });
   }
 
   private async onMessageCreate(message: any): Promise<void> {
@@ -61,6 +62,11 @@ export class DiscordClient {
 
       if (command === 'wordle') {
         await handleWordleCommand(message, args);
+        return;
+      }
+
+      if (command === 'fonttest') {
+        await handleFontTestCommand(message, args);
         return;
       }
     }
