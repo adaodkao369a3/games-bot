@@ -312,16 +312,9 @@ export class WheelImageGenerator {
     const centerX = ctx.canvas.width / 2;
     const centerY = ctx.canvas.height / 2;
     const radius = wheelSize / 2;
-    const innerRadius = radius * 0.2; // Don't highlight center hub
-    
-    // Calculate the winning slice's center angle in wheel coordinates
-    const sliceCenterAngle = highlightIndex * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
-    
-    // The winning slice's final angle after wheel rotation
-    const finalSliceAngle = sliceCenterAngle + wheelRotation;
+    const innerRadius = 0; // Extend all the way to center
     
     // The highlight should be centered at the upward direction (-Math.PI / 2)
-    // Calculate the rotation needed to center the highlight at upward direction
     const highlightCenterAngle = -Math.PI / 2;
     
     // The highlight spans exactly one slice width
