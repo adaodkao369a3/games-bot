@@ -1,25 +1,8 @@
 import sharp from 'sharp';
 import { LetterState, EvaluatedGuess } from './wordleEvaluator.js';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { existsSync, readFileSync } from 'fs';
-import { cwd } from 'process';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const PROJECT_ROOT = cwd();
-
-// Load font file as base64 for embedding in SVG
-const fontPath = join(PROJECT_ROOT, 'assets', 'fonts', 'Roboto-Bold.ttf');
-let fontBase64 = '';
-try {
-  if (existsSync(fontPath)) {
-    const fontBuffer = readFileSync(fontPath);
-    fontBase64 = fontBuffer.toString('base64');
-  }
-} catch (error) {
-  console.warn('[WordleRenderer] Could not load font file:', error);
-}
+// We'll use system fonts instead of embedding to avoid large SVG files
+// Railway should have standard fonts available
 
 export interface WordleBoardData {
   guesses: EvaluatedGuess[];
@@ -58,6 +41,8 @@ export class WordleRenderer {
   static async generateBoard(data: WordleBoardData): Promise<Buffer> {
     const { guesses, maxGuesses, wordLength, keyboardStates, isGameOver, guessCount } = data;
     
+    console.log('[WordleRenderer] Generating board with', guesses.length, 'guesses');
+    
     // Create SVG with board and keyboard
     const svg = this.createBoardSVG(guesses, maxGuesses, wordLength, keyboardStates);
     
@@ -66,13 +51,15 @@ export class WordleRenderer {
       .png()
       .toBuffer();
     
+    console.log('[WordleRenderer] Generated image buffer size:', image.length);
+    
     return image;
   }
   
   /**
    * Create SVG for the Wordle board
    */
-  private static createBoardSVG(
+  static createBoardSVG(
     guesses: EvaluatedGuess[],
     maxGuesses: number,
     wordLength: number,
@@ -83,15 +70,11 @@ export class WordleRenderer {
     const keyboardHeight = 100;
     const totalHeight = boardHeight + keyboardHeight + 20;
     
-    const fontFace = fontBase64 ? `
+    const fontFace = `
       <style>
-        @font-face {
-          font-family: 'Roboto-Bold';
-          src: url('data:font/truetype;charset=utf-8;base64,${fontBase64}') format('truetype');
-        }
-        .letter { font-family: 'Roboto-Bold', Arial, sans-serif; font-weight: bold; }
+        .letter { font-family: 'Arial', 'Helvetica', 'DejaVu Sans', 'Liberation Sans', sans-serif; font-weight: bold; }
       </style>
-    ` : '';
+    `;
     
     let svg = `
       <svg width="${boardWidth}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">
@@ -133,18 +116,18 @@ export class WordleRenderer {
         
         if (letter) {
           const centerX = x + this.CELL_SIZE / 2;
-          const centerY = y + this.CELL_SIZE / 2 + this.CELL_SIZE * 0.35;
+          const centerY = y + this.CELL_SIZE / 2;
           svg += `
             <text x="${centerX}" y="${centerY}" class="letter" 
-                  font-size="32" fill="${this.COLORS.text}" 
-                  text-anchor="middle" font-weight="bold">${letter}</text>
+                  font-size="36" fill="${this.COLORS.text}" 
+                  text-anchor="middle" dominant-baseline="central" font-weight="bold">${letter}</text>
           `;
         }
       }
     }
     
     // Draw keyboard
-    svg += this.createKeyboardSVG(keyboardStates, boardWidth, boardHeight + 20);
+    svg += WordleRenderer.createKeyboardSVG(keyboardStates, boardWidth, boardHeight + 20);
     
     svg += '</svg>';
     
@@ -154,7 +137,7 @@ export class WordleRenderer {
   /**
    * Create SVG for the keyboard
    */
-  private static createKeyboardSVG(
+  static createKeyboardSVG(
     keyboardStates: Map<string, LetterState>,
     boardWidth: number,
     startY: number
@@ -202,11 +185,11 @@ export class WordleRenderer {
         `;
         
         const centerX = x + keySize / 2;
-        const centerY = currentY + keySize / 2 + keySize * 0.3;
+        const centerY = currentY + keySize / 2;
         svg += `
           <text x="${centerX}" y="${centerY}" class="letter" 
-                font-size="14" fill="${this.COLORS.text}" 
-                text-anchor="middle" font-weight="bold">${letter}</text>
+                font-size="16" fill="${this.COLORS.text}" 
+                text-anchor="middle" dominant-baseline="central" font-weight="bold">${letter}</text>
         `;
       }
       

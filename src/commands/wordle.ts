@@ -185,9 +185,15 @@ async function announceWinner(game: WordleGame, channel: any, winner: string, se
     if (msgChannel && 'messages' in msgChannel) {
       const message = await msgChannel.messages.fetch(messageId);
       
+      // Generate final board image
+      const uiData = createUIDataFromGame(game);
+      const attachment = await WordleUI.generateBoardAttachment(uiData);
+      
       const winEmbed = WordleUI.createWinEmbed(winner, secretWord, game.getGuessCount());
+      winEmbed.setImage('attachment://wordle-board.png');
       
       await message.edit({
+        files: [attachment],
         embeds: [winEmbed],
       });
       
@@ -218,9 +224,15 @@ async function announceGameOver(game: WordleGame, channel: any, secretWord: stri
     if (msgChannel && 'messages' in msgChannel) {
       const message = await msgChannel.messages.fetch(messageId);
       
+      // Generate final board image
+      const uiData = createUIDataFromGame(game);
+      const attachment = await WordleUI.generateBoardAttachment(uiData);
+      
       const gameOverEmbed = WordleUI.createGameOverEmbed(secretWord, game.getGuessCount());
+      gameOverEmbed.setImage('attachment://wordle-board.png');
       
       await message.edit({
+        files: [attachment],
         embeds: [gameOverEmbed],
       });
       
@@ -240,10 +252,13 @@ async function announceGameOver(game: WordleGame, channel: any, secretWord: stri
 function createUIDataFromGame(game: WordleGame) {
   const publicState = game.getPublicState();
   const keyboardStates = game.getKeyboardStates();
+  const guesses = game.getGuesses();
+  
+  console.log('[Wordle Command] Creating UI data with', guesses.length, 'guesses');
   
   return {
     channelId: game.getChannelId(),
-    guesses: game.getGuesses(),
+    guesses: guesses,
     maxGuesses: game.getMaxGuesses(),
     wordLength: game.getWordLength(),
     guessCount: game.getGuessCount(),

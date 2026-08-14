@@ -65,7 +65,8 @@ export class WordleUI {
       .setTitle('🎉 WE HAVE A WINNER!')
       .setDescription(
         `🏆 **${winner}** guessed the word **${secretWord.toUpperCase()}**!\n\n` +
-        `GG everyone!`
+        `GG everyone!\n\n` +
+        `${this.createLegend()}`
       )
       .setFooter({ text: `Won in ${guessCount} guesses • Bob Kun 🍌` });
     
@@ -81,7 +82,8 @@ export class WordleUI {
       .setTitle('💀 Game Over!')
       .setDescription(
         `The word was **${secretWord.toUpperCase()}**.\n\n` +
-        `Better luck next time!`
+        `Better luck next time!\n\n` +
+        `${this.createLegend()}`
       )
       .setFooter({ text: `${guessCount} / 5 guesses used • Bob Kun 🍌` });
     
