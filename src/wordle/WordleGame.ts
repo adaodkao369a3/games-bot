@@ -84,6 +84,9 @@ export class WordleGame {
     // Evaluate the guess
     const result = WordleEvaluator.evaluate(normalizedGuess, this.state.secretWord);
     
+    console.log('[Wordle] Guess:', normalizedGuess);
+    console.log('[Wordle] Evaluation:', result);
+    
     // Add to guesses
     this.state.guesses.push({
       word: normalizedGuess,
@@ -91,6 +94,10 @@ export class WordleGame {
       player: playerName,
       timestamp: Date.now(),
     });
+    
+    // Log keyboard state after this guess
+    const keyboardStates = this.getKeyboardStates();
+    console.log('[Wordle] Keyboard state after guess:', Object.fromEntries(keyboardStates));
     
     // Check for win
     if (result.isCorrect) {

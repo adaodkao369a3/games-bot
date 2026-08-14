@@ -2,6 +2,8 @@ import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { WordleRenderer } from './wordleRenderer.js';
+import { LetterState } from './wordleEvaluator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -59,14 +61,68 @@ async function testFontRendering(): Promise<void> {
   }
 }
 
-// Run test if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  testFontRendering()
-    .then(() => process.exit(0))
-    .catch((error) => {
-      console.error(error);
-      process.exit(1);
-    });
+export { testFontRendering };
+
+/**
+ * Test keyboard rendering with hardcoded states
+ */
+async function testKeyboardRendering(): Promise<void> {
+  console.log('[Keyboard Test] Starting keyboard rendering test...');
+
+  try {
+    // Create hardcoded keyboard states
+    const keyboardStates = new Map<string, LetterState>([
+      ['A', LetterState.CORRECT],
+      ['B', LetterState.WRONG_POSITION],
+      ['C', LetterState.NOT_FOUND],
+      ['D', LetterState.NOT_FOUND],
+      // All other letters will be unused (undefined in map)
+    ]);
+
+    console.log('[Keyboard Test] Keyboard states:', Object.fromEntries(keyboardStates));
+
+    // Generate board with empty guesses but with keyboard states
+    const boardData = {
+      guesses: [],
+      maxGuesses: 5,
+      wordLength: 6,
+      keyboardStates,
+      isGameOver: false,
+      guessCount: 0,
+    };
+
+    const buffer = await WordleRenderer.generateBoard(boardData);
+    console.log('[Keyboard Test] Generated image buffer size:', buffer.length);
+
+    // Save test image
+    const testPath = join(__dirname, '../../keyboard-test.png');
+    await sharp(buffer).toFile(testPath);
+    console.log('[Keyboard Test] Test image saved to:', testPath);
+
+    console.log('[Keyboard Test] ✓ Keyboard rendering test completed successfully');
+  } catch (error) {
+    console.error('[Keyboard Test] ✗ Keyboard rendering test failed:', error);
+    throw error;
+  }
 }
 
-export { testFontRendering };
+// Run test if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const testType = process.argv[2];
+  
+  if (testType === 'keyboard') {
+    testKeyboardRendering()
+      .then(() => process.exit(0))
+      .catch((error) => {
+        console.error(error);
+        process.exit(1);
+      });
+  } else {
+    testFontRendering()
+      .then(() => process.exit(0))
+      .catch((error) => {
+        console.error(error);
+        process.exit(1);
+      });
+  }
+}
