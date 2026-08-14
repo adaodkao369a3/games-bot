@@ -1,12 +1,21 @@
 import { Message, AttachmentBuilder } from 'discord.js';
 import { FontDiagnostic } from '../wordle/fontDiagnostic.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { isStaff } from '../utils/permissions.js';
 
 /**
- * Handle the font test diagnostic command
+ * Handle the font test diagnostic command (staff only)
  */
 export async function handleFontTestCommand(message: Message, args: string[]): Promise<void> {
   try {
+    // Check staff permission
+    if (!isStaff(message.member)) {
+      await message.reply({
+        content: '❌ This command is restricted to staff members only.',
+      });
+      return;
+    }
+
     console.log('[Font Test Command] Starting font diagnostic test');
     
     // Generate the diagnostic image

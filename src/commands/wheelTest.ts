@@ -1,12 +1,21 @@
 import { Message, AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import { WheelImageGenerator, WheelOption } from '../utils/wheel-image-generator.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { isStaff } from '../utils/permissions.js';
 
 /**
- * Handle the wheel test command
+ * Handle the wheel test command (staff only)
  */
 export async function handleWheelTestCommand(message: Message): Promise<void> {
   try {
+    // Check staff permission
+    if (!isStaff(message.member)) {
+      await message.reply({
+        content: '❌ This command is restricted to staff members only.',
+      });
+      return;
+    }
+
     console.log('[WheelTest] Generating test wheel');
 
     // Create test options with obvious labels

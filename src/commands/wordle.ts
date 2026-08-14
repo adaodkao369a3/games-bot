@@ -4,6 +4,7 @@ import { DatamuseWordProvider } from '../wordle/datamuseProvider.js';
 import { WordleUI } from '../ui/wordle-ui.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { BobKunPersonality } from '../services/bob-kun-personality.js';
+import { isStaff } from '../utils/permissions.js';
 
 // Active games keyed by channel ID
 const activeGames = new Map<string, WordleGame>();
@@ -97,9 +98,10 @@ export async function handleWordleGuess(message: Message): Promise<void> {
     
     const playerName = message.author.displayName || message.author.username;
     const playerId = message.author.id;
+    const staffMember = isStaff(message.member);
     
     // Process the guess
-    const validationResult = await game.processGuess(content, playerId, playerName);
+    const validationResult = await game.processGuess(content, playerId, playerName, staffMember);
     
     if (!validationResult.isValid) {
       // Send error message to user (ephemeral-like via reply)

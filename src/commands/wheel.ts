@@ -2,6 +2,7 @@ import { Message, AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import { WheelImageGenerator } from '../utils/wheel-image-generator.js';
 import { getWheelCategories, getWheelOptions, isValidCategory, wheelCategories } from '../utils/wheel-data.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { isStaff } from '../utils/permissions.js';
 
 // Global wheel state
 let wheelCooldownUntil = 0;
@@ -21,9 +22,9 @@ export async function handleWheelCommand(message: Message, args: string[]): Prom
       return;
     }
 
-    // Check global cooldown
+    // Check global cooldown (staff bypass)
     const now = Date.now();
-    if (now < wheelCooldownUntil) {
+    if (!isStaff(message.member) && now < wheelCooldownUntil) {
       const remainingTime = Math.ceil((wheelCooldownUntil - now) / 1000);
       const minutes = Math.floor(remainingTime / 60);
       const seconds = remainingTime % 60;

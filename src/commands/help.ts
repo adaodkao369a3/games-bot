@@ -1,11 +1,12 @@
-import { Message, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { Message, EmbedBuilder } from 'discord.js';
+import { isStaff } from '../utils/permissions.js';
 
 /**
  * Handle the help command
  */
 export async function handleHelpCommand(message: Message): Promise<void> {
   try {
-    const isStaff = message.member?.permissions.has(PermissionFlagsBits.Administrator) || false;
+    const staffMember = isStaff(message.member);
 
     const embed = new EmbedBuilder()
       .setTitle('🤖 Bob Kun — Commands')
@@ -27,7 +28,7 @@ export async function handleHelpCommand(message: Message): Promise<void> {
     ]);
 
     // Staff-only section
-    if (isStaff) {
+    if (staffMember) {
       embed.addFields([
         {
           name: '🛠️ **Staff Commands**',

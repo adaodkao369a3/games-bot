@@ -62,7 +62,7 @@ export class WordleGame {
   /**
    * Process a guess from a player
    */
-  async processGuess(guess: string, playerId: string, playerName: string): Promise<GuessValidationResult> {
+  async processGuess(guess: string, playerId: string, playerName: string, isStaff: boolean = false): Promise<GuessValidationResult> {
     // Check if game is over
     if (this.state.isGameOver) {
       return { isValid: false, error: 'Game is already over' };
@@ -73,13 +73,15 @@ export class WordleGame {
       return { isValid: false, error: 'Maximum guesses reached' };
     }
     
-    // Check player cooldown
-    const cooldownUntil = this.state.playerCooldowns.get(playerId);
-    if (cooldownUntil && cooldownUntil > Date.now()) {
-      const remainingMs = cooldownUntil - Date.now();
-      const remainingSeconds = Math.ceil(remainingMs / 1000);
-      const timeText = remainingSeconds === 1 ? 'second' : 'seconds';
-      return { isValid: false, error: `⏳ You need to wait ${remainingSeconds} ${timeText} before guessing again.` };
+    // Check player cooldown (staff bypass)
+    if (!isStaff) {
+      const cooldownUntil = this.state.playerCooldowns.get(playerId);
+      if (cooldownUntil && cooldownUntil > Date.now()) {
+        const remainingMs = cooldownUntil - Date.now();
+        const remainingSeconds = Math.ceil(remainingMs / 1000);
+        const timeText = remainingSeconds === 1 ? 'second' : 'seconds';
+        return { isValid: false, error: `⏳ You need to wait ${remainingSeconds} ${timeText} before guessing again.` };
+      }
     }
     
     // Validate format
@@ -118,8 +120,10 @@ export class WordleGame {
       timestamp: Date.now(),
     });
     
-    // Set player cooldown for 25 seconds
-    this.state.playerCooldowns.set(playerId, Date.now() + 25_000);
+    // Set player cooldown for 25 seconds (staff bypass)
+    if (!isStaff) {
+      this.state.playerCooldowns.set(playerId, Date.now() + 25_000);
+    }
     
     // Log keyboard state after this guess
     const keyboardStates = this.getKeyboardStates();

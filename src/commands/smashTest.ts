@@ -1,11 +1,19 @@
 import { Message, AttachmentBuilder } from 'discord.js';
 import { SmashImageGenerator, SmashImageData } from '../utils/smash-image-generator.js';
+import { isStaff } from '../utils/permissions.js';
 
 /**
- * Handle the smash test command to test the Canvas renderer
+ * Handle the smash test command to test the Canvas renderer (staff only)
  */
 export async function handleSmashTestCommand(message: Message): Promise<void> {
   try {
+    // Check staff permission
+    if (!isStaff(message.member)) {
+      await message.reply({
+        content: '❌ This command is restricted to staff members only.',
+      });
+      return;
+    }
     // Use sample avatar URLs (Discord default avatars)
     const sampleAvatar1 = await SmashImageGenerator.downloadAvatar('https://cdn.discordapp.com/embed/avatars/0.png');
     const sampleAvatar2 = await SmashImageGenerator.downloadAvatar('https://cdn.discordapp.com/embed/avatars/1.png');

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { cwd } from 'process';
 import { existsSync } from 'fs';
+import { isStaff } from '../utils/permissions.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -30,10 +31,18 @@ try {
 }
 
 /**
- * Handle the wheel font test command
+ * Handle the wheel font test command (staff only)
  */
 export async function handleWheelFontTestCommand(message: Message): Promise<void> {
   try {
+    // Check staff permission
+    if (!isStaff(message.member)) {
+      await message.reply({
+        content: '❌ This command is restricted to staff members only.',
+      });
+      return;
+    }
+
     console.log('[WheelFontTest] Generating font test image');
 
     if (!fontLoaded) {
