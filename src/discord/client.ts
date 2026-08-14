@@ -9,6 +9,7 @@ import { handleSmashTestCommand } from '../commands/smashTest.js';
 import { handleWheelCommand } from '../commands/wheel.js';
 import { handleWheelFontTestCommand } from '../commands/wheelFontTest.js';
 import { handleWheelTestCommand } from '../commands/wheelTest.js';
+import { handleHelpCommand } from '../commands/help.js';
 
 export class DiscordClient {
   private client: Client;
@@ -91,6 +92,11 @@ export class DiscordClient {
 
       if (command === 'wheelfonttest') {
         await handleWheelFontTestCommand(message);
+        return;
+      }
+
+      if (command === 'help') {
+        await handleHelpCommand(message);
         return;
       }
     }

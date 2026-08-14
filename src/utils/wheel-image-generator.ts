@@ -264,8 +264,8 @@ export class WheelImageGenerator {
       this.drawSliceHighlight(ctx, wheelSize, highlightIndex);
     }
 
-    // Draw option labels (in wheel-local coordinates)
-    this.drawOptionLabels(ctx, options, wheelSize);
+    // Draw option labels (in wheel-local coordinates, passing rotation for proper angle calculation)
+    this.drawOptionLabels(ctx, options, wheelSize, rotation);
 
     // Restore context (undo rotation and translation)
     ctx.restore();
@@ -326,7 +326,8 @@ export class WheelImageGenerator {
   private static drawOptionLabels(
     ctx: SKRSContext2D,
     options: WheelOption[],
-    wheelSize: number
+    wheelSize: number,
+    wheelRotation: number
   ): void {
     const radius = wheelSize / 2;
     const textRadius = radius * 0.67; // Position text at 67% of radius for better slice centering
@@ -339,8 +340,11 @@ export class WheelImageGenerator {
     for (let i = 0; i < options.length; i++) {
       const option = options[i];
       
-      // Calculate angle for this option's center using consistent coordinate system
-      const sliceCenterAngle = this.SLICE_CENTER_OFFSET + i * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
+      // Calculate slice center angle including wheel rotation
+      // The wheel is already rotated by wheelRotation in the parent context
+      // So we calculate the slice position in the rotated wheel's coordinate system
+      const sliceStartAngle = i * this.SLICE_ANGLE;
+      const sliceCenterAngle = sliceStartAngle + this.SLICE_ANGLE / 2;
       
       // Calculate text position in wheel-local coordinates (context is at wheel center)
       const textX = Math.cos(sliceCenterAngle) * textRadius;
@@ -349,13 +353,26 @@ export class WheelImageGenerator {
       // Calculate text rotation to follow radial direction but never be upside down
       let textRotation = sliceCenterAngle;
       
+      // Normalize to -PI to +PI range
+      while (textRotation > Math.PI) {
+        textRotation -= Math.PI * 2;
+      }
+      while (textRotation < -Math.PI) {
+        textRotation += Math.PI * 2;
+      }
+      
       // Flip text 180 degrees if it would be upside down
-      if (textRotation > Math.PI / 2 && textRotation < Math.PI * 1.5) {
+      if (textRotation > Math.PI / 2 || textRotation < -Math.PI / 2) {
         textRotation += Math.PI;
       }
       
-      // Normalize to -PI to +PI range
-      textRotation = ((textRotation + Math.PI) % (Math.PI * 2)) - Math.PI;
+      // Normalize again after flip
+      while (textRotation > Math.PI) {
+        textRotation -= Math.PI * 2;
+      }
+      while (textRotation < -Math.PI) {
+        textRotation += Math.PI * 2;
+      }
       
       // Save context for text rotation
       ctx.save();
