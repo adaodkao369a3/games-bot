@@ -216,7 +216,7 @@ export class WordleGame {
     
     for (const guess of this.state.guesses) {
       for (let i = 0; i < guess.word.length; i++) {
-        const letter = guess.word[i];
+        const letter = guess.word[i].toUpperCase();
         const currentState = guess.result.letters[i];
         
         // Only upgrade state (correct > wrong_position > not_found)

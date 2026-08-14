@@ -192,7 +192,7 @@ export class WordleRenderer {
         
         // Determine key color based on state with proper priority
         let fillColor = this.COLORS.unused; // Default to unused (light gray)
-        const state = keyboardStates.get(letter);
+        const state = keyboardStates.get(letter) ?? keyboardStates.get(letter.toLowerCase());
         
         if (state) {
           switch (state) {
