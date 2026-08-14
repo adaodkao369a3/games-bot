@@ -67,7 +67,7 @@ export interface WheelResultConfig {
 export class WheelImageGenerator {
   private static readonly DEFAULT_CANVAS_SIZE = 800;
   private static readonly DEFAULT_DURATION = 5; // seconds
-  private static readonly DEFAULT_FRAME_COUNT = 75; // Increased for smoother animation
+  private static readonly DEFAULT_FRAME_COUNT = 110; // Smoother animation with more frames
   private static readonly OPTION_COUNT = 8; // Always exactly 8 options
   private static readonly SLICE_ANGLE = (Math.PI * 2) / this.OPTION_COUNT; // 45 degrees in radians
   private static readonly SLICE_CENTER_OFFSET = -Math.PI / 2; // Option 0 starts at top
@@ -115,7 +115,7 @@ export class WheelImageGenerator {
     const gif = new GIFEncoder();
 
     // Calculate frame delay in centiseconds (gifenc uses centiseconds)
-    // Use 30ms delay for smooth animation (3 centiseconds)
+    // Use 33ms delay for smooth animation (3.3 centiseconds, rounded to 3)
     const frameDelay = 3;
 
     // Generate frames with easing
@@ -283,15 +283,16 @@ export class WheelImageGenerator {
     // Restore context (undo rotation and translation)
     ctx.restore();
 
-    // Draw fixed pointer/hub on top (doesn't rotate)
+    // Draw fixed pointer at the top center (doesn't rotate with wheel)
     // Scale pointer to be proportional to wheel
     const pointerScale = wheelSize / this.WHEEL_SOURCE_SIZE * 0.25; // Pointer is 25% of wheel size
     const pointerDrawWidth = this.POINTER_WIDTH * pointerScale;
     const pointerDrawHeight = this.POINTER_HEIGHT * pointerScale;
     
-    // Position pointer so its hub center is exactly at wheel center
-    const pointerDrawX = centerX - this.POINTER_HUB_CENTER_X * pointerScale;
-    const pointerDrawY = centerY - this.POINTER_HUB_CENTER_Y * pointerScale;
+    // Position pointer at top center of canvas, pointing down into the wheel
+    // Center horizontally, position at top with some padding
+    const pointerDrawX = centerX - pointerDrawWidth / 2;
+    const pointerDrawY = 20; // Top padding from canvas edge
     
     ctx.drawImage(
       pointerImage,
