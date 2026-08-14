@@ -64,19 +64,43 @@ async function testFontRendering(): Promise<void> {
 export { testFontRendering };
 
 /**
- * Test keyboard rendering with hardcoded states
+ * Test keyboard rendering with full keyboard layout
  */
 async function testKeyboardRendering(): Promise<void> {
   console.log('[Keyboard Test] Starting keyboard rendering test...');
 
   try {
-    // Create hardcoded keyboard states
+    // Create keyboard states for all letters to test full layout
     const keyboardStates = new Map<string, LetterState>([
-      ['A', LetterState.CORRECT],
-      ['B', LetterState.WRONG_POSITION],
-      ['C', LetterState.NOT_FOUND],
+      // Top row: QWERTYUIOP
+      ['Q', LetterState.NOT_FOUND],
+      ['W', LetterState.WRONG_POSITION],
+      ['E', LetterState.CORRECT],
+      ['R', LetterState.NOT_FOUND],
+      ['T', LetterState.WRONG_POSITION],
+      ['Y', LetterState.CORRECT],
+      ['U', LetterState.NOT_FOUND],
+      ['I', LetterState.WRONG_POSITION],
+      ['O', LetterState.CORRECT],
+      ['P', LetterState.NOT_FOUND],
+      // Middle row: ASDFGHJKL
+      ['A', LetterState.WRONG_POSITION],
+      ['S', LetterState.CORRECT],
       ['D', LetterState.NOT_FOUND],
-      // All other letters will be unused (undefined in map)
+      ['F', LetterState.WRONG_POSITION],
+      ['G', LetterState.CORRECT],
+      ['H', LetterState.NOT_FOUND],
+      ['J', LetterState.WRONG_POSITION],
+      ['K', LetterState.CORRECT],
+      ['L', LetterState.NOT_FOUND],
+      // Bottom row: ZXCVBNM
+      ['Z', LetterState.NOT_FOUND],
+      ['X', LetterState.WRONG_POSITION],
+      ['C', LetterState.CORRECT],
+      ['V', LetterState.NOT_FOUND],
+      ['B', LetterState.WRONG_POSITION],
+      ['N', LetterState.CORRECT],
+      ['M', LetterState.NOT_FOUND],
     ]);
 
     console.log('[Keyboard Test] Keyboard states:', Object.fromEntries(keyboardStates));

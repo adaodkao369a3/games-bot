@@ -329,7 +329,7 @@ export class WheelImageGenerator {
     wheelSize: number
   ): void {
     const radius = wheelSize / 2;
-    const textRadius = radius * 0.60; // Position text at 60% of radius
+    const textRadius = radius * 0.67; // Position text at 67% of radius for better slice centering
     const maxFontSize = 28;
     const minFontSize = 16;
 

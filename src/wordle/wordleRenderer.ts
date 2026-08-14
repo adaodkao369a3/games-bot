@@ -172,23 +172,26 @@ export class WordleRenderer {
       'ZXCVBNM'
     ];
     
-    const keySize = 35;
+    const horizontalPadding = 12;
+    let keySize = 35;
     const keyPadding = 6;
-    const rowOffset = 8; // Extra offset for middle and bottom rows
+    
+    // Calculate maximum key width that fits with padding
+    const availableWidth = boardWidth - (horizontalPadding * 2);
+    const maxKeysInRow = 10; // QWERTYUIOP has 10 keys
+    const maxKeyWidth = (availableWidth - ((maxKeysInRow - 1) * keyPadding)) / maxKeysInRow;
+    keySize = Math.min(keySize, maxKeyWidth);
     
     let currentY = startY;
     
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
       const row = rows[rowIndex];
-      const rowWidth = row.length * (keySize + keyPadding) + keyPadding;
+      const rowWidth = row.length * keySize + (row.length - 1) * keyPadding;
       const startX = (boardWidth - rowWidth) / 2;
-      
-      // Add offset for middle and bottom rows to match Wordle layout
-      const rowOffsetX = rowIndex === 1 ? rowOffset : (rowIndex === 2 ? rowOffset * 2 : 0);
       
       for (let i = 0; i < row.length; i++) {
         const letter = row[i];
-        const x = startX + i * (keySize + keyPadding) + rowOffsetX;
+        const x = startX + i * (keySize + keyPadding);
         
         // Determine key color based on state with proper priority
         let fillColor = this.COLORS.unused; // Default to unused (light gray)
