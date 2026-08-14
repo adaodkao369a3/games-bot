@@ -70,7 +70,7 @@ export class WheelImageGenerator {
   private static readonly DEFAULT_FRAME_COUNT = 110; // Smoother animation with more frames
   private static readonly OPTION_COUNT = 8; // Always exactly 8 options
   private static readonly SLICE_ANGLE = (Math.PI * 2) / this.OPTION_COUNT; // 45 degrees in radians
-  private static readonly SLICE_CENTER_OFFSET = -Math.PI / 2; // Option 0 starts at top
+  private static readonly SLICE_CENTER_OFFSET = 0; // Wheel asset starts at 0 radians
   private static readonly SAFETY_MARGIN = 0.15; // 15% safety margin from slice boundaries
   
   // Wheel asset geometry (actual circular region within wheel.png)
@@ -200,7 +200,7 @@ export class WheelImageGenerator {
 
   /**
    * Calculate target rotation to land on selected option
-   * The pointer points UP (at SLICE_CENTER_OFFSET)
+   * The pointer points UP (-Math.PI / 2 in canvas coordinates)
    * Uses safety margin to ensure pointer never lands on slice boundary
    */
   private static calculateTargetRotation(selectedIndex: number): number {
@@ -221,9 +221,9 @@ export class WheelImageGenerator {
     // The final target angle for the slice center
     const targetSliceAngle = sliceCenterAngle + randomOffset;
     
-    // Calculate rotation needed: we want targetSliceAngle + rotation = SLICE_CENTER_OFFSET
-    // So rotation = SLICE_CENTER_OFFSET - targetSliceAngle
-    const targetAngle = this.SLICE_CENTER_OFFSET - targetSliceAngle;
+    // Calculate rotation needed: we want targetSliceAngle + rotation = -Math.PI / 2 (UP)
+    // So rotation = -Math.PI / 2 - targetSliceAngle
+    const targetAngle = -Math.PI / 2 - targetSliceAngle;
     
     // Add base rotations
     const totalRotation = baseRotations + targetAngle;
@@ -283,13 +283,13 @@ export class WheelImageGenerator {
     // Restore context (undo rotation and translation)
     ctx.restore();
 
-    // Draw fixed pointer at top center (doesn't rotate with wheel)
+    // Draw fixed pointer at center of wheel (doesn't rotate with wheel)
     const pointerScale = wheelSize / this.WHEEL_SOURCE_SIZE * 0.25;
     const pointerDrawWidth = this.POINTER_WIDTH * pointerScale;
     const pointerDrawHeight = this.POINTER_HEIGHT * pointerScale;
     
     const pointerDrawX = centerX - pointerDrawWidth / 2;
-    const pointerDrawY = 0;
+    const pointerDrawY = centerY - pointerDrawHeight / 2;
     
     ctx.drawImage(
       pointerImage,
@@ -311,9 +311,9 @@ export class WheelImageGenerator {
     const radius = wheelSize / 2;
     const innerRadius = radius * 0.2; // Don't highlight center hub
     
-    // Calculate angles for the highlighted slice using consistent coordinate system
-    // Slice starts at SLICE_CENTER_OFFSET and spans SLICE_ANGLE
-    const startAngle = this.SLICE_CENTER_OFFSET + highlightIndex * this.SLICE_ANGLE;
+    // Calculate angles for the highlighted slice
+    // Slice starts at index * SLICE_ANGLE and spans SLICE_ANGLE
+    const startAngle = highlightIndex * this.SLICE_ANGLE;
     const endAngle = startAngle + this.SLICE_ANGLE;
     
     // Draw highlight arc (context is already at wheel center)
