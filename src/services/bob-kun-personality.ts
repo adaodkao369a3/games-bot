@@ -36,6 +36,14 @@ export class BobKunPersonality {
     roundAnnouncement: (round: number, total: number) => `${this.EMOJIS.star} ROUND ${round}${total > 0 ? ` of ${total}` : ''} ${this.EMOJIS.star}`,
     nextMatchup: `${this.EMOJIS.banana} Bob Kun presents the next matchup!`,
     error: `${this.EMOJIS.confused} Bob Kun encountered a problem!`,
+    // Wordle-specific messages
+    wordleGameStart: `${this.EMOJIS.banana} Bob Kun started a Wordle game!`,
+    wordleInvalidWord: `${this.EMOJIS.confused} Bob Kun doesn't know that word!`,
+    wordleWrongLength: `${this.EMOJIS.thinking} Bob Kun thinks you need the right number of letters!`,
+    wordleGameAlreadyRunning: `${this.EMOJIS.confused} Bob Kun is already running a Wordle game here!`,
+    wordleWinner: (name: string, word: string) => `${this.EMOJIS.crown} **${name}** guessed **${word}**! Bob Kun is impressed!`,
+    wordleGameOver: (word: string) => `${this.EMOJIS.skull} The word was **${word}**. Bob Kun is sad.`,
+    wordleThinking: `${this.EMOJIS.thinking} Bob Kun is thinking about words...`,
   };
 
   static get ready(): string {
@@ -112,6 +120,35 @@ export class BobKunPersonality {
 
   static get error(): string {
     return this.MESSAGES.error;
+  }
+
+  // Wordle-specific getters
+  static get wordleGameStart(): string {
+    return this.MESSAGES.wordleGameStart;
+  }
+
+  static get wordleInvalidWord(): string {
+    return this.MESSAGES.wordleInvalidWord;
+  }
+
+  static get wordleWrongLength(): string {
+    return this.MESSAGES.wordleWrongLength;
+  }
+
+  static get wordleGameAlreadyRunning(): string {
+    return this.MESSAGES.wordleGameAlreadyRunning;
+  }
+
+  static wordleWinner(name: string, word: string): string {
+    return this.MESSAGES.wordleWinner(name, word);
+  }
+
+  static wordleGameOver(word: string): string {
+    return this.MESSAGES.wordleGameOver(word);
+  }
+
+  static get wordleThinking(): string {
+    return this.MESSAGES.wordleThinking;
   }
 
   static formatWinner(name: string, votes: number, totalVotes: number): string {
