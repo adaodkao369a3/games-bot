@@ -10,6 +10,7 @@ import { handleWheelCommand } from '../commands/wheel.js';
 import { handleWheelFontTestCommand } from '../commands/wheelFontTest.js';
 import { handleWheelTestCommand } from '../commands/wheelTest.js';
 import { handleHelpCommand } from '../commands/help.js';
+import { handleQuickDrawCommand, handleQuickDrawInteraction } from '../commands/quickdraw.js';
 
 export class DiscordClient {
   private client: Client;
@@ -99,6 +100,11 @@ export class DiscordClient {
         await handleHelpCommand(message);
         return;
       }
+
+      if (command === 'quickdraw') {
+        await handleQuickDrawCommand(message, args);
+        return;
+      }
     }
 
     // Check for Wordle guesses (only if not a command)
@@ -116,6 +122,13 @@ export class DiscordClient {
   }
 
   private async handleButtonInteraction(interaction: any): Promise<void> {
+    const customId = interaction.customId;
+    
+    if (customId === 'quickdraw_fire') {
+      await handleQuickDrawInteraction(interaction);
+      return;
+    }
+    
     await handleSmashVote(interaction);
   }
 
