@@ -221,6 +221,8 @@ export class QuickDrawGame {
     await interaction.update({
       embeds: [victoryEmbed],
       components: [row],
+      files: [], // Clear any previous image attachments
+      attachments: [], // Clear any previous attachments
     });
     
     return {
@@ -359,9 +361,9 @@ export class QuickDrawGame {
       .setTitle('🏆 QUICK DRAW RESULTS')
       .setColor(0xFFD700)
       .setDescription(
-        `🔫 <@${this.state.winner}> VS <@${this.state.loser}>\n\n` +
+        `**<@${this.state.winner}> VS <@${this.state.loser}>**\n\n` +
         `### 🥇 <@${this.state.winner}> is the fastest gun!\n\n` +
-        `🎯 **Reaction Time:** \`${formattedSeconds}s\` (${reactionTime}ms)\n` +
+        `🎯 **Reaction Time:** \`${formattedSeconds}s\` (${reactionTime}ms)\n\n` +
         `💀 **Fallen Cowboy:** <@${this.state.loser}>`
       )
       .setImage(winGif)
