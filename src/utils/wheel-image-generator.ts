@@ -329,7 +329,7 @@ export class WheelImageGenerator {
     wheelSize: number
   ): void {
     const radius = wheelSize / 2;
-    const textRadius = radius * 0.65; // Position text at 65% of radius
+    const textRadius = radius * 0.60; // Position text at 60% of radius
     const maxFontSize = 28;
     const minFontSize = 16;
 
@@ -340,18 +340,27 @@ export class WheelImageGenerator {
       const option = options[i];
       
       // Calculate angle for this option's center using consistent coordinate system
-      const textAngle = this.SLICE_CENTER_OFFSET + i * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
+      const sliceCenterAngle = this.SLICE_CENTER_OFFSET + i * this.SLICE_ANGLE + this.SLICE_ANGLE / 2;
       
       // Calculate text position in wheel-local coordinates (context is at wheel center)
-      const textX = Math.cos(textAngle) * textRadius;
-      const textY = Math.sin(textAngle) * textRadius;
+      const textX = Math.cos(sliceCenterAngle) * textRadius;
+      const textY = Math.sin(sliceCenterAngle) * textRadius;
+      
+      // Calculate text rotation to follow radial direction but never be upside down
+      let textRotation = sliceCenterAngle;
+      
+      // Flip text 180 degrees if it would be upside down
+      if (textRotation > Math.PI / 2 && textRotation < Math.PI * 1.5) {
+        textRotation += Math.PI;
+      }
+      
+      // Normalize to -PI to +PI range
+      textRotation = ((textRotation + Math.PI) % (Math.PI * 2)) - Math.PI;
       
       // Save context for text rotation
       ctx.save();
       ctx.translate(textX, textY);
-      
-      // Rotate text to align with slice (readable from outside in)
-      ctx.rotate(textAngle + Math.PI / 2);
+      ctx.rotate(textRotation);
       
       // Fit text to slice width
       const label = option.label;
