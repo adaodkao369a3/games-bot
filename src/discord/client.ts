@@ -11,6 +11,7 @@ import { handleWheelFontTestCommand } from '../commands/wheelFontTest.js';
 import { handleWheelTestCommand } from '../commands/wheelTest.js';
 import { handleHelpCommand } from '../commands/help.js';
 import { handleQuickDrawCommand, handleQuickDrawInteraction } from '../commands/quickdraw.js';
+import { handleQuickDrawMaxCommand, handleQuickDrawMaxInteraction } from '../commands/quickdrawmax.js';
 import { handleRouletteCommand, handleRouletteInteraction } from '../commands/roulette.js';
 import { handleRouletteMaxCommand, handleRouletteMaxInteraction } from '../commands/roulettemax.js';
 
@@ -108,6 +109,11 @@ export class DiscordClient {
         return;
       }
 
+      if (command === 'quickdrawmax') {
+        await handleQuickDrawMaxCommand(message, args);
+        return;
+      }
+
       if (command === 'roulette') {
         await handleRouletteCommand(message);
         return;
@@ -138,6 +144,11 @@ export class DiscordClient {
     
     if (customId === 'quickdraw_fire') {
       await handleQuickDrawInteraction(interaction);
+      return;
+    }
+
+    if (customId === 'quickdrawmax_fire') {
+      await handleQuickDrawMaxInteraction(interaction);
       return;
     }
 
