@@ -68,13 +68,15 @@ export class QuickDrawMaxGame {
   async start(message: Message): Promise<void> {
     this.currentMessage = message;
     
-    // Initial duel message
+    // Initial duel message with disabled button
     const initialEmbed = await this.createInitialEmbed();
+    const disabledRow = this.createDisabledButtonRow();
+    
     await this.currentMessage.edit({
       content: null,
       embeds: [initialEmbed.embed],
       files: initialEmbed.files,
-      components: [],
+      components: [disabledRow],
     });
     
     // Start the suspense sequence
@@ -85,6 +87,8 @@ export class QuickDrawMaxGame {
    * Run the suspense sequence before DRAW
    */
   private async runSuspenseSequence(): Promise<void> {
+    const disabledRow = this.createDisabledButtonRow();
+    
     // Countdown phase (3, 2, 1)
     for (let countdown = 3; countdown >= 1; countdown--) {
       if (this.state.isGameOver) return;
@@ -99,6 +103,7 @@ export class QuickDrawMaxGame {
       await this.currentMessage?.edit({
         embeds: [countdownData.embed],
         files: countdownData.files,
+        components: [disabledRow],
       });
       
       await this.delay(1000);
@@ -124,6 +129,7 @@ export class QuickDrawMaxGame {
       await this.currentMessage?.edit({
         embeds: [suspenseData.embed],
         files: suspenseData.files,
+        components: [disabledRow],
       });
       
       await this.delay(1500 + Math.random() * 1000);
@@ -152,6 +158,7 @@ export class QuickDrawMaxGame {
     ];
     
     const randomMessage = distractionMessages[Math.floor(Math.random() * distractionMessages.length)];
+    const disabledRow = this.createDisabledButtonRow();
     
     const distractionEmbed = new EmbedBuilder()
       .setTitle('😏 QUICK DRAW MAX')
@@ -163,7 +170,7 @@ export class QuickDrawMaxGame {
     
     await this.currentMessage.edit({
       embeds: [distractionEmbed],
-      components: [], // No buttons during distraction
+      components: [disabledRow], // Keep button visible but disabled
       files: [],
       attachments: [],
     });
@@ -187,18 +194,12 @@ export class QuickDrawMaxGame {
     this.state.drawStartTime = Date.now();
     
     const drawData = await this.createDrawEmbed();
-    const row = new ActionRowBuilder<ButtonBuilder>()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId('quickdrawmax_fire')
-          .setLabel('🔫 DRAW!')
-          .setStyle(ButtonStyle.Danger)
-      );
+    const enabledRow = this.createEnabledButtonRow();
     
     await this.currentMessage.edit({
       embeds: [drawData.embed],
       files: drawData.files,
-      components: [row],
+      components: [enabledRow],
     });
     
     // Set timeout to auto-end if no one clicks (30 seconds)
@@ -415,5 +416,33 @@ export class QuickDrawMaxGame {
       const timeout = setTimeout(resolve, ms);
       this.timers.push(timeout);
     });
+  }
+
+  /**
+   * Create disabled button row
+   */
+  private createDisabledButtonRow(): ActionRowBuilder<ButtonBuilder> {
+    return new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('quickdrawmax_fire')
+          .setLabel('🔫 DRAW!')
+          .setStyle(ButtonStyle.Danger)
+          .setDisabled(true)
+      );
+  }
+
+  /**
+   * Create enabled button row
+   */
+  private createEnabledButtonRow(): ActionRowBuilder<ButtonBuilder> {
+    return new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('quickdrawmax_fire')
+          .setLabel('🔫 DRAW!')
+          .setStyle(ButtonStyle.Danger)
+          .setDisabled(false)
+      );
   }
 }

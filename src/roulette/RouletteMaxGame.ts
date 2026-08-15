@@ -526,7 +526,7 @@ export class RouletteMaxGame {
 
     await this.currentMessage?.edit({
       embeds: [embed],
-      components: [],
+      components: this.getDisabledAttackButtons(),
     });
 
     // Wait for GIF to play (15 seconds)
@@ -556,7 +556,7 @@ export class RouletteMaxGame {
 
     await this.currentMessage?.edit({
       embeds: [embed],
-      components: [],
+      components: this.getDisabledAttackButtons(),
     });
 
     // Wait for GIF to play (8 seconds)
@@ -586,7 +586,7 @@ export class RouletteMaxGame {
 
     await this.currentMessage?.edit({
       embeds: [embed],
-      components: [],
+      components: this.getDisabledAttackButtons(),
     });
 
     // Wait for GIF to play (9 seconds)
@@ -642,6 +642,7 @@ export class RouletteMaxGame {
         .setCustomId('roulettemax_attack_p1')
         .setLabel(`⚔️ ATTACK (${this.state.player1.name})`)
         .setStyle(ButtonStyle.Primary)
+        .setDisabled(false)
     );
 
     row.addComponents(
@@ -649,6 +650,32 @@ export class RouletteMaxGame {
         .setCustomId('roulettemax_attack_p2')
         .setLabel(`⚔️ ATTACK (${this.state.player2.name})`)
         .setStyle(ButtonStyle.Danger)
+        .setDisabled(false)
+    );
+
+    return [row];
+  }
+
+  /**
+   * Get disabled attack buttons
+   */
+  private getDisabledAttackButtons(): ActionRowBuilder<ButtonBuilder>[] {
+    const row = new ActionRowBuilder<ButtonBuilder>();
+
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId('roulettemax_attack_p1')
+        .setLabel(`⚔️ ATTACK (${this.state.player1.name})`)
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(true)
+    );
+
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId('roulettemax_attack_p2')
+        .setLabel(`⚔️ ATTACK (${this.state.player2.name})`)
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(true)
     );
 
     return [row];
@@ -752,7 +779,7 @@ export class RouletteMaxGame {
 
     await this.currentMessage?.edit({
       embeds: [embed],
-      components: [],
+      components: this.getDisabledAttackButtons(),
     });
 
     // Wait for GIF to play
@@ -795,7 +822,7 @@ export class RouletteMaxGame {
 
     await this.currentMessage?.edit({
       embeds: [embed],
-      components: [],
+      components: this.getDisabledAttackButtons(),
     });
 
     await this.delay(2000);

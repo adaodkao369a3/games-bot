@@ -67,13 +67,15 @@ export class QuickDrawGame {
   async start(message: Message): Promise<void> {
     this.currentMessage = message;
     
-    // Initial duel message
+    // Initial duel message with disabled button
     const initialEmbed = await this.createInitialEmbed();
+    const disabledRow = this.createDisabledButtonRow();
+    
     await this.currentMessage.edit({
       content: null,
       embeds: [initialEmbed.embed],
       files: initialEmbed.files,
-      components: [],
+      components: [disabledRow],
     });
     
     // Start the suspense sequence
@@ -84,6 +86,8 @@ export class QuickDrawGame {
    * Run the suspense sequence before DRAW
    */
   private async runSuspenseSequence(): Promise<void> {
+    const disabledRow = this.createDisabledButtonRow();
+    
     // Countdown phase (3, 2, 1)
     for (let countdown = 3; countdown >= 1; countdown--) {
       if (this.state.isGameOver) return;
@@ -98,6 +102,7 @@ export class QuickDrawGame {
       await this.currentMessage?.edit({
         embeds: [countdownData.embed],
         files: countdownData.files,
+        components: [disabledRow],
       });
       
       await this.delay(1000);
@@ -123,6 +128,7 @@ export class QuickDrawGame {
       await this.currentMessage?.edit({
         embeds: [suspenseData.embed],
         files: suspenseData.files,
+        components: [disabledRow],
       });
       
       await this.delay(1500 + Math.random() * 1000);
@@ -147,18 +153,12 @@ export class QuickDrawGame {
     this.state.drawStartTime = Date.now();
     
     const drawData = await this.createDrawEmbed();
-    const row = new ActionRowBuilder<ButtonBuilder>()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId('quickdraw_fire')
-          .setLabel('🔫 DRAW!')
-          .setStyle(ButtonStyle.Danger)
-      );
+    const enabledRow = this.createEnabledButtonRow();
     
     await this.currentMessage.edit({
       embeds: [drawData.embed],
       files: drawData.files,
-      components: [row],
+      components: [enabledRow],
     });
     
     // Set timeout to auto-end if no one clicks (30 seconds)
@@ -389,5 +389,33 @@ export class QuickDrawGame {
       const timeout = setTimeout(resolve, ms);
       this.timers.push(timeout);
     });
+  }
+
+  /**
+   * Create disabled button row
+   */
+  private createDisabledButtonRow(): ActionRowBuilder<ButtonBuilder> {
+    return new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('quickdraw_fire')
+          .setLabel('🔫 DRAW!')
+          .setStyle(ButtonStyle.Danger)
+          .setDisabled(true)
+      );
+  }
+
+  /**
+   * Create enabled button row
+   */
+  private createEnabledButtonRow(): ActionRowBuilder<ButtonBuilder> {
+    return new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('quickdraw_fire')
+          .setLabel('🔫 DRAW!')
+          .setStyle(ButtonStyle.Danger)
+          .setDisabled(false)
+      );
   }
 }
