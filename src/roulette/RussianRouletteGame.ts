@@ -21,6 +21,8 @@ export interface RouletteState {
   currentChamberIndex: number;
   messageId?: string;
   turnStartTime?: number;
+  isDoubleTurnActive: boolean;
+  doubleTurnShotNumber: number; // 1 or 2
 }
 
 export interface RouletteResult {
@@ -59,6 +61,8 @@ export class RussianRouletteGame {
       bulletCount: 1,
       chambers: this.initializeChambers(6, 1),
       currentChamberIndex: 0,
+      isDoubleTurnActive: false,
+      doubleTurnShotNumber: 0,
     };
     this.onGameEnd = onGameEnd;
   }
@@ -191,7 +195,7 @@ export class RussianRouletteGame {
    */
   private async showTriggerState(player: RoulettePlayer): Promise<void> {
     const row = new ActionRowBuilder<ButtonBuilder>();
-    
+
     // Pull trigger button
     row.addComponents(
       new ButtonBuilder()
@@ -200,8 +204,8 @@ export class RussianRouletteGame {
         .setStyle(ButtonStyle.Danger)
     );
 
-    // Double turn button (if not used)
-    if (!player.hasUsedDoubleTurn) {
+    // Double turn button (only if not used and not in double turn)
+    if (!player.hasUsedDoubleTurn && !this.state.isDoubleTurnActive) {
       row.addComponents(
         new ButtonBuilder()
           .setCustomId('roulette_double')
@@ -231,7 +235,7 @@ export class RussianRouletteGame {
         this.handleTimeout();
       }
     }, 10000);
-    
+
     this.timers.push(timeout);
   }
 
@@ -304,7 +308,43 @@ export class RussianRouletteGame {
    * Pull the trigger
    */
   private async pullTrigger(): Promise<void> {
+    const result = await this.executeShot();
     const currentPlayer = this.state.players[this.state.currentPlayerIndex];
+
+    // Handle result based on context
+    if (this.state.isDoubleTurnActive) {
+      if (this.state.doubleTurnShotNumber === 1) {
+        // First shot of double turn
+        if (result === 'bullet') {
+          // Player died on first shot, end turn
+          await this.showBulletResult(currentPlayer);
+        } else {
+          // Player survived first shot, show second shot UI
+          await this.showEmptyResult(currentPlayer, false); // Don't advance turn
+          await this.showSecondShotUI(currentPlayer);
+        }
+      } else {
+        // Second shot of double turn
+        if (result === 'bullet') {
+          await this.showBulletResult(currentPlayer);
+        } else {
+          await this.showEmptyResult(currentPlayer, true); // Advance turn
+        }
+      }
+    } else {
+      // Normal turn
+      if (result === 'bullet') {
+        await this.showBulletResult(currentPlayer);
+      } else {
+        await this.showEmptyResult(currentPlayer, true); // Advance turn
+      }
+    }
+  }
+
+  /**
+   * Execute a shot and return the result
+   */
+  private async executeShot(): Promise<'empty' | 'bullet'> {
     const chamberIndex = this.state.currentChamberIndex % this.state.chambers.length;
     const hasBullet = this.state.chambers[chamberIndex];
 
@@ -314,19 +354,15 @@ export class RussianRouletteGame {
     await this.delay(1500);
 
     // Check if game is still active
-    if (this.state.isGameOver) return;
+    if (this.state.isGameOver) return 'empty';
 
-    if (hasBullet) {
-      await this.showBulletResult(currentPlayer);
-    } else {
-      await this.showEmptyResult(currentPlayer);
-    }
+    return hasBullet ? 'bullet' : 'empty';
   }
 
   /**
    * Show empty chamber result
    */
-  private async showEmptyResult(player: RoulettePlayer): Promise<void> {
+  private async showEmptyResult(player: RoulettePlayer, shouldAdvanceTurn: boolean = true): Promise<void> {
     const embed = new EmbedBuilder()
       .setTitle('🔫 RUSSIAN ROULETTE')
       .setDescription(
@@ -346,15 +382,21 @@ export class RussianRouletteGame {
     // Check if game is still active
     if (this.state.isGameOver) return;
 
-    // Transition pause before next player
-    await this.delay(2000);
+    if (shouldAdvanceTurn) {
+      // Reset double turn state when advancing turn
+      this.state.isDoubleTurnActive = false;
+      this.state.doubleTurnShotNumber = 0;
 
-    // Check if game is still active
-    if (this.state.isGameOver) return;
+      // Transition pause before next player
+      await this.delay(2000);
 
-    // Move to next player
-    this.moveToNextPlayer();
-    await this.startTurn();
+      // Check if game is still active
+      if (this.state.isGameOver) return;
+
+      // Move to next player
+      this.moveToNextPlayer();
+      await this.startTurn();
+    }
   }
 
   /**
@@ -388,6 +430,10 @@ export class RussianRouletteGame {
     // Check if game is still active
     if (this.state.isGameOver) return;
 
+    // Reset double turn state on death
+    this.state.isDoubleTurnActive = false;
+    this.state.doubleTurnShotNumber = 0;
+
     // Check win condition BEFORE moving to next player
     // This ensures the death GIF plays fully before winner is shown
     if (this.checkWinCondition()) {
@@ -407,9 +453,13 @@ export class RussianRouletteGame {
     const currentPlayer = this.state.players[this.state.currentPlayerIndex];
     currentPlayer.hasUsedDoubleTurn = true;
 
+    // Set double turn state
+    this.state.isDoubleTurnActive = true;
+    this.state.doubleTurnShotNumber = 1;
+
     const embed = new EmbedBuilder()
       .setTitle('🔁 DOUBLE TURN')
-      .setDescription(`🔁 <@${currentPlayer.id}> used their DOUBLE TURN!\n\nTaking first shot...`)
+      .setDescription(`🔁 <@${currentPlayer.id}> used their DOUBLE TURN!\n\nFirst shot...`)
       .setColor(0xFFD700)
       .setThumbnail(currentPlayer.avatar);
 
@@ -419,28 +469,50 @@ export class RussianRouletteGame {
 
     await this.delay(1500);
 
-    // Take the first shot
+    // Automatically execute first shot
     await this.pullTrigger();
+  }
 
-    // If player survived the first shot, they get a second shot with barrel spin
-    if (!currentPlayer.isEliminated && !this.state.isGameOver) {
-      await this.delay(1500);
+  /**
+   * Show second shot UI (only trigger button, no double turn button)
+   */
+  private async showSecondShotUI(player: RoulettePlayer): Promise<void> {
+    // Set double turn shot number to 2
+    this.state.doubleTurnShotNumber = 2;
 
-      const secondShotEmbed = new EmbedBuilder()
-        .setTitle('🔁 SECOND SHOT')
-        .setDescription(`🔁 <@${currentPlayer.id}> survived!\n\nBarrel spinning for second shot...`)
-        .setColor(0xFFD700)
-        .setThumbnail(currentPlayer.avatar);
+    const row = new ActionRowBuilder<ButtonBuilder>();
 
-      await this.currentMessage?.edit({
-        embeds: [secondShotEmbed],
-      });
+    // Only pull trigger button - NO double turn button
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId('roulette_trigger')
+        .setLabel('🔫 PULL TRIGGER')
+        .setStyle(ButtonStyle.Danger)
+    );
 
-      await this.delay(1500);
+    const embed = new EmbedBuilder()
+      .setTitle('🔁 SECOND SHOT')
+      .setDescription(
+        `🔁 <@${player.id}> survived the first shot.\n\nOne shot remains.`
+      )
+      .setColor(0xFFD700)
+      .setThumbnail(player.avatar)
+      .addFields({ name: '👥 PLAYERS', value: this.getPlayerListString() });
 
-      // Show barrel spin for second shot
-      await this.showBarrelSpin(currentPlayer);
-    }
+    await this.currentMessage?.edit({
+      embeds: [embed],
+      components: [row],
+    });
+
+    // Start 10-second timeout
+    this.state.turnStartTime = Date.now();
+    const timeout = setTimeout(() => {
+      if (!this.state.isGameOver && this.state.turnStartTime) {
+        this.handleTimeout();
+      }
+    }, 10000);
+
+    this.timers.push(timeout);
   }
 
   /**
