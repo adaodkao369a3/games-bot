@@ -409,7 +409,7 @@ export class RussianRouletteGame {
       .setTitle('💀 RUSSIAN ROULETTE')
       .setDescription(
         `💥 BANG!\n\n<@${player.id}> has been eliminated.\n\nYou are cooked.`
-      )
+      ) 
       .setColor(0xFF0000)
       .setImage(RussianRouletteGame.BULLET_GIF);
 

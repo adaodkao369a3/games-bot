@@ -15,6 +15,7 @@ export interface RouletteMaxState {
   winner?: string;
   messageId?: string;
   currentPhase: RouletteMaxPhase;
+  startingPlayer: number; // 1 or 2
   player1SecretMoveActivated: boolean;
   player2SecretMoveActivated: boolean;
   player1Score: number;
@@ -27,6 +28,7 @@ export interface RouletteMaxState {
 
 export enum RouletteMaxPhase {
   STARTING = 'STARTING',
+  STARTING_PLAYER_SELECTION = 'STARTING_PLAYER_SELECTION',
   NORMAL_PLAYER1_SHOT1 = 'NORMAL_PLAYER1_SHOT1',
   NORMAL_PLAYER2_SHOT1 = 'NORMAL_PLAYER2_SHOT1',
   NORMAL_PLAYER1_SHOT2 = 'NORMAL_PLAYER1_SHOT2',
@@ -59,6 +61,7 @@ export class RouletteMaxGame {
   private onGameEnd?: () => void;
 
   // GIF URLs
+  private static readonly STARTING_PLAYER_GIF = 'https://c.tenor.com/sjaTtq5lHVwAAAAd/tenor.gif';
   private static readonly BARREL_SPIN_GIF = 'https://c.tenor.com/fklGVnlUSFQAAAAd/tenor.gif';
   private static readonly EMPTY_CHAMBER_GIF = 'https://i.gifer.com/9mOY.gif';
   private static readonly PLAYER1_DOMAIN_GIF = 'https://c.tenor.com/CL7dHXumGO0AAAAd/tenor.gif';
@@ -87,6 +90,7 @@ export class RouletteMaxGame {
       player2,
       isGameOver: false,
       currentPhase: RouletteMaxPhase.STARTING,
+      startingPlayer: 1,
       player1SecretMoveActivated: false,
       player2SecretMoveActivated: false,
       player1Score: 0,
@@ -104,7 +108,61 @@ export class RouletteMaxGame {
   async start(message: Message): Promise<void> {
     this.currentMessage = message;
     
-    // Start with Player 1's first shot
+    // Show starting player selection GIF
+    await this.showStartingPlayerSelection();
+  }
+
+  /**
+   * Show starting player selection with GIF
+   */
+  private async showStartingPlayerSelection(): Promise<void> {
+    this.state.currentPhase = RouletteMaxPhase.STARTING_PLAYER_SELECTION;
+
+    const embed = new EmbedBuilder()
+      .setTitle('🔫 ROULETTE MAX')
+      .setDescription('🎲 Choosing the first player...\n\nThe chamber is ready.')
+      .setColor(0xFFD700)
+      .setImage(RouletteMaxGame.STARTING_PLAYER_GIF);
+
+    await this.currentMessage?.edit({
+      content: null,
+      embeds: [embed],
+      components: [],
+    });
+
+    // Wait for GIF to play (9 seconds)
+    await this.delay(9000);
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
+
+    // Randomly select starting player
+    this.state.startingPlayer = Math.random() < 0.5 ? 1 : 2;
+
+    // Reveal first player
+    await this.revealFirstPlayer();
+  }
+
+  /**
+   * Reveal the first player
+   */
+  private async revealFirstPlayer(): Promise<void> {
+    const firstPlayer = this.state.startingPlayer === 1 ? this.state.player1 : this.state.player2;
+    
+    const embed = new EmbedBuilder()
+      .setTitle('🎯 FIRST TURN')
+      .setDescription(`<@${firstPlayer.id}>\n\nYou have been chosen to go first.`)
+      .setColor(0xFFD700)
+      .setThumbnail(firstPlayer.avatar);
+
+    await this.currentMessage?.edit({
+      embeds: [embed],
+    });
+
+    // Check if game is still active
+    if (this.state.isGameOver) return;
+
+    // Start the first shot with the selected player
     await this.startNormalShot1();
   }
 
@@ -112,8 +170,14 @@ export class RouletteMaxGame {
    * Start Player 1's first normal shot
    */
   private async startNormalShot1(): Promise<void> {
-    this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER1_SHOT1;
-    await this.showBarrelSpin(this.state.player1);
+    // If starting player is 2, start with player 2 instead
+    if (this.state.startingPlayer === 2) {
+      this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER2_SHOT1;
+      await this.showBarrelSpin(this.state.player2);
+    } else {
+      this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER1_SHOT1;
+      await this.showBarrelSpin(this.state.player1);
+    }
   }
 
   /**
@@ -373,14 +437,17 @@ export class RouletteMaxGame {
   private async transitionToNextPhase(): Promise<void> {
     switch (this.state.currentPhase) {
       case RouletteMaxPhase.NORMAL_PLAYER1_SHOT1:
+        // After player 1's first shot, go to player 2's first shot
         this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER2_SHOT1;
         await this.showBarrelSpin(this.state.player2);
         break;
       case RouletteMaxPhase.NORMAL_PLAYER2_SHOT1:
+        // After player 2's first shot, go to player 1's second shot
         this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER1_SHOT2;
         await this.showBarrelSpin(this.state.player1);
         break;
       case RouletteMaxPhase.NORMAL_PLAYER1_SHOT2:
+        // After player 1's second shot, go to player 2's second shot
         this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER2_SHOT2;
         await this.showBarrelSpin(this.state.player2);
         break;
@@ -426,7 +493,7 @@ export class RouletteMaxGame {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('roulettemax_secret_p1')
-        .setLabel('❓ SECRET MOVE?')
+        .setLabel(`SECRET TECHNIQUE? (${this.state.player1.name})`)
         .setStyle(ButtonStyle.Primary)
         .setDisabled(this.state.player1SecretMoveActivated)
     );
@@ -434,8 +501,8 @@ export class RouletteMaxGame {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('roulettemax_secret_p2')
-        .setLabel('❓ SECRET MOVE?')
-        .setStyle(ButtonStyle.Primary)
+        .setLabel(`SECRET TECHNIQUE? (${this.state.player2.name})`)
+        .setStyle(ButtonStyle.Danger)
         .setDisabled(this.state.player2SecretMoveActivated)
     );
 
@@ -573,14 +640,14 @@ export class RouletteMaxGame {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('roulettemax_attack_p1')
-        .setLabel('🔥 ATTACK')
-        .setStyle(ButtonStyle.Danger)
+        .setLabel(`⚔️ ATTACK (${this.state.player1.name})`)
+        .setStyle(ButtonStyle.Primary)
     );
 
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('roulettemax_attack_p2')
-        .setLabel('🔥 ATTACK')
+        .setLabel(`⚔️ ATTACK (${this.state.player2.name})`)
         .setStyle(ButtonStyle.Danger)
     );
 
@@ -822,6 +889,9 @@ export class RouletteMaxGame {
       case RouletteMaxPhase.NORMAL_PLAYER2_SHOT1:
       case RouletteMaxPhase.NORMAL_PLAYER2_SHOT2:
         return this.state.player2;
+      case RouletteMaxPhase.STARTING_PLAYER_SELECTION:
+        // This phase doesn't have a current player yet
+        return this.state.player1; // Default fallback
       default:
         throw new Error(`Cannot determine current player for phase ${this.state.currentPhase}`);
     }
