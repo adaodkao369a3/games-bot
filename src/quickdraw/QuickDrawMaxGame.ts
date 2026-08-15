@@ -34,7 +34,13 @@ export class QuickDrawMaxGame {
   private timers: NodeJS.Timeout[] = [];
   
   // GIF URLs
-  private static readonly DISTRACTION_GIF = 'https://i.imgur.com/ARzvCzJ.gif';
+  private static readonly DISTRACTION_GIFS = [
+    'https://64.media.tumblr.com/856124ad485a570a57576b8cca0b8f6e/tumblr_nl611yirs81rcufwuo1_500.gif',
+    'https://c.tenor.com/rJH1bgY-V14AAAAd/tenor.gif',
+    'https://c.tenor.com/cuW_cX4icJ8AAAAd/tenor.gif',
+    'https://c.tenor.com/-mjPgG3RuhYAAAAd/tenor.gif',
+    'https://media.tenor.com/O2p0QIYkbdkAAAAM/anime-twerk.gif',
+  ];
   private static readonly PLAYER1_WIN_GIF = 'https://c.tenor.com/oNRn8VZn9bQAAAAC/tenor.gif';
   private static readonly PLAYER2_WIN_GIF = 'https://c.tenor.com/Jwx-E4jVRVwAAAAC/tenor.gif';
 
@@ -158,6 +164,7 @@ export class QuickDrawMaxGame {
     ];
     
     const randomMessage = distractionMessages[Math.floor(Math.random() * distractionMessages.length)];
+    const randomGif = QuickDrawMaxGame.DISTRACTION_GIFS[Math.floor(Math.random() * QuickDrawMaxGame.DISTRACTION_GIFS.length)];
     const disabledRow = this.createDisabledButtonRow();
     
     const distractionEmbed = new EmbedBuilder()
@@ -166,7 +173,7 @@ export class QuickDrawMaxGame {
         `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n${randomMessage}`
       )
       .setColor(0xFF69B4)
-      .setImage(QuickDrawMaxGame.DISTRACTION_GIF);
+      .setImage(randomGif);
     
     await this.currentMessage.edit({
       embeds: [distractionEmbed],
