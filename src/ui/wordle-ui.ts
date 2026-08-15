@@ -34,9 +34,6 @@ export class WordleUI {
       .setDescription(`Guess the ${data.wordLength}-letter word!\n\nType your guess in chat to play.`)
       .setFooter({ text: `${data.guessCount} / ${data.maxGuesses} guesses` });
 
-    // Add username list
-    this.addUsernameList(embed, data);
-
     return embed;
   }
   
@@ -44,22 +41,11 @@ export class WordleUI {
    * Create an updated game embed
    */
   static createUpdatedEmbed(data: WordleUIData, lastPlayer?: string): EmbedBuilder {
-    let description = `Guess the ${data.wordLength}-letter word!\n\n`;
-
-    if (lastPlayer) {
-      description += `🎯 **${lastPlayer}** guessed\n\n`;
-    }
-
-    description += `Type your guess in chat to play.`;
-
     const embed = new EmbedBuilder()
       .setColor(0x538d4e)
       .setTitle('🟩 WORDLE')
-      .setDescription(description)
+      .setDescription(`Guess the ${data.wordLength}-letter word!\n\nType your guess in chat to play.`)
       .setFooter({ text: `${data.guessCount} / ${data.maxGuesses} guesses` });
-
-    // Add username list
-    this.addUsernameList(embed, data);
 
     return embed;
   }
@@ -73,8 +59,7 @@ export class WordleUI {
       .setTitle('🎉 WE HAVE A WINNER!')
       .setDescription(
         `🏆 **${winner}** guessed the word **${secretWord.toUpperCase()}**!\n\n` +
-        `GG everyone!\n\n` +
-        `${this.createLegend()}`
+        `GG everyone!`
       )
       .setFooter({ text: `Won in ${guessCount} guesses • Bob Kun 🍌` });
 
@@ -90,8 +75,7 @@ export class WordleUI {
       .setTitle('💀 Game Over!')
       .setDescription(
         `The word was **${secretWord.toUpperCase()}**.\n\n` +
-        `Better luck next time!\n\n` +
-        `${this.createLegend()}`
+        `Better luck next time!`
       )
       .setFooter({ text: `${guessCount} / 5 guesses used • Bob Kun 🍌` });
 
@@ -109,39 +93,7 @@ export class WordleUI {
     return embed;
   }
   
-  /**
-   * Create the legend for letter colors
-   */
-  static createLegend(): string {
-    return `🟩 Correct   🟨 Wrong Position   ⬛ Not Found`;
-  }
 
-  /**
-   * Add username list to embed
-   */
-  private static addUsernameList(embed: EmbedBuilder, data: WordleUIData): void {
-    const guesses = data.guesses || [];
-
-    if (guesses.length === 0) {
-      return;
-    }
-
-    let usernameList = '';
-    for (const guess of guesses) {
-      let entry = `@${guess.player}`;
-      // Add crown for correct guesses
-      if (guess.result.isCorrect) {
-        entry = `👑 ${entry}`;
-      }
-      usernameList += `${entry}\n`;
-    }
-
-    if (usernameList) {
-      embed.addFields({ name: '👥 Guesses', value: usernameList, inline: true });
-    }
-  }
-
-  
   /**
    * Generate the board image attachment
    */
@@ -178,10 +130,6 @@ export class WordleUI {
     
     // Add image to embed with dynamic filename
     embed.setImage(`attachment://${attachment.name}`);
-    
-    // Add legend to description
-    const currentDescription = embed.data.description || '';
-    embed.setDescription(`${currentDescription}\n\n${this.createLegend()}`);
     
     return { embed, attachment };
   }

@@ -173,7 +173,7 @@ async function updateGameMessage(game: WordleGame, channel: any, lastPlayer: str
 
     try {
       const uiData = createUIDataFromGame(game);
-      const { embed, attachment } = await WordleUI.createGameMessage(uiData, lastPlayer);
+      const { embed, attachment } = await WordleUI.createGameMessage(uiData);
 
       // Edit the existing message
       await currentMessage.edit({
