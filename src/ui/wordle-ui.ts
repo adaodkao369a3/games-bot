@@ -7,7 +7,7 @@ export interface WordleUIData {
   channelId: string;
   guesses: Array<{
     word: string;
-    result: { letters: LetterState[] };
+    result: { letters: LetterState[]; isCorrect: boolean };
     player: string;
   }>;
   maxGuesses: number;
@@ -34,6 +34,9 @@ export class WordleUI {
       .setDescription(`Guess the ${data.wordLength}-letter word!\n\nType your guess in chat to play.`)
       .setFooter({ text: `${data.guessCount} / ${data.maxGuesses} guesses` });
 
+    // Add username list
+    this.addUsernameList(embed, data);
+
     return embed;
   }
   
@@ -54,6 +57,9 @@ export class WordleUI {
       .setTitle('🟩 WORDLE')
       .setDescription(description)
       .setFooter({ text: `${data.guessCount} / ${data.maxGuesses} guesses` });
+
+    // Add username list
+    this.addUsernameList(embed, data);
 
     return embed;
   }
@@ -108,6 +114,31 @@ export class WordleUI {
    */
   static createLegend(): string {
     return `🟩 Correct   🟨 Wrong Position   ⬛ Not Found`;
+  }
+
+  /**
+   * Add username list to embed
+   */
+  private static addUsernameList(embed: EmbedBuilder, data: WordleUIData): void {
+    const guesses = data.guesses || [];
+
+    if (guesses.length === 0) {
+      return;
+    }
+
+    let usernameList = '';
+    for (const guess of guesses) {
+      let entry = `@${guess.player}`;
+      // Add crown for correct guesses
+      if (guess.result.isCorrect) {
+        entry = `👑 ${entry}`;
+      }
+      usernameList += `${entry}\n`;
+    }
+
+    if (usernameList) {
+      embed.addFields({ name: '👥 Guesses', value: usernameList, inline: true });
+    }
   }
 
   

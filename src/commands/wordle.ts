@@ -104,7 +104,17 @@ export async function handleWordleGuess(message: Message): Promise<void> {
     const validationResult = await game.processGuess(content, playerId, username, staffMember);
 
     if (!validationResult.isValid) {
-      // Invalid or already-guessed word - leave user's message alone, no bot response
+      // Check if it's a cooldown error - send separate temporary message
+      if (validationResult.error && validationResult.error.includes('wait')) {
+        try {
+          await message.reply({
+            content: validationResult.error,
+          });
+        } catch (error) {
+          console.warn('[Wordle Guess] Could not send cooldown message:', error);
+        }
+      }
+      // Invalid or already-guessed word - leave user's message alone
       return;
     }
 
