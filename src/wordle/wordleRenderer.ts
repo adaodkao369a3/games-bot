@@ -43,12 +43,13 @@ export interface WordleBoardData {
  * Renders Wordle game boards using @napi-rs/canvas
  */
 export class WordleRenderer {
-  private static readonly BOARD_WIDTH = 600;
+  private static readonly BOARD_WIDTH = 800; // Increased for username column
   private static readonly BOARD_HEIGHT = 700; // Board + keyboard
   private static readonly CELL_SIZE = 60;
   private static readonly CELL_PADDING = 5;
   private static readonly BOARD_TOP_PADDING = 20;
   private static readonly KEYBOARD_TOP_PADDING = 560;
+  private static readonly USERNAME_COLUMN_WIDTH = 200;
   
   // Colors
   private static readonly COLORS = {
@@ -76,11 +77,11 @@ export class WordleRenderer {
     }
     
     // Calculate dimensions
-    const boardWidth = wordLength * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_PADDING;
+    const boardWidth = wordLength * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_PADDING + this.USERNAME_COLUMN_WIDTH;
     const boardHeight = maxGuesses * (this.CELL_SIZE + this.CELL_PADDING) + this.BOARD_TOP_PADDING;
     const keyboardHeight = 130; // Increased for larger keys
     const totalHeight = boardHeight + keyboardHeight + 20;
-    
+
     // Create canvas
     const canvas = createCanvas(boardWidth, totalHeight);
     const ctx = canvas.getContext('2d');
@@ -97,17 +98,17 @@ export class WordleRenderer {
       for (let col = 0; col < wordLength; col++) {
         const x = this.CELL_PADDING + col * (this.CELL_SIZE + this.CELL_PADDING);
         const y = this.BOARD_TOP_PADDING + row * (this.CELL_SIZE + this.CELL_PADDING);
-        
+
         let fillColor = this.COLORS.empty;
         let letter = '';
-        
+
         if (row < guesses.length) {
           const guess = guesses[row];
           letter = guess.word[col].toUpperCase();
           const state = guess.result.letters[col];
-          
+
           console.log('[WordleRenderer] Row:', row, 'Col:', col, 'Letter:', letter, 'State:', state);
-          
+
           switch (state) {
             case LetterState.CORRECT:
               fillColor = this.COLORS.correct;
@@ -120,29 +121,48 @@ export class WordleRenderer {
               break;
           }
         }
-        
+
         // Draw cell
         ctx.fillStyle = fillColor;
         this.roundRect(ctx, x, y, this.CELL_SIZE, this.CELL_SIZE, 4);
         ctx.fill();
-        
+
         // Draw border
         ctx.strokeStyle = this.COLORS.border;
         ctx.lineWidth = 2;
         this.roundRect(ctx, x, y, this.CELL_SIZE, this.CELL_SIZE, 4);
         ctx.stroke();
-        
+
         // Draw letter
         if (letter) {
           const centerX = x + this.CELL_SIZE / 2;
           const centerY = y + this.CELL_SIZE / 2;
-          
+
           ctx.fillStyle = this.COLORS.text;
           ctx.font = 'bold 36px Roboto';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(letter, centerX, centerY);
         }
+      }
+
+      // Draw username beside each guess row
+      if (row < guesses.length) {
+        const guess = guesses[row];
+        const usernameX = wordLength * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_PADDING + 20;
+        const usernameY = this.BOARD_TOP_PADDING + row * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_SIZE / 2;
+
+        let usernameText = `@${guess.player}`;
+        // Add crown for correct guesses
+        if (guess.result.isCorrect) {
+          usernameText = `👑 ${usernameText}`;
+        }
+
+        ctx.fillStyle = this.COLORS.text;
+        ctx.font = 'bold 18px Roboto';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(usernameText, usernameX, usernameY);
       }
     }
     

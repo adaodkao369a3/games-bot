@@ -34,9 +34,6 @@ export class WordleUI {
       .setDescription(`Guess the ${data.wordLength}-letter word!\n\nType your guess in chat to play.`)
       .setFooter({ text: `${data.guessCount} / ${data.maxGuesses} guesses` });
 
-    // Add player/guess list
-    this.addPlayerGuessList(embed, data);
-
     return embed;
   }
   
@@ -58,9 +55,6 @@ export class WordleUI {
       .setDescription(description)
       .setFooter({ text: `${data.guessCount} / ${data.maxGuesses} guesses` });
 
-    // Add player/guess list
-    this.addPlayerGuessList(embed, data);
-
     return embed;
   }
   
@@ -78,11 +72,6 @@ export class WordleUI {
       )
       .setFooter({ text: `Won in ${guessCount} guesses • Bob Kun 🍌` });
 
-    // Add player/guess list if data provided
-    if (data) {
-      this.addPlayerGuessList(embed, data);
-    }
-
     return embed;
   }
   
@@ -99,11 +88,6 @@ export class WordleUI {
         `${this.createLegend()}`
       )
       .setFooter({ text: `${guessCount} / 5 guesses used • Bob Kun 🍌` });
-
-    // Add player/guess list if data provided
-    if (data) {
-      this.addPlayerGuessList(embed, data);
-    }
 
     return embed;
   }
@@ -126,36 +110,6 @@ export class WordleUI {
     return `🟩 Correct   🟨 Wrong Position   ⬛ Not Found`;
   }
 
-  /**
-   * Add player/guess list to embed
-   */
-  private static addPlayerGuessList(embed: EmbedBuilder, data: WordleUIData): void {
-    const wrongGuesses = data.wrongGuesses || [];
-    const correctGuessers = data.correctGuessers || [];
-
-    let fieldText = '';
-
-    // Add wrong guesses with X markers
-    if (wrongGuesses.length > 0) {
-      fieldText += '❌ **Wrong Guesses**\n';
-      for (const word of wrongGuesses) {
-        fieldText += `❌ ${word.toUpperCase()}\n`;
-      }
-      fieldText += '\n';
-    }
-
-    // Add correct guessers with crown
-    if (correctGuessers.length > 0) {
-      fieldText += '👑 **Correct Guessers**\n';
-      for (const guesser of correctGuessers) {
-        fieldText += `👑 @${guesser.username}\n`;
-      }
-    }
-
-    if (fieldText) {
-      embed.addFields({ name: '👥 Players', value: fieldText, inline: true });
-    }
-  }
   
   /**
    * Generate the board image attachment
