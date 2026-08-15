@@ -180,8 +180,8 @@ export class RussianRouletteGame {
       components: [],
     });
 
-    // Wait for GIF to play (exactly 2 seconds - this IS the stage duration)
-    await this.delay(2000);
+    // Wait for GIF to play (exactly 4 seconds - this IS the stage duration)
+    await this.delay(4000);
 
     // Check if game is still active
     if (this.state.isGameOver) return;
