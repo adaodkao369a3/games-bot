@@ -14,6 +14,8 @@ export interface WordleGameState {
   messageId?: string;
   startTime: number;
   playerCooldowns: Map<string, number>;
+  correctGuessers: Array<{ username: string; playerId: string }>;
+  wrongGuesses: string[];
 }
 
 export interface GuessValidationResult {
@@ -48,6 +50,8 @@ export class WordleGame {
       isGameOver: false,
       startTime: Date.now(),
       playerCooldowns: new Map<string, number>(),
+      correctGuessers: [],
+      wrongGuesses: [],
     };
   }
   
@@ -62,17 +66,17 @@ export class WordleGame {
   /**
    * Process a guess from a player
    */
-  async processGuess(guess: string, playerId: string, playerName: string, isStaff: boolean = false): Promise<GuessValidationResult> {
+  async processGuess(guess: string, playerId: string, username: string, isStaff: boolean = false): Promise<GuessValidationResult> {
     // Check if game is over
     if (this.state.isGameOver) {
       return { isValid: false, error: 'Game is already over' };
     }
-    
+
     // Check if max guesses reached
     if (this.state.guesses.length >= this.state.maxGuesses) {
       return { isValid: false, error: 'Maximum guesses reached' };
     }
-    
+
     // Check player cooldown (staff bypass)
     if (!isStaff) {
       const cooldownUntil = this.state.playerCooldowns.get(playerId);
@@ -83,63 +87,79 @@ export class WordleGame {
         return { isValid: false, error: `⏳ You need to wait ${remainingSeconds} ${timeText} before guessing again.` };
       }
     }
-    
+
     // Validate format
     if (!WordleEvaluator.isValidFormat(guess, this.state.wordLength)) {
       return { isValid: false, error: `Guess must be exactly ${this.state.wordLength} letters` };
     }
-    
+
     // Validate word exists using provider
     const normalizedGuess = WordleEvaluator.normalizeGuess(guess);
     const isValidWord = await this.wordProvider.isValidWord(normalizedGuess);
-    
+
     if (!isValidWord) {
       return { isValid: false, error: 'Not a valid word' };
     }
-    
+
     // Check if this word was already guessed
     const alreadyGuessed = this.state.guesses.some(
       existing => existing.word === normalizedGuess
     );
-    
+
     if (alreadyGuessed) {
       return { isValid: false, error: "You've already guessed that word! 🔁" };
     }
-    
+
     // Evaluate the guess
     const result = WordleEvaluator.evaluate(normalizedGuess, this.state.secretWord);
-    
+
     console.log('[Wordle] Guess:', normalizedGuess);
     console.log('[Wordle] Evaluation:', result);
-    
+
     // Add to guesses
     this.state.guesses.push({
       word: normalizedGuess,
       result,
-      player: playerName,
+      player: username,
       timestamp: Date.now(),
     });
-    
+
+    // Track correct guessers and wrong guesses
+    if (result.isCorrect) {
+      // Add to correct guessers if not already there
+      const alreadyCorrect = this.state.correctGuessers.some(g => g.playerId === playerId);
+      if (!alreadyCorrect) {
+        this.state.correctGuessers.push({ username, playerId });
+      }
+      // Remove from wrong guesses if present
+      this.state.wrongGuesses = this.state.wrongGuesses.filter(w => w !== normalizedGuess);
+    } else {
+      // Add to wrong guesses if not already there
+      if (!this.state.wrongGuesses.includes(normalizedGuess)) {
+        this.state.wrongGuesses.push(normalizedGuess);
+      }
+    }
+
     // Set player cooldown for 25 seconds (staff bypass)
     if (!isStaff) {
       this.state.playerCooldowns.set(playerId, Date.now() + 25_000);
     }
-    
+
     // Log keyboard state after this guess
     const keyboardStates = this.getKeyboardStates();
     console.log('[Wordle] Keyboard state after guess:', Object.fromEntries(keyboardStates));
-    
+
     // Check for win
     if (result.isCorrect) {
       this.state.isGameOver = true;
-      this.state.winner = playerName;
+      this.state.winner = username;
     }
-    
+
     // Check for loss (max guesses reached)
     if (this.state.guesses.length >= this.state.maxGuesses && !result.isCorrect) {
       this.state.isGameOver = true;
     }
-    
+
     return { isValid: true };
   }
   
@@ -270,6 +290,20 @@ export class WordleGame {
    */
   getMessageId(): string | undefined {
     return this.state.messageId;
+  }
+
+  /**
+   * Get correct guessers
+   */
+  getCorrectGuessers(): Array<{ username: string; playerId: string }> {
+    return [...this.state.correctGuessers];
+  }
+
+  /**
+   * Get wrong guesses
+   */
+  getWrongGuesses(): string[] {
+    return [...this.state.wrongGuesses];
   }
   
   /**
