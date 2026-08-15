@@ -17,7 +17,7 @@ export async function handleHelpCommand(message: Message): Promise<void> {
     embed.addFields([
       {
         name: '🎮 **Games**',
-        value: '`,wordle` — Start a multiplayer Wordle game\n`,smash @user1 @user2` — Start a Smash or Pass vote',
+        value: '`,wordle` — Start a multiplayer Wordle game\n`,smash @user1 @user2` — Start a Smash or Pass vote\n`,roulette @user1 @user2...` — Play Russian Roulette\n`,roulettemax @user` — Play Roulette Max (2 players only)',
         inline: false,
       },
       {

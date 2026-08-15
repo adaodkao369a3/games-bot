@@ -12,6 +12,7 @@ import { handleWheelTestCommand } from '../commands/wheelTest.js';
 import { handleHelpCommand } from '../commands/help.js';
 import { handleQuickDrawCommand, handleQuickDrawInteraction } from '../commands/quickdraw.js';
 import { handleRouletteCommand, handleRouletteInteraction } from '../commands/roulette.js';
+import { handleRouletteMaxCommand, handleRouletteMaxInteraction } from '../commands/roulettemax.js';
 
 export class DiscordClient {
   private client: Client;
@@ -111,6 +112,11 @@ export class DiscordClient {
         await handleRouletteCommand(message);
         return;
       }
+
+      if (command === 'roulettemax') {
+        await handleRouletteMaxCommand(message);
+        return;
+      }
     }
 
     // Check for Wordle guesses (only if not a command)
@@ -137,6 +143,11 @@ export class DiscordClient {
 
     if (customId === 'roulette_trigger' || customId === 'roulette_double') {
       await handleRouletteInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('roulettemax_')) {
+      await handleRouletteMaxInteraction(interaction);
       return;
     }
     
