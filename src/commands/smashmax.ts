@@ -38,11 +38,14 @@ export async function handleSmashMaxCommand(message: Message): Promise<void> {
 
     // Handle API failure
     if (!char1 || !char2) {
+      const cacheSize = jikanService.getCacheSize();
       await replyMessage.edit({
         embeds: [
           new EmbedBuilder()
             .setTitle('❌ Error')
-            .setDescription('Failed to fetch anime characters. Please try again later.')
+            .setDescription(cacheSize >= 2 
+              ? 'Failed to fetch anime characters. Not enough cached data available. Please try again later.'
+              : 'Failed to fetch anime characters. Please try again later.')
             .setColor(0xFF0000)
         ],
       });
