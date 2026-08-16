@@ -22,6 +22,24 @@ export async function handleSmashMaxCommand(message: Message): Promise<void> {
       return;
     }
 
+    // Parse mode argument
+    const args = message.content.trim().split(/\s+/);
+    let mode: 'normal' | 'female' | 'nsfw' = 'normal';
+    
+    if (args.length > 1) {
+      const modeArg = args[1].toLowerCase();
+      if (modeArg === 'f' || modeArg === 'female') {
+        mode = 'female';
+      } else if (modeArg === 'nsfw') {
+        mode = 'nsfw';
+      } else {
+        await message.reply({
+          content: 'Invalid mode. Use: `,smashmax` (normal), `,smashmax f` (female-only), or `,smashmax nsfw` (adult mode).',
+        });
+        return;
+      }
+    }
+
     // Send initial loading message
     const loadingEmbed = new EmbedBuilder()
       .setTitle('🔥 SMASHMAX')
@@ -32,9 +50,9 @@ export async function handleSmashMaxCommand(message: Message): Promise<void> {
       embeds: [loadingEmbed],
     });
 
-    // Fetch two random characters
+    // Fetch two random characters with mode
     const anilistService = AniListCharacterService.getInstance();
-    const [char1, char2] = await anilistService.fetchTwoRandomCharacters();
+    const [char1, char2] = await anilistService.fetchTwoRandomCharacters(mode);
 
     // Handle API failure
     if (!char1 || !char2) {

@@ -9,6 +9,7 @@ interface AniListCharacter {
     full: string | null;
     native: string | null;
   };
+  gender: string | null;
   image: {
     large: string | null;
     medium: string | null;
@@ -21,6 +22,7 @@ interface AniListCharacter {
         romaji: string | null;
         native: string | null;
       };
+      isAdult: boolean;
     }>;
   } | null;
 }
@@ -48,6 +50,8 @@ export interface CachedCharacter {
   name: string;
   imageUrl: string | null;
   anime: string | null;
+  gender: string | null;
+  isAdult: boolean;
   cachedAt: number;
   hasValidImage: boolean;
 }
@@ -57,6 +61,8 @@ interface CacheEntry {
   name: string;
   imageUrl: string | null;
   anime: string | null;
+  gender: string | null;
+  isAdult: boolean;
   cachedAt: number;
   hasValidImage: boolean;
 }
@@ -208,6 +214,7 @@ export class AniListCharacterService {
               full
               native
             }
+            gender
             image {
               large
               medium
@@ -220,6 +227,7 @@ export class AniListCharacterService {
                   romaji
                   native
                 }
+                isAdult
               }
             }
           }
@@ -320,11 +328,13 @@ export class AniListCharacterService {
       return false;
     }
 
-    // Get anime/media name
+    // Get anime/media name and isAdult flag
     let anime: string | null = null;
+    let isAdult = false;
     if (character.media && character.media.nodes.length > 0) {
       const media = character.media.nodes[0];
       anime = media.title.english || media.title.romaji || media.title.native;
+      isAdult = media.isAdult;
     }
 
     const cachedChar: IndexedCachedCharacter = {
@@ -332,6 +342,8 @@ export class AniListCharacterService {
       name: name,
       imageUrl: imageUrl,
       anime: anime,
+      gender: character.gender,
+      isAdult: isAdult,
       cachedAt: Date.now(),
       hasValidImage: true,
     };
@@ -343,15 +355,30 @@ export class AniListCharacterService {
   /**
    * Fetch two different random characters - cache only
    */
-  async fetchTwoRandomCharacters(): Promise<[CachedCharacter | null, CachedCharacter | null]> {
-    const validCachedChars = Array.from(this.cache.values()).filter(c => c.hasValidImage);
+  async fetchTwoRandomCharacters(mode: 'normal' | 'female' | 'nsfw' = 'normal'): Promise<[CachedCharacter | null, CachedCharacter | null]> {
+    let validCachedChars = Array.from(this.cache.values()).filter(c => c.hasValidImage);
+    
+    // Filter based on mode
+    if (mode === 'female') {
+      validCachedChars = validCachedChars.filter(c => 
+        c.gender && (c.gender.toLowerCase() === 'female' || c.gender.toLowerCase() === 'f') && !c.isAdult
+      );
+      console.log(`[AniListService] Filtered to ${validCachedChars.length} female non-adult characters.`);
+    } else if (mode === 'nsfw') {
+      validCachedChars = validCachedChars.filter(c => c.isAdult);
+      console.log(`[AniListService] Filtered to ${validCachedChars.length} adult characters.`);
+    } else {
+      // Normal mode: exclude adult
+      validCachedChars = validCachedChars.filter(c => !c.isAdult);
+      console.log(`[AniListService] Filtered to ${validCachedChars.length} non-adult characters.`);
+    }
     
     if (validCachedChars.length >= 2) {
       console.log('[AniListService] Using cached characters.');
       return this.selectTwoFromCache(validCachedChars);
     }
 
-    console.log(`[AniListService] Cache has only ${validCachedChars.length} characters. Triggering background population.`);
+    console.log(`[AniListService] Cache has only ${validCachedChars.length} characters for mode '${mode}'. Triggering background population.`);
     this.initializeBackgroundPopulation();
 
     if (validCachedChars.length >= 2) {
