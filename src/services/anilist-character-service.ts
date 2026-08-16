@@ -125,32 +125,53 @@ export class AniListCharacterService {
   /**
    * Initialize background population (non-blocking)
    */
-  initializeBackgroundPopulation(): void {
-    this.populateCacheIfNeeded().catch(error => {
+  initializeBackgroundPopulation(mode: 'normal' | 'female' | 'nsfw' = 'normal'): void {
+    this.populateCacheIfNeeded(mode).catch(error => {
       console.log('[AniListService] Background population failed:', error);
     });
   }
 
   /**
-   * Populate cache in background if needed
+   * Populate cache in background if needed (mode-aware)
    */
-  private async populateCacheIfNeeded(): Promise<void> {
+  private async populateCacheIfNeeded(mode: 'normal' | 'female' | 'nsfw' = 'normal'): Promise<void> {
     if (this.isPopulating) {
       return;
     }
 
-    const currentSize = this.getCacheSize();
-    if (currentSize >= this.MIN_CACHE_SIZE) {
-      console.log(`[AniListService] Cache has ${currentSize} characters; skipping API fetch.`);
+    // Get filtered pool size for the requested mode
+    let validCachedChars = Array.from(this.cache.values()).filter(c => c.hasValidImage);
+    if (mode === 'female') {
+      validCachedChars = validCachedChars.filter(c => 
+        c.gender && (c.gender.toLowerCase() === 'female' || c.gender.toLowerCase() === 'f') && !c.isAdult
+      );
+    } else if (mode === 'nsfw') {
+      validCachedChars = validCachedChars.filter(c => c.isAdult);
+    } else {
+      validCachedChars = validCachedChars.filter(c => !c.isAdult);
+    }
+
+    const poolSize = validCachedChars.length;
+    
+    // Check if the mode-specific pool has enough characters
+    if (poolSize >= this.MIN_CACHE_SIZE) {
+      console.log(`[AniListService] Mode '${mode}' has ${poolSize} eligible cached characters; skipping API fetch.`);
+      return;
+    }
+
+    // Also check total cache size to avoid unnecessary population if we have plenty overall
+    const totalSize = this.getCacheSize();
+    if (totalSize >= this.TARGET_CACHE_SIZE && poolSize > 0) {
+      console.log(`[AniListService] Mode '${mode}' has ${poolSize} eligible cached characters (total: ${totalSize}). Pool may be limited by mode filter.`);
       return;
     }
 
     this.isPopulating = true;
-    console.log('[AniListService] Background cache population started.');
+    console.log(`[AniListService] Mode '${mode}' has ${poolSize} eligible cached characters. Starting controlled population for mode '${mode}'.`);
 
     try {
-      const added = await this.fetchCharactersFromAniList(this.TARGET_CACHE_SIZE - currentSize);
-      console.log(`[AniListService] Added ${added} characters to cache.`);
+      const added = await this.fetchCharactersFromAniList(this.TARGET_CACHE_SIZE - totalSize);
+      console.log(`[AniListService] Added ${added} characters to cache. Mode '${mode}' pool now contains ${this.getModePoolSize(mode)} eligible characters.`);
     } catch (error) {
       console.log('[AniListService] Background population failed:', error);
     } finally {
@@ -353,6 +374,23 @@ export class AniListCharacterService {
   }
 
   /**
+   * Get the size of a mode-specific pool
+   */
+  private getModePoolSize(mode: 'normal' | 'female' | 'nsfw'): number {
+    let validCachedChars = Array.from(this.cache.values()).filter(c => c.hasValidImage);
+    if (mode === 'female') {
+      validCachedChars = validCachedChars.filter(c => 
+        c.gender && (c.gender.toLowerCase() === 'female' || c.gender.toLowerCase() === 'f') && !c.isAdult
+      );
+    } else if (mode === 'nsfw') {
+      validCachedChars = validCachedChars.filter(c => c.isAdult);
+    } else {
+      validCachedChars = validCachedChars.filter(c => !c.isAdult);
+    }
+    return validCachedChars.length;
+  }
+
+  /**
    * Fetch two different random characters - cache only
    */
   async fetchTwoRandomCharacters(mode: 'normal' | 'female' | 'nsfw' = 'normal'): Promise<[CachedCharacter | null, CachedCharacter | null]> {
@@ -378,8 +416,8 @@ export class AniListCharacterService {
       return this.selectTwoFromCache(validCachedChars);
     }
 
-    console.log(`[AniListService] Cache has only ${validCachedChars.length} characters for mode '${mode}'. Triggering background population.`);
-    this.initializeBackgroundPopulation();
+    console.log(`[AniListService] Mode '${mode}' has ${validCachedChars.length} eligible cached characters. Triggering background population.`);
+    this.initializeBackgroundPopulation(mode);
 
     if (validCachedChars.length >= 2) {
       return this.selectTwoFromCache(validCachedChars);
