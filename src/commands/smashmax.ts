@@ -1,6 +1,6 @@
 import { Message, MessageComponentInteraction, EmbedBuilder } from 'discord.js';
 import { SmashMaxGame, SmashMaxState } from '../smashmax/SmashMaxGame.js';
-import { JikanCharacterService } from '../services/jikan-character-service.js';
+import { AniListCharacterService } from '../services/anilist-character-service.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
 const activeGames = new Map<string, SmashMaxGame>();
@@ -33,8 +33,8 @@ export async function handleSmashMaxCommand(message: Message): Promise<void> {
     });
 
     // Fetch two random characters
-    const jikanService = JikanCharacterService.getInstance();
-    const [char1, char2] = await jikanService.fetchTwoRandomCharacters();
+    const anilistService = AniListCharacterService.getInstance();
+    const [char1, char2] = await anilistService.fetchTwoRandomCharacters();
 
     // Handle API failure
     if (!char1 || !char2) {

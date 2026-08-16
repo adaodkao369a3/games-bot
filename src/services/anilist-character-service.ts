@@ -1,23 +1,46 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-interface JikanCharacter {
-  mal_id: number;
-  name: string;
-  images: {
-    jpg: {
-      image_url: string | null;
-    };
+interface AniListCharacter {
+  id: number;
+  name: {
+    first: string | null;
+    last: string | null;
+    full: string | null;
+    native: string | null;
   };
-  about: string | null;
+  image: {
+    large: string | null;
+    medium: string | null;
+  };
+  media: {
+    nodes: Array<{
+      id: number;
+      title: {
+        english: string | null;
+        romaji: string | null;
+        native: string | null;
+      };
+    }>;
+  } | null;
 }
 
-interface JikanPaginatedResponse {
-  data: JikanCharacter[];
-  pagination: {
-    has_next_page: boolean;
-    last_visible_page: number;
+interface AniListResponse {
+  data?: {
+    Page: {
+      characters: AniListCharacter[];
+      pageInfo: {
+        hasNextPage: boolean;
+      };
+    };
   };
+  errors?: Array<{
+    message: string;
+    extensions?: {
+      status?: number;
+      code?: string;
+    };
+  }>;
 }
 
 export interface CachedCharacter {
@@ -50,15 +73,15 @@ enum CircuitState {
 }
 
 /**
- * Service for fetching and caching anime characters from Jikan API
+ * Service for fetching and caching anime characters from AniList GraphQL API
  * Implements persistent cache, rate limiting, circuit breaker, and background population
  */
-export class JikanCharacterService {
-  private static instance: JikanCharacterService;
-  private cache: Map<number, CachedCharacter> = new Map();
-  private readonly API_BASE = 'https://api.jikan.moe/v4';
+export class AniListCharacterService {
+  private static instance: AniListCharacterService;
+  private cache: Map<number, IndexedCachedCharacter> = new Map();
+  private readonly API_BASE = 'https://graphql.anilist.co';
   private readonly CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
-  private readonly CACHE_FILE = path.join(process.cwd(), 'data', 'jikan-cache.json');
+  private readonly CACHE_FILE = path.join(process.cwd(), 'data', 'anilist-cache.json');
   private readonly MIN_CACHE_SIZE = 10; // Minimum characters for cache-only mode
   private readonly TARGET_CACHE_SIZE = 20; // Target for background population
   private readonly MAX_RETRIES = 2;
@@ -79,7 +102,6 @@ export class JikanCharacterService {
 
   // Background population
   private isPopulating = false;
-  private populationPromise: Promise<void> | null = null;
 
   private constructor() {
     this.ensureDataDirectory();
@@ -87,20 +109,19 @@ export class JikanCharacterService {
     this.startQueueProcessor();
   }
 
-  static getInstance(): JikanCharacterService {
-    if (!JikanCharacterService.instance) {
-      JikanCharacterService.instance = new JikanCharacterService();
+  static getInstance(): AniListCharacterService {
+    if (!AniListCharacterService.instance) {
+      AniListCharacterService.instance = new AniListCharacterService();
     }
-    return JikanCharacterService.instance;
+    return AniListCharacterService.instance;
   }
 
   /**
    * Initialize background population (non-blocking)
    */
   initializeBackgroundPopulation(): void {
-    // Don't wait for this, let it run in background
     this.populateCacheIfNeeded().catch(error => {
-      console.log('[JikanService] Background population failed:', error);
+      console.log('[AniListService] Background population failed:', error);
     });
   }
 
@@ -109,41 +130,41 @@ export class JikanCharacterService {
    */
   private async populateCacheIfNeeded(): Promise<void> {
     if (this.isPopulating) {
-      return; // Already populating
+      return;
     }
 
     const currentSize = this.getCacheSize();
     if (currentSize >= this.MIN_CACHE_SIZE) {
-      console.log(`[JikanService] Cache has ${currentSize} characters; skipping API fetch.`);
+      console.log(`[AniListService] Cache has ${currentSize} characters; skipping API fetch.`);
       return;
     }
 
     this.isPopulating = true;
-    console.log('[JikanService] Background cache population started.');
+    console.log('[AniListService] Background cache population started.');
 
     try {
-      const added = await this.fetchCharactersFromJikan(this.TARGET_CACHE_SIZE - currentSize);
-      console.log(`[JikanService] Added ${added} characters to cache.`);
+      const added = await this.fetchCharactersFromAniList(this.TARGET_CACHE_SIZE - currentSize);
+      console.log(`[AniListService] Added ${added} characters to cache.`);
     } catch (error) {
-      console.log('[JikanService] Background population failed:', error);
+      console.log('[AniListService] Background population failed:', error);
     } finally {
       this.isPopulating = false;
     }
   }
 
   /**
-   * Fetch characters from Jikan using paginated endpoint
+   * Fetch characters from AniList using GraphQL
    */
-  private async fetchCharactersFromJikan(targetCount: number): Promise<number> {
+  private async fetchCharactersFromAniList(targetCount: number): Promise<number> {
     if (this.isCircuitOpen()) {
-      console.log('[JikanService] Circuit breaker is open; skipping fetch.');
+      console.log('[AniListService] Circuit breaker is open; skipping fetch.');
       return 0;
     }
 
     let added = 0;
     let page = 1;
   
-    while (added < targetCount && page <= 5) { // Limit to 5 pages max
+    while (added < targetCount && page <= 5) {
       const response = await this.enqueueRequest(async () => {
         return this.fetchPaginatedCharacters(page);
       });
@@ -173,34 +194,88 @@ export class JikanCharacterService {
   }
 
   /**
-   * Fetch a paginated page of characters from Jikan
+   * Fetch a paginated page of characters from AniList
    */
-  private async fetchPaginatedCharacters(page: number): Promise<JikanCharacter[] | null> {
+  private async fetchPaginatedCharacters(page: number): Promise<AniListCharacter[] | null> {
+    const query = `
+      query ($page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+          characters(sort: FAVOURITES_DESC) {
+            id
+            name {
+              first
+              last
+              full
+              native
+            }
+            image {
+              large
+              medium
+            }
+            media(perPage: 1, sort: POPULARITY_DESC) {
+              nodes {
+                id
+                title {
+                  english
+                  romaji
+                  native
+                }
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      page: page,
+      perPage: 25
+    };
+
     for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
       try {
-        const response = await fetch(`${this.API_BASE}/characters?page=${page}&limit=25&order_by=favorites&sort=desc`, {
+        const response = await fetch(this.API_BASE, {
+          method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
+          body: JSON.stringify({
+            query: query,
+            variables: variables
+          }),
         });
 
         if (response.ok) {
-          const data = await response.json() as JikanPaginatedResponse;
-          return data.data;
+          const data = await response.json() as AniListResponse;
+          
+          if (data.errors) {
+            console.log('[AniListService] GraphQL errors:', data.errors.map(e => e.message).join(', '));
+            return null;
+          }
+
+          if (data.data?.Page?.characters) {
+            return data.data.Page.characters;
+          }
+
+          return null;
         }
 
         // Handle rate limiting
         if (response.status === 429) {
           const retryAfter = response.headers.get('Retry-After');
           const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : this.BASE_RETRY_DELAY * attempt;
-          console.log(`[JikanService] Jikan rate limited; circuit opened for ${waitTime}ms.`);
+          console.log(`[AniListService] Rate limited; circuit opened for ${waitTime}ms.`);
           this.openCircuit(waitTime);
           return null;
         }
 
         // Handle gateway errors
         if (response.status === 504 || response.status >= 500) {
-          console.log(`[JikanService] Temporary gateway error. Retry ${attempt}/${this.MAX_RETRIES}.`);
+          console.log(`[AniListService] Temporary gateway error. Retry ${attempt}/${this.MAX_RETRIES}.`);
           if (attempt < this.MAX_RETRIES) {
             const jitter = Math.random() * 500;
             await this.delay(this.BASE_RETRY_DELAY * Math.pow(2, attempt - 1) + jitter);
@@ -209,11 +284,11 @@ export class JikanCharacterService {
         }
 
         // Other errors
-        console.log(`[JikanService] API error: ${response.status} ${response.statusText}`);
+        console.log(`[AniListService] API error: ${response.status} ${response.statusText}`);
         return null;
 
       } catch (error) {
-        console.log(`[JikanService] Network error on attempt ${attempt}/${this.MAX_RETRIES}.`);
+        console.log(`[AniListService] Network error on attempt ${attempt}/${this.MAX_RETRIES}.`);
         if (attempt < this.MAX_RETRIES) {
           const jitter = Math.random() * 500;
           await this.delay(this.BASE_RETRY_DELAY * Math.pow(2, attempt - 1) + jitter);
@@ -227,73 +302,74 @@ export class JikanCharacterService {
   /**
    * Validate and cache a character
    */
-  private validateAndCacheCharacter(character: JikanCharacter): boolean {
-    // Validate required fields
-    if (!character.mal_id || !character.name || !character.name.trim()) {
+  private validateAndCacheCharacter(character: AniListCharacter): boolean {
+    // Get character name
+    const name = character.name.full || character.name.first || character.name.last || character.name.native;
+    if (!character.id || !name || !name.trim()) {
       return false;
     }
 
     // Check for valid image
-    const imageUrl = character.images.jpg.image_url;
+    const imageUrl = character.image.large || character.image.medium;
     if (!imageUrl) {
       return false;
     }
 
     // Skip if already cached
-    if (this.cache.has(character.mal_id)) {
+    if (this.cache.has(character.id)) {
       return false;
     }
 
-    const anime = this.extractAnimeFromAbout(character.about);
+    // Get anime/media name
+    let anime: string | null = null;
+    if (character.media && character.media.nodes.length > 0) {
+      const media = character.media.nodes[0];
+      anime = media.title.english || media.title.romaji || media.title.native;
+    }
 
-    const cachedChar: CachedCharacter = {
-      characterId: character.mal_id,
-      name: character.name,
+    const cachedChar: IndexedCachedCharacter = {
+      characterId: character.id,
+      name: name,
       imageUrl: imageUrl,
       anime: anime,
       cachedAt: Date.now(),
       hasValidImage: true,
     };
 
-    this.cache.set(character.mal_id, cachedChar);
+    this.cache.set(character.id, cachedChar);
     return true;
   }
 
   /**
    * Fetch two different random characters - cache only
-   * This should NOT make Jikan requests during normal operation
    */
   async fetchTwoRandomCharacters(): Promise<[CachedCharacter | null, CachedCharacter | null]> {
     const validCachedChars = Array.from(this.cache.values()).filter(c => c.hasValidImage);
     
-    // If we have at least 2 cached characters, use cache only
     if (validCachedChars.length >= 2) {
-      console.log('[JikanService] Using cached characters.');
+      console.log('[AniListService] Using cached characters.');
       return this.selectTwoFromCache(validCachedChars);
     }
 
-    // If cache is too small, trigger background population and return what we have
-    console.log(`[JikanService] Cache has only ${validCachedChars.length} characters. Triggering background population.`);
+    console.log(`[AniListService] Cache has only ${validCachedChars.length} characters. Triggering background population.`);
     this.initializeBackgroundPopulation();
 
-    // If we have at least 2, use them anyway
     if (validCachedChars.length >= 2) {
       return this.selectTwoFromCache(validCachedChars);
     }
 
-    // Not enough characters
     return [null, null];
   }
 
   /**
    * Select two different characters from cache
    */
-  private selectTwoFromCache(cachedChars: CachedCharacter[]): [CachedCharacter | null, CachedCharacter | null] {
+  private selectTwoFromCache(cachedChars: IndexedCachedCharacter[]): [CachedCharacter | null, CachedCharacter | null] {
     if (cachedChars.length < 2) {
       return [cachedChars[0] || null, null];
     }
 
-    // Fisher-Yates shuffle for better randomness
+    // Fisher-Yates shuffle
     const shuffled = [...cachedChars];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -301,7 +377,6 @@ export class JikanCharacterService {
     }
     return [shuffled[0], shuffled[1]];
   }
-
 
   /**
    * Get a random character from cache (excluding specified ID)
@@ -320,26 +395,9 @@ export class JikanCharacterService {
   }
 
   /**
-   * Extract anime/source from the about field
+   * Extract anime/source from the about field (not used for AniList)
    */
   private extractAnimeFromAbout(about: string | null): string | null {
-    if (!about) return null;
-
-    // Try to find anime name in the about text
-    // Common patterns: "from [anime]", "in [anime]", "[anime] character"
-    const patterns = [
-      /from\s+(.+?)(?:\.|,|$)/i,
-      /in\s+(.+?)(?:\.|,|$)/i,
-      /(.+?)\s+character/i,
-    ];
-
-    for (const pattern of patterns) {
-      const match = about.match(pattern);
-      if (match && match[1]) {
-        return match[1].trim();
-      }
-    }
-
     return null;
   }
 
@@ -357,7 +415,7 @@ export class JikanCharacterService {
     }
     if (removed > 0) {
       this.saveCacheToDisk();
-      console.log(`[JikanService] Cleaned up ${removed} expired cache entries.`);
+      console.log(`[AniListService] Cleaned up ${removed} expired cache entries.`);
     }
   }
 
@@ -386,7 +444,7 @@ export class JikanCharacterService {
     if (this.circuitState === CircuitState.OPEN) {
       if (Date.now() >= this.circuitOpenUntil) {
         this.circuitState = CircuitState.HALF_OPEN;
-        console.log('[JikanService] Circuit breaker transitioning to half-open.');
+        console.log('[AniListService] Circuit breaker transitioning to half-open.');
         return false;
       }
       return true;
@@ -397,14 +455,14 @@ export class JikanCharacterService {
   private openCircuit(duration?: number): void {
     this.circuitState = CircuitState.OPEN;
     this.circuitOpenUntil = Date.now() + (duration || this.CIRCUIT_COOLDOWN);
-    console.log(`[JikanService] Circuit breaker opened for ${duration || this.CIRCUIT_COOLDOWN}ms.`);
+    console.log(`[AniListService] Circuit breaker opened for ${duration || this.CIRCUIT_COOLDOWN}ms.`);
   }
 
   private recordSuccess(): void {
     this.failureCount = 0;
     if (this.circuitState === CircuitState.HALF_OPEN) {
       this.circuitState = CircuitState.CLOSED;
-      console.log('[JikanService] Circuit breaker closed after successful request.');
+      console.log('[AniListService] Circuit breaker closed after successful request.');
     }
   }
 
@@ -460,7 +518,6 @@ export class JikanCharacterService {
       this.isProcessingQueue = false;
     };
 
-    // Process queue periodically
     setInterval(processQueue, 100);
   }
 
@@ -485,7 +542,7 @@ export class JikanCharacterService {
       };
       fs.writeFileSync(this.CACHE_FILE, JSON.stringify(cacheData, null, 2), 'utf-8');
     } catch (error) {
-      console.error('[JikanService] Failed to save cache to disk:', error);
+      console.error('[AniListService] Failed to save cache to disk:', error);
     }
   }
 
@@ -498,7 +555,6 @@ export class JikanCharacterService {
         const data = fs.readFileSync(this.CACHE_FILE, 'utf-8');
         const cacheData: CacheData = JSON.parse(data);
         
-        // Clean expired entries
         const now = Date.now();
         for (const char of cacheData.characters) {
           if (now - char.cachedAt < this.CACHE_DURATION) {
@@ -506,10 +562,10 @@ export class JikanCharacterService {
           }
         }
         
-        console.log(`[JikanService] Loaded ${this.cache.size} characters from cache.`);
+        console.log(`[AniListService] Loaded ${this.cache.size} characters from cache.`);
       }
     } catch (error) {
-      console.error('[JikanService] Failed to load cache from disk:', error);
+      console.error('[AniListService] Failed to load cache from disk:', error);
     }
   }
 
@@ -520,3 +576,6 @@ export class JikanCharacterService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
+
+// Type alias for internal use
+interface IndexedCachedCharacter extends CachedCharacter {}

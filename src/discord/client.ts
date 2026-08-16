@@ -16,7 +16,7 @@ import { handleRouletteCommand, handleRouletteInteraction } from '../commands/ro
 import { handleRouletteMaxCommand, handleRouletteMaxInteraction } from '../commands/roulettemax.js';
 import { handlePissCompCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
 import { handleSmashMaxCommand, handleSmashMaxInteraction } from '../commands/smashmax.js';
-import { JikanCharacterService } from '../services/jikan-character-service.js';
+import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
   private client: Client;
@@ -55,9 +55,9 @@ export class DiscordClient {
     // Set bot status
     this.client.user?.setActivity('googoo gaga niggas', { type: 3 as any });
     
-    // Initialize Jikan service (non-blocking, will populate cache in background if needed)
-    const jikanService = JikanCharacterService.getInstance();
-    jikanService.initializeBackgroundPopulation();
+    // Initialize AniList service (non-blocking, will populate cache in background if needed)
+    const anilistService = AniListCharacterService.getInstance();
+    anilistService.initializeBackgroundPopulation();
   }
 
   private async onMessageCreate(message: any): Promise<void> {

@@ -1,5 +1,5 @@
 import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder } from 'discord.js';
-import { CachedCharacter } from '../services/jikan-character-service.js';
+import { CachedCharacter } from '../services/anilist-character-service.js';
 
 export interface SmashMaxState {
   channelId: string;
