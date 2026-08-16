@@ -31,14 +31,11 @@ export interface PissCompResult {
 export class PissCompGame {
   private state: PissCompState;
   private currentMessage?: Message;
-  private timers: NodeJS.Timeout[] = [];
   private onGameEnd?: () => void;
 
   // Game constants
   private static readonly MAX_METER = 100;
-  private static readonly PUMP_AMOUNT = 8;
-  private static readonly DRAIN_AMOUNT = 2;
-  private static readonly DRAIN_INTERVAL = 500; // ms
+  private static readonly PUMP_AMOUNT = 10;
   private static readonly WIN_THRESHOLD = 100;
 
   // GIF URLs
@@ -73,43 +70,6 @@ export class PissCompGame {
     
     // Show initial game state
     await this.showGameState();
-    
-    // Start the drain timer
-    this.startDrainTimer();
-  }
-
-  /**
-   * Start the passive drain timer
-   */
-  private startDrainTimer(): void {
-    const drainInterval = setInterval(() => {
-      if (this.state.isGameOver) {
-        clearInterval(drainInterval);
-        return;
-      }
-
-      // Drain both meters
-      let meterChanged = false;
-      
-      if (this.state.player1Meter > 0) {
-        this.state.player1Meter = Math.max(0, this.state.player1Meter - PissCompGame.DRAIN_AMOUNT);
-        meterChanged = true;
-      }
-      
-      if (this.state.player2Meter > 0) {
-        this.state.player2Meter = Math.max(0, this.state.player2Meter - PissCompGame.DRAIN_AMOUNT);
-        meterChanged = true;
-      }
-
-      // Update the message if meters changed
-      if (meterChanged) {
-        this.showGameState().catch(error => {
-          console.error('[PissComp] Error updating game state:', error);
-        });
-      }
-    }, PissCompGame.DRAIN_INTERVAL);
-
-    this.timers.push(drainInterval);
   }
 
   /**
@@ -192,7 +152,6 @@ export class PissCompGame {
   private async handleDraw(interaction: MessageComponentInteraction): Promise<void> {
     this.state.isDraw = true;
     this.state.isGameOver = true;
-    this.clearTimers();
 
     const drawEmbed = this.createDrawEmbed();
 
@@ -212,7 +171,6 @@ export class PissCompGame {
 
     // Restart the game
     await this.showGameState();
-    this.startDrainTimer();
   }
 
   /**
@@ -221,7 +179,6 @@ export class PissCompGame {
   private async handleVictory(winnerId: string, loserId: string, interaction: MessageComponentInteraction): Promise<void> {
     this.state.winner = winnerId;
     this.state.isGameOver = true;
-    this.clearTimers();
 
     const victoryEmbed = this.createVictoryEmbed(winnerId, loserId);
 
@@ -266,7 +223,7 @@ export class PissCompGame {
       )
       .setColor(0x00BFFF)
       .setThumbnail('https://cdn.discordapp.com/emojis/1256402744083284029.webp?size=96')
-      .setFooter({ text: 'Spam your pump button to fill the meter!' });
+      .setFooter({ text: 'First to 100% wins!' });
   }
 
   /**
@@ -358,21 +315,10 @@ export class PissCompGame {
   }
 
   /**
-   * Clean up all timers
-   */
-  private clearTimers(): void {
-    this.timers.forEach(timer => clearTimeout(timer));
-    this.timers = [];
-  }
-
-  /**
    * Delay helper
    */
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => {
-      const timeout = setTimeout(resolve, ms);
-      this.timers.push(timeout);
-    });
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
