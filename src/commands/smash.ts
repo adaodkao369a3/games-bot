@@ -76,12 +76,12 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
 
     // Generate initial voting image
     const imageData: SmashImageData = {
-      player1Name: user1.displayName || user1.username,
-      player1Avatar: player1AvatarBuffer,
-      player2Name: user2.displayName || user2.username,
-      player2Avatar: player2AvatarBuffer,
-      player1Votes: 0,
-      player2Votes: 0,
+      subject1Name: user1.displayName || user1.username,
+      subject1Image: player1AvatarBuffer,
+      subject2Name: user2.displayName || user2.username,
+      subject2Image: player2AvatarBuffer,
+      subject1Votes: 0,
+      subject2Votes: 0,
     };
 
     const votingImage = await SmashImageGenerator.generateVotingImage(imageData);
@@ -182,12 +182,12 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
           console.log('[Vote Handler] Regenerating image with votes:', voteData.player1Votes, '-', voteData.player2Votes);
           
           const imageData: SmashImageData = {
-            player1Name: voteData.user1.displayName || voteData.user1.username,
-            player1Avatar: voteData.player1AvatarBuffer,
-            player2Name: voteData.user2.displayName || voteData.user2.username,
-            player2Avatar: voteData.player2AvatarBuffer,
-            player1Votes: voteData.player1Votes,
-            player2Votes: voteData.player2Votes,
+            subject1Name: voteData.user1.displayName || voteData.user1.username,
+            subject1Image: voteData.player1AvatarBuffer,
+            subject2Name: voteData.user2.displayName || voteData.user2.username,
+            subject2Image: voteData.player2AvatarBuffer,
+            subject1Votes: voteData.player1Votes,
+            subject2Votes: voteData.player2Votes,
           };
 
           const updatedImage = await SmashImageGenerator.generateVotingImage(imageData);
@@ -241,11 +241,11 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
   }
 
   // Determine winner or tie
-  let winner: 'player1' | 'player2' | 'tie' = 'tie';
+  let winner: 'subject1' | 'subject2' | 'tie' = 'tie';
   if (voteData.player1Votes > voteData.player2Votes) {
-    winner = 'player1';
+    winner = 'subject1';
   } else if (voteData.player2Votes > voteData.player1Votes) {
-    winner = 'player2';
+    winner = 'subject2';
   } else {
     winner = 'tie';
   }
@@ -254,12 +254,12 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
   if (voteData.player1AvatarBuffer && voteData.player2AvatarBuffer && voteData.user1 && voteData.user2) {
     try {
       const imageData: SmashImageData = {
-        player1Name: voteData.user1.displayName || voteData.user1.username,
-        player1Avatar: voteData.player1AvatarBuffer,
-        player2Name: voteData.user2.displayName || voteData.user2.username,
-        player2Avatar: voteData.player2AvatarBuffer,
-        player1Votes: voteData.player1Votes,
-        player2Votes: voteData.player2Votes,
+        subject1Name: voteData.user1.displayName || voteData.user1.username,
+        subject1Image: voteData.player1AvatarBuffer,
+        subject2Name: voteData.user2.displayName || voteData.user2.username,
+        subject2Image: voteData.player2AvatarBuffer,
+        subject1Votes: voteData.player1Votes,
+        subject2Votes: voteData.player2Votes,
         isResult: true,
         winner,
       };
@@ -273,7 +273,7 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
       if (winner === 'tie') {
         resultDescription = '🤝 Both are certified smashes!';
       } else {
-        const winnerUser = winner === 'player1' ? voteData.user1 : voteData.user2;
+        const winnerUser = winner === 'subject1' ? voteData.user1 : voteData.user2;
         const winnerUserId = winnerUser.id; // Use actual Discord user ID for mention
         resultDescription = `<a:pinkheartexclaim:1529443130104090734> <@${winnerUserId}> is a total smash by public choice!`;
         console.log('[End Voting] Using Discord mention for user ID:', winnerUserId);

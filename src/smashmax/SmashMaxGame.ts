@@ -1,5 +1,6 @@
-import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder } from 'discord.js';
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder, AttachmentBuilder } from 'discord.js';
 import { CachedCharacter } from '../services/anilist-character-service.js';
+import { SmashImageGenerator, SmashImageData } from '../utils/smash-image-generator.js';
 
 export interface SmashMaxState {
   channelId: string;
@@ -23,7 +24,7 @@ export enum SmashMaxPhase {
 }
 
 export interface SmashMaxResult {
-  winner: 'character1' | 'character2' | 'tie';
+  winner: 'subject1' | 'subject2' | 'tie';
   character1Votes: number;
   character2Votes: number;
 }
@@ -37,6 +38,8 @@ export class SmashMaxGame {
   private timers: NodeJS.Timeout[] = [];
   private onGameEnd?: () => void;
   private readonly VOTING_DURATION = 15 * 1000; // 15 seconds
+  private character1ImageBuffer?: Buffer;
+  private character2ImageBuffer?: Buffer;
 
   constructor(
     channelId: string,
@@ -70,14 +73,14 @@ export class SmashMaxGame {
   }
 
   /**
-   * Show loading state while fetching characters
+   * Show loading state while downloading character images
    */
   private async showLoading(): Promise<void> {
     this.state.currentPhase = SmashMaxPhase.LOADING;
 
     const embed = new EmbedBuilder()
       .setTitle('🔥 SMASHMAX')
-      .setDescription('🎲 Fetching anime characters...\n\nPlease wait.')
+      .setDescription('🎲 Loading anime character images...\n\nPlease wait.')
       .setColor(0xFFD700);
 
     await this.currentMessage?.edit({
@@ -86,8 +89,28 @@ export class SmashMaxGame {
       components: [],
     });
 
-    // Small delay to show loading state
-    await this.delay(1000);
+    // Download character images
+    try {
+      if (this.state.character1.imageUrl) {
+        this.character1ImageBuffer = await SmashImageGenerator.downloadImage(this.state.character1.imageUrl);
+      }
+      if (this.state.character2.imageUrl) {
+        this.character2ImageBuffer = await SmashImageGenerator.downloadImage(this.state.character2.imageUrl);
+      }
+    } catch (error) {
+      console.error('[SmashMaxGame] Failed to download character images:', error);
+      await this.currentMessage?.edit({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('❌ Error')
+            .setDescription('Failed to load character images. Please try again later.')
+            .setColor(0xFF0000)
+        ],
+      });
+      this.state.isGameOver = true;
+      if (this.onGameEnd) this.onGameEnd();
+      return;
+    }
 
     // Check if game is still active
     if (this.state.isGameOver) return;
@@ -103,9 +126,10 @@ export class SmashMaxGame {
     this.state.currentPhase = SmashMaxPhase.VOTING;
     this.state.votingStartTime = Date.now();
 
-    const embed = this.createVotingEmbed();
+    const { embed, attachment } = await this.createVotingEmbed();
 
     await this.currentMessage?.edit({
+      files: [attachment],
       embeds: [embed],
       components: [this.createVotingButtons()],
     });
@@ -121,40 +145,37 @@ export class SmashMaxGame {
   }
 
   /**
-   * Create voting embed
+   * Create voting embed with generated collage
    */
-  private createVotingEmbed(): EmbedBuilder {
+  private async createVotingEmbed(): Promise<{ embed: EmbedBuilder; attachment: AttachmentBuilder }> {
+    if (!this.character1ImageBuffer || !this.character2ImageBuffer) {
+      throw new Error('Character images not loaded');
+    }
+
     const char1 = this.state.character1;
     const char2 = this.state.character2;
+
+    // Generate collage using SmashImageGenerator
+    const imageData: SmashImageData = {
+      subject1Name: char1.name,
+      subject1Image: this.character1ImageBuffer,
+      subject2Name: char2.name,
+      subject2Image: this.character2ImageBuffer,
+      subject1Votes: this.state.player1Votes,
+      subject2Votes: this.state.player2Votes,
+    };
+
+    const votingImage = await SmashImageGenerator.generateVotingImage(imageData);
+    const attachment = new AttachmentBuilder(votingImage, { name: 'smashmax-voting.png' });
 
     const embed = new EmbedBuilder()
       .setTitle('🔥 SMASHMAX')
       .setColor(0xFFD700)
+      .setImage('attachment://smashmax-voting.png')
       .setTimestamp()
       .setFooter({ text: '15 seconds to vote' });
 
-    // Build description with character info
-    let description = `**${char1.name}**\n`;
-    if (char1.anime) {
-      description += `*${char1.anime}*\n`;
-    }
-    description += `\n**VS**\n\n`;
-    description += `**${char2.name}**\n`;
-    if (char2.anime) {
-      description += `*${char2.anime}*\n`;
-    }
-
-    embed.setDescription(description);
-
-    // Add images if available
-    if (char1.imageUrl) {
-      embed.setThumbnail(char1.imageUrl);
-    }
-    if (char2.imageUrl) {
-      embed.setImage(char2.imageUrl);
-    }
-
-    return embed;
+    return { embed, attachment };
   }
 
   /**
@@ -220,15 +241,10 @@ export class SmashMaxGame {
    * Update voting embed with current vote counts
    */
   private async updateVotingEmbed(): Promise<void> {
-    const embed = this.createVotingEmbed();
-    
-    // Add vote counts to description
-    const currentDescription = embed.data.description || '';
-    const voteInfo = `\n\n📊 **Votes:**\n${this.state.character1.name}: ${this.state.player1Votes}\n${this.state.character2.name}: ${this.state.player2Votes}`;
-    
-    embed.setDescription(currentDescription + voteInfo);
+    const { embed, attachment } = await this.createVotingEmbed();
 
     await this.currentMessage?.edit({
+      files: [attachment],
       embeds: [embed],
     });
   }
@@ -243,11 +259,11 @@ export class SmashMaxGame {
     this.clearTimers();
 
     // Determine winner
-    let winner: 'character1' | 'character2' | 'tie' = 'tie';
+    let winner: 'subject1' | 'subject2' | 'tie' = 'tie';
     if (this.state.player1Votes > this.state.player2Votes) {
-      winner = 'character1';
+      winner = 'subject1';
     } else if (this.state.player2Votes > this.state.player1Votes) {
-      winner = 'character2';
+      winner = 'subject2';
     }
 
     // Show result
@@ -255,11 +271,30 @@ export class SmashMaxGame {
   }
 
   /**
-   * Show result embed
+   * Show result embed with generated collage
    */
-  private async showResult(winner: 'character1' | 'character2' | 'tie'): Promise<void> {
+  private async showResult(winner: 'subject1' | 'subject2' | 'tie'): Promise<void> {
+    if (!this.character1ImageBuffer || !this.character2ImageBuffer) {
+      throw new Error('Character images not loaded');
+    }
+
     const char1 = this.state.character1;
     const char2 = this.state.character2;
+
+    // Generate result collage using SmashImageGenerator
+    const imageData: SmashImageData = {
+      subject1Name: char1.name,
+      subject1Image: this.character1ImageBuffer,
+      subject2Name: char2.name,
+      subject2Image: this.character2ImageBuffer,
+      subject1Votes: this.state.player1Votes,
+      subject2Votes: this.state.player2Votes,
+      isResult: true,
+      winner,
+    };
+
+    const resultImage = await SmashImageGenerator.generateResultImage(imageData);
+    const attachment = new AttachmentBuilder(resultImage, { name: 'smashmax-result.png' });
 
     let resultDescription: string;
     let resultColor: number;
@@ -268,8 +303,8 @@ export class SmashMaxGame {
       resultDescription = `🤝 **It's a tie!**\n\nBoth characters are equally smashable!\n\n**Final Score:**\n${char1.name}: ${this.state.player1Votes} votes\n${char2.name}: ${this.state.player2Votes} votes`;
       resultColor = 0xFFA500;
     } else {
-      const winnerChar = winner === 'character1' ? char1 : char2;
-      const loserChar = winner === 'character1' ? char2 : char1;
+      const winnerChar = winner === 'subject1' ? char1 : char2;
+      const loserChar = winner === 'subject1' ? char2 : char1;
       resultDescription = `🏆 **${winnerChar.name} WINS!**\n\n${winnerChar.anime ? `*${winnerChar.anime}*\n` : ''}The people have spoken!\n\n**Final Score:**\n${char1.name}: ${this.state.player1Votes} votes\n${char2.name}: ${this.state.player2Votes} votes`;
       resultColor = 0xFFD700;
     }
@@ -278,18 +313,12 @@ export class SmashMaxGame {
       .setTitle('🔥 SMASHMAX — RESULTS')
       .setDescription(resultDescription)
       .setColor(resultColor)
+      .setImage('attachment://smashmax-result.png')
       .setTimestamp()
       .setFooter({ text: 'Bob Kun 🍌' });
 
-    // Keep the images
-    if (char1.imageUrl) {
-      embed.setThumbnail(char1.imageUrl);
-    }
-    if (char2.imageUrl) {
-      embed.setImage(char2.imageUrl);
-    }
-
     await this.currentMessage?.edit({
+      files: [attachment],
       embeds: [embed],
       components: [this.createDisabledButtons()],
     });

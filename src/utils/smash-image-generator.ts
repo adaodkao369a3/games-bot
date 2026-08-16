@@ -29,14 +29,14 @@ try {
 }
 
 export interface SmashImageData {
-  player1Name: string;
-  player1Avatar: Buffer;
-  player2Name: string;
-  player2Avatar: Buffer;
-  player1Votes: number;
-  player2Votes: number;
+  subject1Name: string;
+  subject1Image: Buffer;
+  subject2Name: string;
+  subject2Image: Buffer;
+  subject1Votes: number;
+  subject2Votes: number;
   isResult?: boolean;
-  winner?: 'player1' | 'player2' | 'tie';
+  winner?: 'subject1' | 'subject2' | 'tie';
 }
 
 export class SmashImageGenerator {
@@ -50,7 +50,7 @@ export class SmashImageGenerator {
    * Generate a voting state image with vote counts
    */
   static async generateVotingImage(data: SmashImageData): Promise<Buffer> {
-    const { player1Avatar, player2Avatar, player1Votes, player2Votes, player1Name, player2Name } = data;
+    const { subject1Image, subject2Image, subject1Votes, subject2Votes, subject1Name, subject2Name } = data;
 
     if (!fontLoaded) {
       throw new Error('[SmashImageGenerator] Font not loaded - cannot render image');
@@ -60,21 +60,21 @@ export class SmashImageGenerator {
     const canvas = createCanvas(this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    // Load avatars
-    const avatar1 = await loadImage(player1Avatar);
-    const avatar2 = await loadImage(player2Avatar);
+    // Load images
+    const image1 = await loadImage(subject1Image);
+    const image2 = await loadImage(subject2Image);
 
-    // Draw avatars with cover cropping
-    this.drawCoverImage(ctx, avatar1, 0, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT);
-    this.drawCoverImage(ctx, avatar2, this.AVATAR_WIDTH, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT);
+    // Draw images with cover cropping
+    this.drawCoverImage(ctx, image1, 0, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT);
+    this.drawCoverImage(ctx, image2, this.AVATAR_WIDTH, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT);
 
     // Draw vote counts
-    this.drawVoteCount(ctx, player1Votes, 60, 100, 'left');
-    this.drawVoteCount(ctx, player2Votes, this.IMAGE_WIDTH - 60, 100, 'right');
+    this.drawVoteCount(ctx, subject1Votes, 60, 100, 'left');
+    this.drawVoteCount(ctx, subject2Votes, this.IMAGE_WIDTH - 60, 100, 'right');
 
-    // Draw usernames
-    this.drawUsername(ctx, player1Name, this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
-    this.drawUsername(ctx, player2Name, this.AVATAR_WIDTH + this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
+    // Draw names
+    this.drawUsername(ctx, subject1Name, this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
+    this.drawUsername(ctx, subject2Name, this.AVATAR_WIDTH + this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
 
     return canvas.toBuffer('image/png');
   }
@@ -87,30 +87,30 @@ export class SmashImageGenerator {
       throw new Error('[SmashImageGenerator] Font not loaded - cannot render image');
     }
 
-    const { player1Avatar, player2Avatar, player1Votes, player2Votes, winner, player1Name, player2Name } = data;
+    const { subject1Image, subject2Image, subject1Votes, subject2Votes, winner, subject1Name, subject2Name } = data;
 
     console.log('[SmashImageGenerator] Generating result image');
 
-    const totalVotes = player1Votes + player2Votes;
+    const totalVotes = subject1Votes + subject2Votes;
     const isZeroVoteTie = totalVotes === 0;
 
     // Create canvas
     const canvas = createCanvas(this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    // Load avatars
-    const avatar1 = await loadImage(player1Avatar);
-    const avatar2 = await loadImage(player2Avatar);
+    // Load images
+    const image1 = await loadImage(subject1Image);
+    const image2 = await loadImage(subject2Image);
 
     // Apply treatments based on winner
-    // In a tie (including 0-0), both players are winners (full color)
+    // In a tie (including 0-0), both subjects are winners (full color)
     const isTie = winner === 'tie';
-    const avatar1IsWinner = isTie || winner === 'player1';
-    const avatar2IsWinner = isTie || winner === 'player2';
+    const subject1IsWinner = isTie || winner === 'subject1';
+    const subject2IsWinner = isTie || winner === 'subject2';
 
-    // Draw avatars with cover cropping and treatments
-    this.drawCoverImageWithTreatment(ctx, avatar1, 0, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT, avatar1IsWinner);
-    this.drawCoverImageWithTreatment(ctx, avatar2, this.AVATAR_WIDTH, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT, avatar2IsWinner);
+    // Draw images with cover cropping and treatments
+    this.drawCoverImageWithTreatment(ctx, image1, 0, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT, subject1IsWinner);
+    this.drawCoverImageWithTreatment(ctx, image2, this.AVATAR_WIDTH, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT, subject2IsWinner);
 
     // Load and draw overlays
     try {
@@ -138,16 +138,16 @@ export class SmashImageGenerator {
         ctx.drawImage(passOverlay, overlayX2, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
       } else {
         // Normal winner/loser or genuine tie with votes
-        if (winner === 'player1' || winner === 'tie') {
+        if (winner === 'subject1' || winner === 'tie') {
           ctx.drawImage(smashOverlay, overlayX1, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
         }
-        if (winner === 'player2' || winner === 'tie') {
+        if (winner === 'subject2' || winner === 'tie') {
           ctx.drawImage(smashOverlay, overlayX2, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
         }
-        if (winner === 'player1') {
+        if (winner === 'subject1') {
           ctx.drawImage(passOverlay, overlayX2, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
         }
-        if (winner === 'player2') {
+        if (winner === 'subject2') {
           ctx.drawImage(passOverlay, overlayX1, overlayY, this.OVERLAY_SIZE, this.OVERLAY_SIZE);
         }
       }
@@ -157,23 +157,30 @@ export class SmashImageGenerator {
     }
 
     // Draw vote counts
-    this.drawVoteCount(ctx, player1Votes, 60, 100, 'left');
-    this.drawVoteCount(ctx, player2Votes, this.IMAGE_WIDTH - 60, 100, 'right');
+    this.drawVoteCount(ctx, subject1Votes, 60, 100, 'left');
+    this.drawVoteCount(ctx, subject2Votes, this.IMAGE_WIDTH - 60, 100, 'right');
 
-    // Draw usernames
-    this.drawUsername(ctx, player1Name, this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
-    this.drawUsername(ctx, player2Name, this.AVATAR_WIDTH + this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
+    // Draw names
+    this.drawUsername(ctx, subject1Name, this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
+    this.drawUsername(ctx, subject2Name, this.AVATAR_WIDTH + this.AVATAR_WIDTH / 2, this.IMAGE_HEIGHT - 50, this.AVATAR_WIDTH - 40);
 
     return canvas.toBuffer('image/png');
   }
 
   /**
-   * Download avatar from URL to Buffer
+   * Download image from URL to Buffer
    */
-  static async downloadAvatar(url: string): Promise<Buffer> {
+  static async downloadImage(url: string): Promise<Buffer> {
     const response = await fetch(url);
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
+  }
+
+  /**
+   * Download avatar from URL to Buffer (legacy alias for compatibility)
+   */
+  static async downloadAvatar(url: string): Promise<Buffer> {
+    return this.downloadImage(url);
   }
 
   /**
