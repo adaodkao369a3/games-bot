@@ -24,17 +24,15 @@ export async function handleSmashMaxCommand(message: Message): Promise<void> {
 
     // Parse mode argument
     const args = message.content.trim().split(/\s+/);
-    let mode: 'normal' | 'female' | 'nsfw' = 'normal';
+    let mode: 'normal' | 'female' = 'normal';
     
     if (args.length > 1) {
       const modeArg = args[1].toLowerCase();
       if (modeArg === 'f' || modeArg === 'female') {
         mode = 'female';
-      } else if (modeArg === 'nsfw') {
-        mode = 'nsfw';
       } else {
         await message.reply({
-          content: 'Invalid mode. Use: `,smashmax` (normal), `,smashmax f` (female-only), or `,smashmax nsfw` (adult mode).',
+          content: 'Invalid mode. Use: `,smashmax` (normal) or `,smashmax f` (female-only).',
         });
         return;
       }
@@ -54,14 +52,14 @@ export async function handleSmashMaxCommand(message: Message): Promise<void> {
     const anilistService = AniListCharacterService.getInstance();
     const [char1, char2] = await anilistService.fetchTwoRandomCharacters(mode);
 
-    // Handle API failure
+    // Handle API failure or exhausted pool
     if (!char1 || !char2) {
       await replyMessage.edit({
         embeds: [
           new EmbedBuilder()
-            .setTitle('❌ Error')
-            .setDescription('SmashMax character data is temporarily unavailable. Please try again later.')
-            .setColor(0xFF0000)
+            .setTitle('⚠️ SmashMax Pool Exhausted')
+            .setDescription('The SmashMax character pool needs to be replenished. New characters are being fetched in the background. Please try again in a few minutes.')
+            .setColor(0xFFA500)
         ],
       });
       return;

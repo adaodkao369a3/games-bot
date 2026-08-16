@@ -1,6 +1,7 @@
 import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder, AttachmentBuilder } from 'discord.js';
 import { CachedCharacter } from '../services/anilist-character-service.js';
 import { SmashImageGenerator, SmashImageData } from '../utils/smash-image-generator.js';
+import { SmashMaxCharacterTracker } from '../services/smashmax-character-tracker.js';
 
 export interface SmashMaxState {
   channelId: string;
@@ -40,6 +41,7 @@ export class SmashMaxGame {
   private readonly VOTING_DURATION = 15 * 1000; // 15 seconds
   private character1ImageBuffer?: Buffer;
   private character2ImageBuffer?: Buffer;
+  private characterTracker = SmashMaxCharacterTracker.getInstance();
 
   constructor(
     channelId: string,
@@ -325,6 +327,12 @@ export class SmashMaxGame {
 
     // Wait a moment before finishing
     await this.delay(2000);
+
+    // Mark characters as used only after successful game completion
+    this.characterTracker.markCharactersAsUsed([
+      this.state.character1.characterId,
+      this.state.character2.characterId
+    ]);
 
     // Mark game as finished
     this.state.currentPhase = SmashMaxPhase.FINISHED;

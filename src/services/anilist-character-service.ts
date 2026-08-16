@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { SmashMaxCharacterTracker } from './smashmax-character-tracker.js';
 
 interface AniListCharacter {
   id: number;
@@ -109,6 +110,9 @@ export class AniListCharacterService {
   // Background population
   private isPopulating = false;
 
+  // Character tracker
+  private characterTracker = SmashMaxCharacterTracker.getInstance();
+
   private constructor() {
     this.ensureDataDirectory();
     this.loadCacheFromDisk();
@@ -125,7 +129,7 @@ export class AniListCharacterService {
   /**
    * Initialize background population (non-blocking)
    */
-  initializeBackgroundPopulation(mode: 'normal' | 'female' | 'nsfw' = 'normal'): void {
+  initializeBackgroundPopulation(mode: 'normal' | 'female' = 'normal'): void {
     this.populateCacheIfNeeded(mode).catch(error => {
       console.log('[AniListService] Background population failed:', error);
     });
@@ -134,7 +138,7 @@ export class AniListCharacterService {
   /**
    * Populate cache in background if needed (mode-aware)
    */
-  private async populateCacheIfNeeded(mode: 'normal' | 'female' | 'nsfw' = 'normal'): Promise<void> {
+  private async populateCacheIfNeeded(mode: 'normal' | 'female' = 'normal'): Promise<void> {
     if (this.isPopulating) {
       return;
     }
@@ -145,8 +149,6 @@ export class AniListCharacterService {
       validCachedChars = validCachedChars.filter(c => 
         c.gender && (c.gender.toLowerCase() === 'female' || c.gender.toLowerCase() === 'f') && !c.isAdult
       );
-    } else if (mode === 'nsfw') {
-      validCachedChars = validCachedChars.filter(c => c.isAdult);
     } else {
       validCachedChars = validCachedChars.filter(c => !c.isAdult);
     }
@@ -376,14 +378,12 @@ export class AniListCharacterService {
   /**
    * Get the size of a mode-specific pool
    */
-  private getModePoolSize(mode: 'normal' | 'female' | 'nsfw'): number {
+  private getModePoolSize(mode: 'normal' | 'female'): number {
     let validCachedChars = Array.from(this.cache.values()).filter(c => c.hasValidImage);
     if (mode === 'female') {
       validCachedChars = validCachedChars.filter(c => 
         c.gender && (c.gender.toLowerCase() === 'female' || c.gender.toLowerCase() === 'f') && !c.isAdult
       );
-    } else if (mode === 'nsfw') {
-      validCachedChars = validCachedChars.filter(c => c.isAdult);
     } else {
       validCachedChars = validCachedChars.filter(c => !c.isAdult);
     }
@@ -393,7 +393,7 @@ export class AniListCharacterService {
   /**
    * Fetch two different random characters - cache only
    */
-  async fetchTwoRandomCharacters(mode: 'normal' | 'female' | 'nsfw' = 'normal'): Promise<[CachedCharacter | null, CachedCharacter | null]> {
+  async fetchTwoRandomCharacters(mode: 'normal' | 'female' = 'normal'): Promise<[CachedCharacter | null, CachedCharacter | null]> {
     let validCachedChars = Array.from(this.cache.values()).filter(c => c.hasValidImage);
     
     // Filter based on mode
@@ -402,27 +402,27 @@ export class AniListCharacterService {
         c.gender && (c.gender.toLowerCase() === 'female' || c.gender.toLowerCase() === 'f') && !c.isAdult
       );
       console.log(`[AniListService] Filtered to ${validCachedChars.length} female non-adult characters.`);
-    } else if (mode === 'nsfw') {
-      validCachedChars = validCachedChars.filter(c => c.isAdult);
-      console.log(`[AniListService] Filtered to ${validCachedChars.length} adult characters.`);
     } else {
       // Normal mode: exclude adult
       validCachedChars = validCachedChars.filter(c => !c.isAdult);
       console.log(`[AniListService] Filtered to ${validCachedChars.length} non-adult characters.`);
     }
+
+    // Filter out previously used characters
+    const beforeFilterCount = validCachedChars.length;
+    validCachedChars = this.characterTracker.filterUsedCachedCharacters(validCachedChars);
+    console.log(`[AniListService] Filtered out ${beforeFilterCount - validCachedChars.length} previously used characters. Remaining: ${validCachedChars.length}`);
     
     if (validCachedChars.length >= 2) {
       console.log('[AniListService] Using cached characters.');
       return this.selectTwoFromCache(validCachedChars);
     }
 
-    console.log(`[AniListService] Mode '${mode}' has ${validCachedChars.length} eligible cached characters. Triggering background population.`);
+    // Pool is exhausted, trigger background population
+    console.log(`[AniListService] Mode '${mode}' has ${validCachedChars.length} eligible unused cached characters. Pool exhausted. Triggering background population.`);
     this.initializeBackgroundPopulation(mode);
 
-    if (validCachedChars.length >= 2) {
-      return this.selectTwoFromCache(validCachedChars);
-    }
-
+    // Return null to indicate pool exhaustion
     return [null, null];
   }
 
@@ -434,12 +434,26 @@ export class AniListCharacterService {
       return [cachedChars[0] || null, null];
     }
 
+    // Create a map to group characters by ID (to handle duplicates)
+    const uniqueChars = new Map<number, IndexedCachedCharacter>();
+    for (const char of cachedChars) {
+      uniqueChars.set(char.characterId, char);
+    }
+
+    const uniqueArray = Array.from(uniqueChars.values());
+
+    if (uniqueArray.length < 2) {
+      console.warn('[AniListService] Not enough unique characters in pool.');
+      return [uniqueArray[0] || null, null];
+    }
+
     // Fisher-Yates shuffle
-    const shuffled = [...cachedChars];
+    const shuffled = [...uniqueArray];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
+
     return [shuffled[0], shuffled[1]];
   }
 
