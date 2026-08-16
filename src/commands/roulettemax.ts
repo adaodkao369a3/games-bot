@@ -22,29 +22,33 @@ export async function handleRouletteMaxCommand(message: Message): Promise<void> 
   const mentionedUsers = message.mentions.users;
   const author = message.author;
 
-  // Must have exactly one opponent
-  if (!mentionedUsers || mentionedUsers.size !== 1) {
-    await message.reply('You must mention exactly one opponent to play Roulette Max.');
+  // Must have exactly 1 or 2 opponents (for 2 or 3 player mode)
+  if (!mentionedUsers || (mentionedUsers.size !== 1 && mentionedUsers.size !== 2)) {
+    await message.reply('You must mention exactly 1 or 2 opponents to play Roulette Max (2 or 3 player mode).');
     return;
   }
 
-  // Get the mentioned user
-  const opponent = mentionedUsers.first();
-  if (!opponent) {
-    await message.reply('Invalid opponent mentioned.');
+  // Get the mentioned users
+  const opponents = Array.from(mentionedUsers.values());
+  if (opponents.length === 0) {
+    await message.reply('Invalid opponents mentioned.');
     return;
   }
 
   // Reject bots
-  if (opponent.bot) {
-    await message.reply('Bots cannot participate in Roulette Max.');
-    return;
+  for (const opponent of opponents) {
+    if (opponent.bot) {
+      await message.reply('Bots cannot participate in Roulette Max.');
+      return;
+    }
   }
 
-  // Reject if opponent is the same as author
-  if (opponent.id === author.id) {
-    await message.reply('You cannot play against yourself.');
-    return;
+  // Reject if any opponent is the same as author
+  for (const opponent of opponents) {
+    if (opponent.id === author.id) {
+      await message.reply('You cannot play against yourself.');
+      return;
+    }
   }
 
   try {
@@ -59,22 +63,33 @@ export async function handleRouletteMaxCommand(message: Message): Promise<void> 
     };
 
     const player2: RouletteMaxPlayer = {
-      id: opponent.id,
-      name: opponent.displayName || opponent.username,
-      avatar: opponent.displayAvatarURL({ size: 256 }) || opponent.defaultAvatarURL,
+      id: opponents[0].id,
+      name: opponents[0].displayName || opponents[0].username,
+      avatar: opponents[0].displayAvatarURL({ size: 256 }) || opponents[0].defaultAvatarURL,
     };
+
+    // Optional player 3 for 3-player mode
+    let player3: RouletteMaxPlayer | undefined;
+    if (opponents.length === 2) {
+      player3 = {
+        id: opponents[1].id,
+        name: opponents[1].displayName || opponents[1].username,
+        avatar: opponents[1].displayAvatarURL({ size: 256 }) || opponents[1].defaultAvatarURL,
+      };
+    }
 
     // Create cleanup callback
     const onGameEnd = () => {
       activeGames.delete(channelId);
     };
 
-    // Create game instance
+    // Create game instance (with or without player 3)
     const game = new RouletteMaxGame(
       channelId,
       guildId || undefined,
       player1,
       player2,
+      player3,
       onGameEnd
     );
 
