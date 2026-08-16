@@ -20,12 +20,12 @@ export async function handleSmashTestCommand(message: Message): Promise<void> {
 
     // Test voting image
     const votingData: SmashImageData = {
-      player1Name: 'Alex',
-      player1Avatar: sampleAvatar1,
-      player2Name: 'VeryLongDiscordUsername123',
-      player2Avatar: sampleAvatar2,
-      player1Votes: 1,
-      player2Votes: 0,
+      subject1Name: 'Alex',
+      subject1Image: sampleAvatar1,
+      subject2Name: 'VeryLongDiscordUsername123',
+      subject2Image: sampleAvatar2,
+      subject1Votes: 1,
+      subject2Votes: 0,
     };
 
     console.log('[SmashTest] Generating voting image...');
@@ -39,14 +39,14 @@ export async function handleSmashTestCommand(message: Message): Promise<void> {
 
     // Test result image
     const resultData: SmashImageData = {
-      player1Name: 'Alex',
-      player1Avatar: sampleAvatar1,
-      player2Name: 'VeryLongDiscordUsername123',
-      player2Avatar: sampleAvatar2,
-      player1Votes: 1,
-      player2Votes: 0,
+      subject1Name: 'Alex',
+      subject1Image: sampleAvatar1,
+      subject2Name: 'VeryLongDiscordUsername123',
+      subject2Image: sampleAvatar2,
+      subject1Votes: 1,
+      subject2Votes: 0,
       isResult: true,
-      winner: 'player1',
+      winner: 'subject1',
     };
 
     console.log('[SmashTest] Generating result image...');
