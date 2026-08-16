@@ -5,8 +5,23 @@ import { ErrorHandler } from '../utils/error-handler.js';
 
 const activeGames = new Map<string, SmashMaxGame>();
 
+// Cooldown tracking: channelId -> last usage timestamp
+const cooldowns = new Map<string, number>();
+const COOLDOWN_DURATION = 120 * 1000; // 2 minutes in milliseconds
+
 export async function handleSmashMaxCommand(message: Message): Promise<void> {
   try {
+    // Check cooldown
+    const now = Date.now();
+    const lastUsage = cooldowns.get(message.channel.id);
+    if (lastUsage && now - lastUsage < COOLDOWN_DURATION) {
+      const remainingTime = Math.ceil((COOLDOWN_DURATION - (now - lastUsage)) / 1000);
+      await message.reply({
+        content: `SmashMax is on cooldown. Please wait ${remainingTime} seconds.`,
+      });
+      return;
+    }
+
     // Check if there's already an active game in this channel
     if (activeGames.has(message.channel.id)) {
       await message.reply({
@@ -64,6 +79,9 @@ export async function handleSmashMaxCommand(message: Message): Promise<void> {
       });
       return;
     }
+
+    // Set cooldown timestamp when command is successfully accepted
+    cooldowns.set(message.channel.id, Date.now());
 
     // Create and start the game
     const game = new SmashMaxGame(
