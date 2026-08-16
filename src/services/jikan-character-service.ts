@@ -12,8 +12,12 @@ interface JikanCharacter {
   about: string | null;
 }
 
-interface JikanResponse {
-  data: JikanCharacter;
+interface JikanPaginatedResponse {
+  data: JikanCharacter[];
+  pagination: {
+    has_next_page: boolean;
+    last_visible_page: number;
+  };
 }
 
 export interface CachedCharacter {
@@ -39,9 +43,15 @@ interface CacheData {
   version: number;
 }
 
+enum CircuitState {
+  CLOSED = 'CLOSED',
+  OPEN = 'OPEN',
+  HALF_OPEN = 'HALF_OPEN',
+}
+
 /**
  * Service for fetching and caching anime characters from Jikan API
- * Implements persistent cache, rate limiting, and proper error backoff
+ * Implements persistent cache, rate limiting, circuit breaker, and background population
  */
 export class JikanCharacterService {
   private static instance: JikanCharacterService;
@@ -49,15 +59,27 @@ export class JikanCharacterService {
   private readonly API_BASE = 'https://api.jikan.moe/v4';
   private readonly CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
   private readonly CACHE_FILE = path.join(process.cwd(), 'data', 'jikan-cache.json');
-  private readonly MIN_CACHE_SIZE = 20; // Minimum characters needed before using cache-only
-  private readonly MAX_RETRIES = 2; // Reduced from 3
-  private readonly BASE_RETRY_DELAY = 2000; // Increased from 1000
+  private readonly MIN_CACHE_SIZE = 10; // Minimum characters for cache-only mode
+  private readonly TARGET_CACHE_SIZE = 20; // Target for background population
+  private readonly MAX_RETRIES = 2;
+  private readonly BASE_RETRY_DELAY = 2000;
   
   // Rate limiting
   private requestQueue: Array<() => Promise<any>> = [];
   private isProcessingQueue = false;
-  private readonly REQUEST_INTERVAL = 400; // 400ms between requests (2.5 req/sec)
+  private readonly REQUEST_INTERVAL = 500; // 500ms between requests (2 req/sec)
   private lastRequestTime = 0;
+
+  // Circuit breaker
+  private circuitState: CircuitState = CircuitState.CLOSED;
+  private failureCount = 0;
+  private readonly FAILURE_THRESHOLD = 3;
+  private circuitOpenUntil = 0;
+  private readonly CIRCUIT_COOLDOWN = 60 * 1000; // 60 seconds
+
+  // Background population
+  private isPopulating = false;
+  private populationPromise: Promise<void> | null = null;
 
   private constructor() {
     this.ensureDataDirectory();
@@ -73,63 +95,115 @@ export class JikanCharacterService {
   }
 
   /**
-   * Fetch a random anime character from Jikan API with rate limiting and proper backoff
+   * Initialize background population (non-blocking)
    */
-  async fetchRandomCharacter(): Promise<CachedCharacter | null> {
-    return this.enqueueRequest(async () => {
-      return this.fetchRandomCharacterInternal();
+  initializeBackgroundPopulation(): void {
+    // Don't wait for this, let it run in background
+    this.populateCacheIfNeeded().catch(error => {
+      console.log('[JikanService] Background population failed:', error);
     });
   }
 
   /**
-   * Internal fetch implementation with retry logic and backoff
+   * Populate cache in background if needed
    */
-  private async fetchRandomCharacterInternal(): Promise<CachedCharacter | null> {
+  private async populateCacheIfNeeded(): Promise<void> {
+    if (this.isPopulating) {
+      return; // Already populating
+    }
+
+    const currentSize = this.getCacheSize();
+    if (currentSize >= this.MIN_CACHE_SIZE) {
+      console.log(`[JikanService] Cache has ${currentSize} characters; skipping API fetch.`);
+      return;
+    }
+
+    this.isPopulating = true;
+    console.log('[JikanService] Background cache population started.');
+
+    try {
+      const added = await this.fetchCharactersFromJikan(this.TARGET_CACHE_SIZE - currentSize);
+      console.log(`[JikanService] Added ${added} characters to cache.`);
+    } catch (error) {
+      console.log('[JikanService] Background population failed:', error);
+    } finally {
+      this.isPopulating = false;
+    }
+  }
+
+  /**
+   * Fetch characters from Jikan using paginated endpoint
+   */
+  private async fetchCharactersFromJikan(targetCount: number): Promise<number> {
+    if (this.isCircuitOpen()) {
+      console.log('[JikanService] Circuit breaker is open; skipping fetch.');
+      return 0;
+    }
+
+    let added = 0;
+    let page = 1;
+  
+    while (added < targetCount && page <= 5) { // Limit to 5 pages max
+      const response = await this.enqueueRequest(async () => {
+        return this.fetchPaginatedCharacters(page);
+      });
+
+      if (!response) {
+        this.recordFailure();
+        break;
+      }
+
+      this.recordSuccess();
+
+      for (const character of response) {
+        if (this.validateAndCacheCharacter(character)) {
+          added++;
+        }
+        if (added >= targetCount) break;
+      }
+
+      page++;
+    }
+
+    if (added > 0) {
+      this.saveCacheToDisk();
+    }
+
+    return added;
+  }
+
+  /**
+   * Fetch a paginated page of characters from Jikan
+   */
+  private async fetchPaginatedCharacters(page: number): Promise<JikanCharacter[] | null> {
     for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
       try {
-        const response = await fetch(`${this.API_BASE}/random/characters`, {
+        const response = await fetch(`${this.API_BASE}/characters?page=${page}&limit=25&order_by=favorites&sort=desc`, {
           headers: {
             'Accept': 'application/json',
           },
         });
 
         if (response.ok) {
-          const data = await response.json() as JikanResponse;
-          const character = data.data;
-
-          const anime = this.extractAnimeFromAbout(character.about);
-          const hasValidImage = !!character.images.jpg.image_url;
-
-          const cachedChar: CachedCharacter = {
-            characterId: character.mal_id,
-            name: character.name,
-            imageUrl: character.images.jpg.image_url,
-            anime: anime,
-            cachedAt: Date.now(),
-            hasValidImage: hasValidImage,
-          };
-
-          this.cache.set(character.mal_id, cachedChar);
-          this.saveCacheToDisk();
-
-          console.log(`[JikanService] Fetched character: ${character.name} (ID: ${character.mal_id})`);
-          return cachedChar;
+          const data = await response.json() as JikanPaginatedResponse;
+          return data.data;
         }
 
         // Handle rate limiting
         if (response.status === 429) {
           const retryAfter = response.headers.get('Retry-After');
           const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : this.BASE_RETRY_DELAY * attempt;
-          console.log(`[JikanService] Rate limited. Waiting ${waitTime}ms before retry.`);
-          await this.delay(waitTime);
-          continue;
+          console.log(`[JikanService] Jikan rate limited; circuit opened for ${waitTime}ms.`);
+          this.openCircuit(waitTime);
+          return null;
         }
 
         // Handle gateway errors
         if (response.status === 504 || response.status >= 500) {
           console.log(`[JikanService] Temporary gateway error. Retry ${attempt}/${this.MAX_RETRIES}.`);
           if (attempt < this.MAX_RETRIES) {
-            await this.delay(this.BASE_RETRY_DELAY * Math.pow(2, attempt - 1)); // Exponential backoff
+            const jitter = Math.random() * 500;
+            await this.delay(this.BASE_RETRY_DELAY * Math.pow(2, attempt - 1) + jitter);
           }
           continue;
         }
@@ -141,58 +215,74 @@ export class JikanCharacterService {
       } catch (error) {
         console.log(`[JikanService] Network error on attempt ${attempt}/${this.MAX_RETRIES}.`);
         if (attempt < this.MAX_RETRIES) {
-          await this.delay(this.BASE_RETRY_DELAY * Math.pow(2, attempt - 1));
+          const jitter = Math.random() * 500;
+          await this.delay(this.BASE_RETRY_DELAY * Math.pow(2, attempt - 1) + jitter);
         }
       }
     }
 
-    console.log('[JikanService] Failed to fetch character after retries');
     return null;
   }
 
   /**
-   * Fetch two different random characters, prioritizing cache
+   * Validate and cache a character
+   */
+  private validateAndCacheCharacter(character: JikanCharacter): boolean {
+    // Validate required fields
+    if (!character.mal_id || !character.name || !character.name.trim()) {
+      return false;
+    }
+
+    // Check for valid image
+    const imageUrl = character.images.jpg.image_url;
+    if (!imageUrl) {
+      return false;
+    }
+
+    // Skip if already cached
+    if (this.cache.has(character.mal_id)) {
+      return false;
+    }
+
+    const anime = this.extractAnimeFromAbout(character.about);
+
+    const cachedChar: CachedCharacter = {
+      characterId: character.mal_id,
+      name: character.name,
+      imageUrl: imageUrl,
+      anime: anime,
+      cachedAt: Date.now(),
+      hasValidImage: true,
+    };
+
+    this.cache.set(character.mal_id, cachedChar);
+    return true;
+  }
+
+  /**
+   * Fetch two different random characters - cache only
+   * This should NOT make Jikan requests during normal operation
    */
   async fetchTwoRandomCharacters(): Promise<[CachedCharacter | null, CachedCharacter | null]> {
     const validCachedChars = Array.from(this.cache.values()).filter(c => c.hasValidImage);
     
-    // If we have enough cached characters, use cache only
-    if (validCachedChars.length >= this.MIN_CACHE_SIZE) {
-      console.log('[JikanService] Using cached character data.');
+    // If we have at least 2 cached characters, use cache only
+    if (validCachedChars.length >= 2) {
+      console.log('[JikanService] Using cached characters.');
       return this.selectTwoFromCache(validCachedChars);
     }
 
-    // If cache is small, try to fetch one new character and use cache for the other
-    console.log(`[JikanService] Cache size ${validCachedChars.length} below threshold. Fetching new characters.`);
-    
-    const char1 = await this.fetchRandomCharacter();
-    if (!char1) {
-      // If fetch failed, try to use cache only if available
-      if (validCachedChars.length >= 2) {
-        console.log('[JikanService] Fetch failed, using cached characters.');
-        return this.selectTwoFromCache(validCachedChars);
-      }
-      return [null, null];
-    }
+    // If cache is too small, trigger background population and return what we have
+    console.log(`[JikanService] Cache has only ${validCachedChars.length} characters. Triggering background population.`);
+    this.initializeBackgroundPopulation();
 
-    // Try to get second character from cache (different from first)
-    const char2 = this.getRandomCachedCharacter(char1.characterId);
-    if (char2) {
-      return [char1, char2];
-    }
-
-    // If cache doesn't have enough, fetch second character
-    const char2Fetched = await this.fetchRandomCharacter();
-    if (char2Fetched && char2Fetched.characterId !== char1.characterId) {
-      return [char1, char2Fetched];
-    }
-
-    // Last resort: use cache even if small
+    // If we have at least 2, use them anyway
     if (validCachedChars.length >= 2) {
       return this.selectTwoFromCache(validCachedChars);
     }
 
-    return [char1, null];
+    // Not enough characters
+    return [null, null];
   }
 
   /**
@@ -203,8 +293,12 @@ export class JikanCharacterService {
       return [cachedChars[0] || null, null];
     }
 
-    // Shuffle and pick two different
-    const shuffled = [...cachedChars].sort(() => Math.random() - 0.5);
+    // Fisher-Yates shuffle for better randomness
+    const shuffled = [...cachedChars];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     return [shuffled[0], shuffled[1]];
   }
 
@@ -282,6 +376,42 @@ export class JikanCharacterService {
     if (char) {
       char.hasValidImage = false;
       this.saveCacheToDisk();
+    }
+  }
+
+  /**
+   * Circuit breaker methods
+   */
+  private isCircuitOpen(): boolean {
+    if (this.circuitState === CircuitState.OPEN) {
+      if (Date.now() >= this.circuitOpenUntil) {
+        this.circuitState = CircuitState.HALF_OPEN;
+        console.log('[JikanService] Circuit breaker transitioning to half-open.');
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  private openCircuit(duration?: number): void {
+    this.circuitState = CircuitState.OPEN;
+    this.circuitOpenUntil = Date.now() + (duration || this.CIRCUIT_COOLDOWN);
+    console.log(`[JikanService] Circuit breaker opened for ${duration || this.CIRCUIT_COOLDOWN}ms.`);
+  }
+
+  private recordSuccess(): void {
+    this.failureCount = 0;
+    if (this.circuitState === CircuitState.HALF_OPEN) {
+      this.circuitState = CircuitState.CLOSED;
+      console.log('[JikanService] Circuit breaker closed after successful request.');
+    }
+  }
+
+  private recordFailure(): void {
+    this.failureCount++;
+    if (this.failureCount >= this.FAILURE_THRESHOLD) {
+      this.openCircuit();
     }
   }
 
@@ -388,33 +518,5 @@ export class JikanCharacterService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Bootstrap cache with initial characters if empty
-   * Call this during bot startup to populate cache
-   */
-  async bootstrapCache(targetSize: number = 50): Promise<void> {
-    const currentSize = this.getCacheSize();
-    if (currentSize >= targetSize) {
-      console.log(`[JikanService] Cache already has ${currentSize} characters. Skipping bootstrap.`);
-      return;
-    }
-
-    console.log(`[JikanService] Bootstrapping cache from ${currentSize} to ${targetSize} characters...`);
-    
-    const needed = targetSize - currentSize;
-    let fetched = 0;
-    
-    for (let i = 0; i < needed; i++) {
-      const char = await this.fetchRandomCharacter();
-      if (char && char.hasValidImage) {
-        fetched++;
-      }
-      // Small delay between bootstrap requests to be gentle
-      await this.delay(500);
-    }
-    
-    console.log(`[JikanService] Bootstrap complete. Fetched ${fetched} new characters.`);
   }
 }

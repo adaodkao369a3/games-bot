@@ -48,16 +48,16 @@ export class DiscordClient {
     this.client.on('error', (error) => this.onError(error));
   }
 
-  private async onReady(): Promise<void> {
+  private onReady(): void {
     console.log(`${BobKunPersonality.ready}`);
     console.log(`Logged in as ${this.client.user?.tag}`);
     
     // Set bot status
     this.client.user?.setActivity('googoo gaga niggas', { type: 3 as any });
     
-    // Bootstrap Jikan character cache
+    // Initialize Jikan service (non-blocking, will populate cache in background if needed)
     const jikanService = JikanCharacterService.getInstance();
-    await jikanService.bootstrapCache(50);
+    jikanService.initializeBackgroundPopulation();
   }
 
   private async onMessageCreate(message: any): Promise<void> {
