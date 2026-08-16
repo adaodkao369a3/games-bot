@@ -15,6 +15,7 @@ import { handleQuickDrawMaxCommand, handleQuickDrawMaxInteraction } from '../com
 import { handleRouletteCommand, handleRouletteInteraction } from '../commands/roulette.js';
 import { handleRouletteMaxCommand, handleRouletteMaxInteraction } from '../commands/roulettemax.js';
 import { handlePissCompCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
+import { handleSmashMaxCommand, handleSmashMaxInteraction } from '../commands/smashmax.js';
 
 export class DiscordClient {
   private client: Client;
@@ -129,6 +130,11 @@ export class DiscordClient {
         await handlePissCompCommand(message, args);
         return;
       }
+
+      if (command === 'smashmax') {
+        await handleSmashMaxCommand(message);
+        return;
+      }
     }
 
     // Check for Wordle guesses (only if not a command)
@@ -170,6 +176,11 @@ export class DiscordClient {
 
     if (customId.startsWith('pisscomp_')) {
       await handlePissCompInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('smashmax_')) {
+      await handleSmashMaxInteraction(interaction);
       return;
     }
     
