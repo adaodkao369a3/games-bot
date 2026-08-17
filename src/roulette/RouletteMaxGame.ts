@@ -383,14 +383,25 @@ export class RouletteMaxGame {
       }
 
       this.state.player1SecretMoveActivated = true;
+      
       await interaction.update({
         components: this.getSecretMoveButtons(),
       });
 
       // Check if all players have activated
       if (this.allSecretMovesActivated()) {
+        // Clear the auto-selection timer since all players have activated
+        this.clearTimers();
         await this.startDomainSequence();
       } else {
+        // Restart the timer for remaining players
+        this.clearTimers();
+        const timeout = setTimeout(() => {
+          if (!this.state.isGameOver && this.state.currentPhase === RouletteMaxPhase.SECRET_MOVE_WAITING) {
+            this.handleSecretMoveTimeout();
+          }
+        }, 5000);
+        this.timers.push(timeout);
         await this.updateSecretMoveWaitingStatus();
       }
     }
@@ -412,14 +423,25 @@ export class RouletteMaxGame {
       }
 
       this.state.player2SecretMoveActivated = true;
+      
       await interaction.update({
         components: this.getSecretMoveButtons(),
       });
 
       // Check if all players have activated
       if (this.allSecretMovesActivated()) {
+        // Clear the auto-selection timer since all players have activated
+        this.clearTimers();
         await this.startDomainSequence();
       } else {
+        // Restart the timer for remaining players
+        this.clearTimers();
+        const timeout = setTimeout(() => {
+          if (!this.state.isGameOver && this.state.currentPhase === RouletteMaxPhase.SECRET_MOVE_WAITING) {
+            this.handleSecretMoveTimeout();
+          }
+        }, 5000);
+        this.timers.push(timeout);
         await this.updateSecretMoveWaitingStatus();
       }
     }
@@ -441,14 +463,25 @@ export class RouletteMaxGame {
       }
 
       this.state.player3SecretMoveActivated = true;
+      
       await interaction.update({
         components: this.getSecretMoveButtons(),
       });
 
       // Check if all players have activated
       if (this.allSecretMovesActivated()) {
+        // Clear the auto-selection timer since all players have activated
+        this.clearTimers();
         await this.startDomainSequence();
       } else {
+        // Restart the timer for remaining players
+        this.clearTimers();
+        const timeout = setTimeout(() => {
+          if (!this.state.isGameOver && this.state.currentPhase === RouletteMaxPhase.SECRET_MOVE_WAITING) {
+            this.handleSecretMoveTimeout();
+          }
+        }, 5000);
+        this.timers.push(timeout);
         await this.updateSecretMoveWaitingStatus();
       }
     }
@@ -560,41 +593,21 @@ export class RouletteMaxGame {
           await this.showBarrelSpin(this.state.player3!);
           break;
         case RouletteMaxPhase.NORMAL_PLAYER3_SHOT1:
-          this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER1_SHOT2;
-          await this.showBarrelSpin(this.state.player1);
-          break;
-        case RouletteMaxPhase.NORMAL_PLAYER1_SHOT2:
-          this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER2_SHOT2;
-          await this.showBarrelSpin(this.state.player2);
-          break;
-        case RouletteMaxPhase.NORMAL_PLAYER2_SHOT2:
-          this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER3_SHOT2;
-          await this.showBarrelSpin(this.state.player3!);
-          break;
-        case RouletteMaxPhase.NORMAL_PLAYER3_SHOT2:
-          // Scripted phase complete, move to Secret Move
+          // Scripted phase complete, move to Secret Move (only one turn per player)
           await this.showSecretMovePhase();
           break;
         default:
           console.error(`[RouletteMax] Invalid phase transition from ${this.state.currentPhase}`);
       }
     } else {
-      // Handle 2-player mode transitions (existing logic)
+      // Handle 2-player mode transitions (only one turn per player)
       switch (this.state.currentPhase) {
         case RouletteMaxPhase.NORMAL_PLAYER1_SHOT1:
           this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER2_SHOT1;
           await this.showBarrelSpin(this.state.player2);
           break;
         case RouletteMaxPhase.NORMAL_PLAYER2_SHOT1:
-          this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER1_SHOT2;
-          await this.showBarrelSpin(this.state.player1);
-          break;
-        case RouletteMaxPhase.NORMAL_PLAYER1_SHOT2:
-          this.state.currentPhase = RouletteMaxPhase.NORMAL_PLAYER2_SHOT2;
-          await this.showBarrelSpin(this.state.player2);
-          break;
-        case RouletteMaxPhase.NORMAL_PLAYER2_SHOT2:
-          // Scripted phase complete, move to Secret Move
+          // Scripted phase complete, move to Secret Move (only one turn per player)
           await this.showSecretMovePhase();
           break;
         default:
@@ -637,6 +650,41 @@ export class RouletteMaxGame {
       embeds: [embed],
       components: this.getSecretMoveButtons(),
     });
+
+    // Start 5-second auto-selection timer
+    const timeout = setTimeout(() => {
+      if (!this.state.isGameOver && this.state.currentPhase === RouletteMaxPhase.SECRET_MOVE_WAITING) {
+        this.handleSecretMoveTimeout();
+      }
+    }, 5000);
+
+    this.timers.push(timeout);
+  }
+
+  /**
+   * Handle Secret Move timeout - auto-activate for players who haven't clicked
+   */
+  private async handleSecretMoveTimeout(): Promise<void> {
+    if (this.state.isGameOver) return;
+
+    // Auto-activate for any players who haven't clicked yet
+    if (!this.state.player1SecretMoveActivated) {
+      this.state.player1SecretMoveActivated = true;
+    }
+    if (!this.state.player2SecretMoveActivated) {
+      this.state.player2SecretMoveActivated = true;
+    }
+    if (this.state.playerCount === 3 && !this.state.player3SecretMoveActivated) {
+      this.state.player3SecretMoveActivated = true;
+    }
+
+    // Update the display to show all techniques activated
+    await this.currentMessage?.edit({
+      components: this.getSecretMoveButtons(),
+    });
+
+    // Immediately proceed to domain sequence
+    await this.startDomainSequence();
   }
 
   /**
