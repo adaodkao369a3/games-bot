@@ -141,14 +141,24 @@ export class TrialGame {
     this.state.phase = 'voting';
     this.state.votingEndsAt = Date.now() + this.VOTING_DURATION;
 
-    // Create new message for jury voting
-    const juryEmbed = TrialRenderer.createJuryEmbed();
-    this.votingMessage = await (this.currentMessage?.channel as TextChannel).send({
-      embeds: [juryEmbed],
-    });
-
     // Generate initial voting card
-    await this.updateVotingCard();
+    const cardBuffer = await TrialRenderer.generateVotingCard(
+      this.avatarBuffer!,
+      0,
+      0
+    );
+
+    const attachment = new AttachmentBuilder(cardBuffer, { name: 'trial-voting.png' });
+
+    const juryEmbed = TrialRenderer.createJuryEmbed()
+      .setImage('attachment://trial-voting.png');
+
+    // Create new message for jury voting with image and buttons
+    this.votingMessage = await (this.currentMessage?.channel as TextChannel).send({
+      files: [attachment],
+      embeds: [juryEmbed],
+      components: [TrialRenderer.createVotingButtons()],
+    });
 
     // Initialize vote manager
     this.voteManager = new VoteManager(
@@ -336,6 +346,27 @@ export class TrialGame {
       embeds: [innocentEmbed],
       components: [TrialRenderer.createMuteButton()],
     });
+
+    // Start 10-second timer for mute button availability
+    this.startMuteButtonTimer();
+  }
+
+  /**
+   * Start 10-second timer for mute button
+   */
+  private startMuteButtonTimer(): void {
+    const muteTimeout = setTimeout(async () => {
+      // Remove mute button after 10 seconds
+      if (this.state.phase === 'innocent') {
+        await this.votingMessage?.edit({
+          components: [],
+        });
+        // End trial to cleanup collectors/timers
+        await this.endTrial();
+      }
+    }, 10000); // 10 seconds
+
+    this.timers.push(muteTimeout as any);
   }
 
   /**
@@ -578,11 +609,11 @@ export class TrialGame {
       await this.votingMessage?.edit({
         embeds: [
           TrialRenderer.createInnocentResultEmbedWithGif()
-            .setDescription('The jury has found the accused NOT GUILTY!\n\n**The accuser has been muted for 30 seconds.**')
+            .setDescription(`${BobKunPersonality.trialInnocent}\n\n🔇 **PROSECUTOR HAS BEEN MUTED FOR 30 SECONDS.** 😭`)
         ],
       });
 
-      // Mark trial as ended to prevent re-triggering
+      // Mark trial as ended to prevent re-triggering and cleanup
       await this.endTrial();
 
     } catch (error) {
