@@ -293,7 +293,7 @@ export class TrialGame {
     // Wait a moment then show guilty GIF with action buttons
     await this.delay(1500);
 
-    // Show guilty GIF with sentence and jump buttons
+    // Show guilty GIF with jump button only (sentence is displayed in embed text)
     const guiltyEmbed = TrialRenderer.createGuiltyResultEmbedWithGif(
       `<@${this.state.accusedId}>`,
       this.state.accusation,
@@ -303,10 +303,31 @@ export class TrialGame {
     await this.votingMessage?.edit({
       files: [],
       embeds: [guiltyEmbed],
-      components: [TrialRenderer.createSentenceButton(), TrialRenderer.createJumpButton()],
+      components: [TrialRenderer.createJumpButton()],
     });
 
     this.state.phase = 'sentence';
+
+    // Start 10-second timer for jump button availability
+    this.startJumpButtonTimer();
+  }
+
+  /**
+   * Start 10-second timer for jump button
+   */
+  private startJumpButtonTimer(): void {
+    const jumpTimeout = setTimeout(async () => {
+      // Remove jump button after 10 seconds
+      if (this.state.phase === 'sentence') {
+        await this.votingMessage?.edit({
+          components: [],
+        });
+        // End trial to cleanup collectors/timers
+        await this.endTrial();
+      }
+    }, 10000); // 10 seconds
+
+    this.timers.push(jumpTimeout as any);
   }
 
   /**
@@ -510,7 +531,7 @@ export class TrialGame {
   }
 
   /**
-   * Process sentence submission
+   * Process sentence submission - only saves sentence, does not end voting
    */
   async processSentenceSubmission(interaction: MessageComponentInteraction, sentence: string): Promise<void> {
     if (interaction.user.id !== this.state.accuserId) {
@@ -521,21 +542,14 @@ export class TrialGame {
       return;
     }
 
+    // Only save the sentence - do not end voting or change phase
     this.state.sentence = sentence;
 
-    // Update embed with sentence (use GIF version)
-    const embed = TrialRenderer.createGuiltyResultEmbedWithGif(
-      `<@${this.state.accusedId}>`,
-      this.state.accusation,
-      sentence
-    );
-
-    await this.votingMessage?.edit({
-      embeds: [embed],
-    });
+    // Calculate remaining time
+    const remainingTime = Math.max(0, Math.ceil((this.state.votingEndsAt! - Date.now()) / 1000));
 
     await interaction.reply({
-      content: 'Sentence has been set!',
+      content: `📝 Sentence submitted! ⏱️ **${remainingTime} seconds remaining**`,
       ephemeral: true,
     });
   }
