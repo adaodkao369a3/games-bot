@@ -16,6 +16,7 @@ import { handleRouletteCommand, handleRouletteInteraction } from '../commands/ro
 import { handleRouletteMaxCommand, handleRouletteMaxInteraction } from '../commands/roulettemax.js';
 import { handlePissCompCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
 import { handleSmashMaxCommand, handleSmashMaxInteraction } from '../commands/smashmax.js';
+import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } from '../commands/trial.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -30,6 +31,7 @@ export class DiscordClient {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.Moderation,
       ],
       partials: [
         Partials.Channel,
@@ -140,6 +142,11 @@ export class DiscordClient {
         await handleSmashMaxCommand(message);
         return;
       }
+
+      if (command === 'trial') {
+        await handleTrialCommand(message);
+        return;
+      }
     }
 
     // Check for Wordle guesses (only if not a command)
@@ -150,6 +157,8 @@ export class DiscordClient {
     try {
       if (interaction.isMessageComponent()) {
         await this.handleButtonInteraction(interaction);
+      } else if (interaction.isModalSubmit()) {
+        await this.handleModalSubmit(interaction);
       }
     } catch (error) {
       await ErrorHandler.handleInteractionError(interaction, error, 'interaction handler');
@@ -188,8 +197,23 @@ export class DiscordClient {
       await handleSmashMaxInteraction(interaction);
       return;
     }
+
+    if (customId.startsWith('trial_')) {
+      await handleTrialInteraction(interaction);
+      return;
+    }
     
     await handleSmashVote(interaction);
+  }
+
+  private async handleModalSubmit(interaction: any): Promise<void> {
+    const customId = interaction.customId;
+
+    if (customId === 'trial_sentence_modal') {
+      const sentence = interaction.fields.getTextInputValue('sentence_text');
+      await handleTrialModalSubmit(interaction, sentence);
+      return;
+    }
   }
 
   private onError(error: Error): void {
