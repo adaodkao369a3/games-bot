@@ -44,6 +44,19 @@ export class BobKunPersonality {
     wordleWinner: (name: string, word: string) => `${this.EMOJIS.crown} **${name}** guessed **${word}**! Bob Kun is impressed!`,
     wordleGameOver: (word: string) => `${this.EMOJIS.skull} The word was **${word}**. Bob Kun is sad.`,
     wordleThinking: `${this.EMOJIS.thinking} Bob Kun is thinking about words...`,
+    // Trial-specific messages
+    trialCourtOpening: `⚖️🍌 **BOB KUN COURT IS NOW IN SESSION** 🍌⚖️\nEveryone shut up. The court is cooking. 👨‍⚖️`,
+    trialAccusation: `🚨 **A VERY SERIOUS ACCUSATION HAS BEEN MADE.** 🚨`,
+    trialDefense: (accused: string, time: string) => `🗣️ ${accused}, what do you have to say for yourself?!\n\n⏱️ You have **${time}**.\nMake it count. 😭`,
+    trialVoting: `👨‍⚖️ **JURY, THE COURT AWAITS YOUR VERDICT.**\n\nGuilty or innocent?\nChoose wisely... 👁️`,
+    trialVotingAlmostDone: `⏰ **THE JURY IS RUNNING OUT OF TIME...**`,
+    trialDrawFirst: `⚖️ **HOLD ON.**\n\nIT'S A DRAW?! 😭\n\nThe court refuses to end like this.\nThe accused gets **another chance to defend themselves.**\n\n🗣️ **30 SECONDS. GO.**`,
+    trialDrawSecond: `😭 **YOU'VE GOT TO BE KIDDING ME.**\n\nSTILL A DRAW.\n\nOne final defense...\n⏱️ **15 SECONDS.**`,
+    trialNoJudgement: `⚖️💀 **NO JUDGEMENT COULD BE MADE TODAY.**\n\nThe jury has failed Bob Kun.`,
+    trialGuilty: (accused: string, accusation: string, sentence: string) => `🚨 **VERDICT: GUILTY** 🚨\n\n${accused} has been found guilty of:\n\n**"${accusation}"**\n\n⚖️ **SENTENCED TO:**\n\n*"${sentence}"*\n\n😭 It's over for you, buddy.`,
+    trialInnocent: `⚖️ **VERDICT: NOT GUILTY** ⚖️\n\nThe jury has spoken! Justice prevails! 🎉`,
+    trialJump: `😳 **OUUU SHIIII...**`,
+    trialEveryoneVote: `🗳️ **EVERYONE IS A JUROR.**\n\nProsecutor? Vote.\nDefense? Vote.\nRandom guy eating a sandwich? **VOTE.** 🍌`,
   };
 
   static get ready(): string {
@@ -149,6 +162,55 @@ export class BobKunPersonality {
 
   static get wordleThinking(): string {
     return this.MESSAGES.wordleThinking;
+  }
+
+  // Trial-specific getters
+  static get trialCourtOpening(): string {
+    return this.MESSAGES.trialCourtOpening;
+  }
+
+  static get trialAccusation(): string {
+    return this.MESSAGES.trialAccusation;
+  }
+
+  static trialDefense(accused: string, time: string): string {
+    return this.MESSAGES.trialDefense(accused, time);
+  }
+
+  static get trialVoting(): string {
+    return this.MESSAGES.trialVoting;
+  }
+
+  static get trialVotingAlmostDone(): string {
+    return this.MESSAGES.trialVotingAlmostDone;
+  }
+
+  static get trialDrawFirst(): string {
+    return this.MESSAGES.trialDrawFirst;
+  }
+
+  static get trialDrawSecond(): string {
+    return this.MESSAGES.trialDrawSecond;
+  }
+
+  static get trialNoJudgement(): string {
+    return this.MESSAGES.trialNoJudgement;
+  }
+
+  static trialGuilty(accused: string, accusation: string, sentence: string): string {
+    return this.MESSAGES.trialGuilty(accused, accusation, sentence);
+  }
+
+  static get trialInnocent(): string {
+    return this.MESSAGES.trialInnocent;
+  }
+
+  static get trialJump(): string {
+    return this.MESSAGES.trialJump;
+  }
+
+  static get trialEveryoneVote(): string {
+    return this.MESSAGES.trialEveryoneVote;
   }
 
   static formatWinner(name: string, votes: number, totalVotes: number): string {

@@ -1,4 +1,4 @@
-import { Message, MessageComponentInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, TextChannel } from 'discord.js';
+import { Message, MessageComponentInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, TextChannel, EmbedBuilder } from 'discord.js';
 import { TrialState, TrialPhase, DefenseRound, VoteRound, DefenseDuration, TrialConfig } from './trial-types.js';
 import { TrialRenderer } from './trial-renderer.js';
 import { VoteManager } from '../shared/voting/vote-manager.js';
@@ -220,7 +220,7 @@ export class TrialGame {
   }
 
   /**
-   * Handle draw - return to defense with shorter timer
+   * Handle draw - return to defense with shorter timer and dramatic transition
    */
   private async handleDraw(): Promise<void> {
     if (this.state.voteRound >= 3) {
@@ -244,6 +244,9 @@ export class TrialGame {
     this.state.guiltyVotes.clear();
     this.state.innocentVotes.clear();
 
+    // Show dramatic draw transition
+    await this.showDrawTransition();
+
     // Return to defense
     await this.startDefenseStage();
   }
@@ -266,7 +269,8 @@ export class TrialGame {
 
     const embed = TrialRenderer.createGuiltyResultEmbed(
       `<@${this.state.accusedId}>`,
-      this.state.accusation
+      this.state.accusation,
+      this.state.sentence
     ).setImage('attachment://trial-result.png');
 
     // First show result with disabled voting buttons
@@ -282,7 +286,8 @@ export class TrialGame {
     // Show guilty GIF with sentence and jump buttons
     const guiltyEmbed = TrialRenderer.createGuiltyResultEmbedWithGif(
       `<@${this.state.accusedId}>`,
-      this.state.accusation
+      this.state.accusation,
+      this.state.sentence
     );
 
     await this.votingMessage?.edit({
@@ -331,6 +336,29 @@ export class TrialGame {
       embeds: [innocentEmbed],
       components: [TrialRenderer.createMuteButton()],
     });
+  }
+
+  /**
+   * Show dramatic draw transition
+   */
+  private async showDrawTransition(): Promise<void> {
+    const drawMessage = this.state.voteRound === 2 
+      ? BobKunPersonality.trialDrawFirst
+      : BobKunPersonality.trialDrawSecond;
+
+    const embed = new EmbedBuilder()
+      .setTitle('⚖️ DRAW')
+      .setDescription(drawMessage)
+      .setColor(0xFFA500)
+      .setTimestamp();
+
+    await this.votingMessage?.edit({
+      embeds: [embed],
+      components: [],
+    });
+
+    // Wait 3 seconds for dramatic effect
+    await this.delay(3000);
   }
 
   /**
@@ -402,18 +430,9 @@ export class TrialGame {
   }
 
   /**
-   * Handle vote
+   * Handle vote - everyone can vote including accuser and accused
    */
   private async handleVote(interaction: MessageComponentInteraction, userId: string, choice: 'subject1' | 'subject2'): Promise<void> {
-    // Prevent accused and accuser from voting
-    if (userId === this.state.accusedId || userId === this.state.accuserId) {
-      await interaction.reply({
-        content: 'You cannot vote in this trial.',
-        ephemeral: true,
-      });
-      return;
-    }
-
     if (!this.voteManager) return;
 
     const result = this.voteManager.handleVote(userId, choice);
@@ -434,12 +453,13 @@ export class TrialGame {
   }
 
   /**
-   * Handle sentence input
+   * Handle sentence input - edit mode if sentence already exists
    */
   private async handleSentence(interaction: MessageComponentInteraction): Promise<void> {
+    const isEdit = !!this.state.sentence;
     const modal = new ModalBuilder()
       .setCustomId('trial_sentence_modal')
-      .setTitle('Enter Sentence');
+      .setTitle(isEdit ? 'Edit Sentence' : 'Enter Sentence');
 
     const sentenceInput = new TextInputBuilder()
       .setCustomId('sentence_text')
@@ -447,6 +467,10 @@ export class TrialGame {
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setPlaceholder('e.g., no more sandwiches for you');
+
+    if (isEdit && this.state.sentence) {
+      sentenceInput.setValue(this.state.sentence);
+    }
 
     const actionRow = new ActionRowBuilder<TextInputBuilder>().addComponents(sentenceInput);
     modal.addComponents(actionRow);

@@ -1,5 +1,6 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } from 'discord.js';
 import { TrialState, TrialPhase } from './trial-types.js';
+import { BobKunPersonality } from '../../services/bob-kun-personality.js';
 import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
 import { cwd } from 'process';
 import { join } from 'path';
@@ -34,7 +35,7 @@ export class TrialRenderer {
    */
   static createCourtOpeningEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('🍌 Bob Kun: COURTS IN SESSION')
+      .setDescription(BobKunPersonality.trialCourtOpening)
       .setColor(0xFFD700)
       .setImage('https://c.tenor.com/bOBzEJLVxhIAAAAd/tenor.gif');
   }
@@ -48,12 +49,15 @@ export class TrialRenderer {
     accusation: string,
     remainingSeconds: number
   ): EmbedBuilder {
+    const timeStr = remainingSeconds >= 60 
+      ? `${Math.floor(remainingSeconds / 60)}:${(remainingSeconds % 60).toString().padStart(2, '0')}`
+      : `${remainingSeconds}`;
     return new EmbedBuilder()
       .setTitle('⚖️ DEFENSE STAGE')
       .setDescription(
+        `${BobKunPersonality.trialAccusation}\n\n` +
         `${accusedMention} has been accused of **"${accusation}"** by ${accuserMention}.\n\n` +
-        `${accusedMention}, what do you have to say about this?\n\n` +
-        `You have **${remainingSeconds}** seconds.`
+        BobKunPersonality.trialDefense(accusedMention, timeStr)
       )
       .setColor(0xFFA500)
       .setTimestamp();
@@ -75,7 +79,10 @@ export class TrialRenderer {
   static createJuryEmbed(): EmbedBuilder {
     return new EmbedBuilder()
       .setTitle('👥 JURY VOTING')
-      .setDescription('**What does the jury have to say about what the accused said in their defense?**\n\nVoting begins now.')
+      .setDescription(
+        `${BobKunPersonality.trialEveryoneVote}\n\n` +
+        BobKunPersonality.trialVoting
+      )
       .setColor(0x00BFFF)
       .setTimestamp();
   }
@@ -94,7 +101,11 @@ export class TrialRenderer {
       new ButtonBuilder()
         .setCustomId('trial_vote_innocent')
         .setLabel('🔵 INNOCENT')
-        .setStyle(ButtonStyle.Primary)
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('trial_sentence')
+        .setLabel('📝 SENTENCE')
+        .setStyle(ButtonStyle.Secondary)
     );
 
     return row;
@@ -123,7 +134,7 @@ export class TrialRenderer {
   }
 
   /**
-   * Generate voting card image
+   * Generate voting card image (crisp during voting)
    */
   static async generateVotingCard(
     avatarBuffer: Buffer,
@@ -140,7 +151,7 @@ export class TrialRenderer {
     // Load avatar
     const avatar = await loadImage(avatarBuffer);
 
-    // Draw avatar on both sides
+    // Draw avatar on both sides - CRISP/SHARP during voting
     this.drawCoverImage(ctx, avatar, 0, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT);
     this.drawCoverImage(ctx, avatar, this.AVATAR_WIDTH, 0, this.AVATAR_WIDTH, this.AVATAR_HEIGHT);
 
@@ -243,11 +254,14 @@ export class TrialRenderer {
     accusation: string,
     sentence?: string
   ): EmbedBuilder {
-    const sentenceText = sentence ? `"${sentence}"` : "pending sentencing";
-    const description = `**${accusedMention} has been found guilty of "${accusation}" and is sentenced to ${sentenceText}**`;
+    const sentenceText = sentence ? sentence : "pending sentencing";
+    const description = BobKunPersonality.trialGuilty(
+      accusedMention,
+      accusation,
+      sentenceText
+    );
 
     return new EmbedBuilder()
-      .setTitle('⚖️ GUILTY VERDICT')
       .setDescription(description)
       .setColor(0xFF0000)
       .setImage('https://c.tenor.com/SCJRAgBurdcAAAAd/tenor.gif')
@@ -262,7 +276,7 @@ export class TrialRenderer {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('trial_sentence')
-        .setLabel('SENTENCE')
+        .setLabel('📝 SENTENCE')
         .setStyle(ButtonStyle.Primary)
     );
     return row;
@@ -287,7 +301,7 @@ export class TrialRenderer {
    */
   static createJumpEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('💀 ouu shii')
+      .setDescription(BobKunPersonality.trialJump)
       .setColor(0xFF0000)
       .setImage('https://c.tenor.com/9pdPttdj5CUAAAAC/tenor.gif');
   }
@@ -308,7 +322,7 @@ export class TrialRenderer {
   static createInnocentResultEmbed(): EmbedBuilder {
     return new EmbedBuilder()
       .setTitle('⚖️ INNOCENT VERDICT')
-      .setDescription('The jury has found the accused NOT GUILTY!')
+      .setDescription(BobKunPersonality.trialInnocent)
       .setColor(0x00FF00)
       .setTimestamp();
   }
@@ -319,7 +333,7 @@ export class TrialRenderer {
   static createInnocentResultEmbedWithGif(): EmbedBuilder {
     return new EmbedBuilder()
       .setTitle('⚖️ INNOCENT VERDICT')
-      .setDescription('The jury has found the accused NOT GUILTY!')
+      .setDescription(BobKunPersonality.trialInnocent)
       .setColor(0x00FF00)
       .setImage('https://c.tenor.com/OhVr0qy0GzAAAAAd/tenor.gif')
       .setTimestamp();
@@ -345,7 +359,7 @@ export class TrialRenderer {
   static createNoJudgementEmbed(): EmbedBuilder {
     return new EmbedBuilder()
       .setTitle('⚖️ NO JUDGEMENT')
-      .setDescription('**No judgement could be made today.**')
+      .setDescription(BobKunPersonality.trialNoJudgement)
       .setColor(0x808080)
       .setTimestamp();
   }
