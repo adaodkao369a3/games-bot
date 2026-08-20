@@ -1,4 +1,4 @@
-import { Message, MessageComponentInteraction } from 'discord.js';
+import { Message, MessageComponentInteraction, GuildChannel } from 'discord.js';
 import { trialManager } from '../games/trial/trial-manager.js';
 import { TrialGame } from '../games/trial/trial-game.js';
 import { ErrorHandler } from '../utils/error-handler.js';
@@ -86,6 +86,15 @@ export async function handleTrialCommand(message: Message): Promise<void> {
     if (!botMember) {
       await message.reply({
         content: `${BobKunPersonality.error} I don't have permission to hold trials.`,
+      });
+      return;
+    }
+
+    // Narrow channel type to guild channel for permissions check
+    // Since we already verified message.guild exists, this is a guild channel
+    if (!(message.channel instanceof GuildChannel)) {
+      await message.reply({
+        content: `${BobKunPersonality.error} Trials can only be held in server channels.`,
       });
       return;
     }

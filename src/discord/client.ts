@@ -31,7 +31,6 @@ export class DiscordClient {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.Moderation,
       ],
       partials: [
         Partials.Channel,
