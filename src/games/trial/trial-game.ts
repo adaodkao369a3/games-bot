@@ -6,8 +6,9 @@ import { BobKunPersonality } from '../../services/bob-kun-personality.js';
 
 export class TrialGame {
   private state: TrialState;
-  private currentMessage?: Message;
-  private votingMessage?: Message;
+  private currentMessage?: Message; // Initial command message
+  private defenseMessage?: Message; // Current defense message
+  private votingMessage?: Message; // Current voting/result message
   private timers: NodeJS.Timeout[] = [];
   private onTrialEnd?: () => void;
   private voteManager?: VoteManager;
@@ -64,7 +65,7 @@ export class TrialGame {
   }
 
   /**
-   * Show defense GIF then text
+   * Show defense GIF then create defense message
    */
   private async showDefenseGif(): Promise<void> {
     const embed = TrialRenderer.createDefenseGifEmbed();
@@ -72,30 +73,50 @@ export class TrialGame {
       embeds: [embed],
     });
 
-    // Wait 5 seconds then show defense text
+    // Wait 5 seconds then create defense message
     await this.delay(this.DEFENSE_GIF_DURATION);
     await this.startDefenseStage();
   }
 
   /**
-   * Start defense stage with countdown
+   * Start defense stage with countdown - creates NEW message or edits existing (after draw)
    */
   private async startDefenseStage(): Promise<void> {
     this.state.phase = 'defense';
     this.state.defenseEndsAt = Date.now() + (this.state.defenseDurationSeconds * 1000);
 
-    // Download accused avatar for later use
-    try {
-      const guild = await this.currentMessage?.client.guilds.fetch(this.state.guildId);
-      if (guild) {
-        const accusedMember = await guild.members.fetch(this.state.accusedId);
-        const avatarUrl = accusedMember?.user?.avatarURL();
-        if (avatarUrl) {
-          this.avatarBuffer = await TrialRenderer.downloadAvatar(avatarUrl);
+    // Download accused avatar for later use (only if not already downloaded)
+    if (!this.avatarBuffer) {
+      try {
+        const guild = await this.currentMessage?.client.guilds.fetch(this.state.guildId);
+        if (guild) {
+          const accusedMember = await guild.members.fetch(this.state.accusedId);
+          const avatarUrl = accusedMember?.user?.avatarURL();
+          if (avatarUrl) {
+            this.avatarBuffer = await TrialRenderer.downloadAvatar(avatarUrl);
+          }
         }
+      } catch (error) {
+        console.error('[TrialGame] Failed to download avatar:', error);
       }
-    } catch (error) {
-      console.error('[TrialGame] Failed to download avatar:', error);
+    }
+
+    const defenseEmbed = TrialRenderer.createDefenseEmbed(
+      `<@${this.state.accusedId}>`,
+      `<@${this.state.accuserId}>`,
+      this.state.accusation,
+      this.state.defenseDurationSeconds
+    );
+
+    // If defenseMessage exists (after draw), edit it. Otherwise create new.
+    if (this.defenseMessage) {
+      await this.defenseMessage.edit({
+        embeds: [defenseEmbed],
+      });
+    } else {
+      this.defenseMessage = await (this.currentMessage?.channel as TextChannel).send({
+        embeds: [defenseEmbed],
+      });
     }
 
     // Start countdown updates
@@ -103,7 +124,7 @@ export class TrialGame {
   }
 
   /**
-   * Update defense countdown
+   * Update defense countdown on the defense message
    */
   private updateDefenseCountdown(): void {
     const updateInterval = setInterval(async () => {
@@ -121,7 +142,7 @@ export class TrialGame {
         remaining
       );
 
-      await this.currentMessage?.edit({
+      await this.defenseMessage?.edit({
         embeds: [embed],
       });
 
@@ -230,7 +251,7 @@ export class TrialGame {
   }
 
   /**
-   * Handle draw - return to defense with shorter timer and dramatic transition
+   * Handle draw - edit voting message into defense message
    */
   private async handleDraw(): Promise<void> {
     if (this.state.voteRound >= 3) {
@@ -254,10 +275,14 @@ export class TrialGame {
     this.state.guiltyVotes.clear();
     this.state.innocentVotes.clear();
 
-    // Show dramatic draw transition
+    // Show dramatic draw transition on voting message
     await this.showDrawTransition();
 
-    // Return to defense
+    // votingMessage becomes the new defenseMessage
+    this.defenseMessage = this.votingMessage;
+    this.votingMessage = undefined;
+
+    // Start defense stage (will edit the defense message)
     await this.startDefenseStage();
   }
 
