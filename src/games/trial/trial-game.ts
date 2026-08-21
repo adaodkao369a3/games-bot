@@ -13,11 +13,31 @@ export class TrialGame {
   private onTrialEnd?: () => void;
   private voteManager?: VoteManager;
   private avatarBuffer?: Buffer;
+  private courtGifEndsAt?: number; // Timestamp when court GIF should be removed
+  private defenseGifEndsAt?: number; // Timestamp when defense GIF should be removed
   
-  private readonly COURT_OPENING_DURATION = 5000; // 5 seconds
-  private readonly DEFENSE_GIF_DURATION = 5000; // 5 seconds
+  private readonly COURT_GIF_DURATION = 4000; // 4 seconds
+  private readonly DEFENSE_GIF_DURATION = 4000; // 4 seconds
   private readonly JUMP_DURATION = 3000; // 3 seconds
   private readonly VOTING_DURATION = 25 * 1000; // 25 seconds
+
+  private static readonly DEFAULT_SENTENCES = [
+    "No more sandwiches for you.",
+    "You are hereby sentenced to touching grass.",
+    "Three days without banana privileges.",
+    "You are banned from the kitchen until further notice.",
+    "One week of mandatory Bob Kun obedience.",
+    "You are sentenced to thinking about what you have done.",
+    "No snacks for you. Court has spoken.",
+    "You must apologize to the nearest banana.",
+    "You are sentenced to eternal sandwichlessness.",
+    "You have lost your banana privileges.",
+    "Your sandwich privileges have been revoked indefinitely.",
+    "The court sentences you to a week of bad vibes.",
+    "You are forbidden from looking at bananas for 24 hours.",
+    "Sentence: One month of no fun allowed.",
+    "You must write 'I will not steal sandwiches' 100 times.",
+  ];
 
   constructor(config: TrialConfig, onTrialEnd?: () => void) {
     this.state = {
@@ -47,9 +67,42 @@ export class TrialGame {
   }
 
   /**
-   * Show court opening with defense text and GIF in single embed
+   * Show court opening with GIF, then transition to defense
    */
   private async showCourtOpening(): Promise<void> {
+    this.state.phase = 'opening';
+
+    // Create court opening message with GIF
+    const courtEmbed = TrialRenderer.createCourtOpeningEmbed();
+    this.defenseMessage = await (this.currentMessage?.channel as TextChannel).send({
+      embeds: [courtEmbed],
+    });
+
+    // Set timestamp for court GIF removal
+    this.courtGifEndsAt = Date.now() + this.COURT_GIF_DURATION;
+
+    // Start court GIF timer
+    this.startCourtGifTimer();
+  }
+
+  /**
+   * Start court GIF timer using timestamps
+   */
+  private startCourtGifTimer(): void {
+    const checkInterval = setInterval(async () => {
+      if (Date.now() >= this.courtGifEndsAt!) {
+        clearInterval(checkInterval);
+        await this.transitionToDefenseWithGif();
+      }
+    }, 100);
+
+    this.timers.push(checkInterval as any);
+  }
+
+  /**
+   * Transition from court opening to defense with GIF
+   */
+  private async transitionToDefenseWithGif(): Promise<void> {
     this.state.phase = 'defense';
     this.state.defenseEndsAt = Date.now() + (this.state.defenseDurationSeconds * 1000);
 
@@ -67,7 +120,7 @@ export class TrialGame {
       console.error('[TrialGame] Failed to download avatar:', error);
     }
 
-    // Create defense message with GIF in the same embed
+    // Edit to defense text with GIF
     const defenseEmbed = TrialRenderer.createDefenseEmbedWithGif(
       `<@${this.state.accusedId}>`,
       `<@${this.state.accuserId}>`,
@@ -75,38 +128,51 @@ export class TrialGame {
       this.state.defenseDurationSeconds
     );
 
-    this.defenseMessage = await (this.currentMessage?.channel as TextChannel).send({
+    await this.defenseMessage?.edit({
       embeds: [defenseEmbed],
     });
 
-    // Start 4-second timer to remove GIF
-    this.startGifRemovalTimer();
+    // Set timestamp for defense GIF removal
+    this.defenseGifEndsAt = Date.now() + this.DEFENSE_GIF_DURATION;
+
+    // Start defense GIF timer
+    this.startDefenseGifTimer();
 
     // Start countdown updates
     this.updateDefenseCountdown();
   }
 
   /**
-   * Start 4-second timer to remove GIF from defense message
+   * Start defense GIF timer using timestamps
    */
-  private startGifRemovalTimer(): void {
-    const gifTimeout = setTimeout(async () => {
-      if (this.state.phase === 'defense') {
-        // Remove GIF, keep defense text
-        const remaining = Math.max(0, Math.ceil((this.state.defenseEndsAt! - Date.now()) / 1000));
-        const embed = TrialRenderer.createDefenseEmbed(
-          `<@${this.state.accusedId}>`,
-          `<@${this.state.accuserId}>`,
-          this.state.accusation,
-          remaining
-        );
-        await this.defenseMessage?.edit({
-          embeds: [embed],
-        });
+  private startDefenseGifTimer(): void {
+    const checkInterval = setInterval(async () => {
+      if (Date.now() >= this.defenseGifEndsAt!) {
+        clearInterval(checkInterval);
+        await this.removeDefenseGif();
       }
-    }, 4000); // 4 seconds
+    }, 100);
 
-    this.timers.push(gifTimeout as any);
+    this.timers.push(checkInterval as any);
+  }
+
+  /**
+   * Remove defense GIF, keep defense text
+   */
+  private async removeDefenseGif(): Promise<void> {
+    if (this.state.phase !== 'defense') return;
+
+    const remaining = Math.max(0, Math.ceil((this.state.defenseEndsAt! - Date.now()) / 1000));
+    const embed = TrialRenderer.createDefenseEmbed(
+      `<@${this.state.accusedId}>`,
+      `<@${this.state.accuserId}>`,
+      this.state.accusation,
+      remaining
+    );
+
+    await this.defenseMessage?.edit({
+      embeds: [embed],
+    });
   }
 
   /**
@@ -128,14 +194,18 @@ export class TrialGame {
       await this.defenseMessage.edit({
         embeds: [defenseEmbed],
       });
-      // Start 4-second timer to remove GIF
-      this.startGifRemovalTimer();
+      // Set timestamp for defense GIF removal
+      this.defenseGifEndsAt = Date.now() + this.DEFENSE_GIF_DURATION;
+      // Start defense GIF timer
+      this.startDefenseGifTimer();
     } else {
       this.defenseMessage = await (this.currentMessage?.channel as TextChannel).send({
         embeds: [defenseEmbed],
       });
-      // Start 4-second timer to remove GIF
-      this.startGifRemovalTimer();
+      // Set timestamp for defense GIF removal
+      this.defenseGifEndsAt = Date.now() + this.DEFENSE_GIF_DURATION;
+      // Start defense GIF timer
+      this.startDefenseGifTimer();
     }
 
     // Start countdown updates
@@ -200,11 +270,10 @@ export class TrialGame {
       components: [TrialRenderer.createVotingButtons()],
     });
 
-    // Initialize vote manager
+    // Initialize vote manager (no onVoteUpdate callback - we update manually in handleVote)
     this.voteManager = new VoteManager(
       this.VOTING_DURATION,
-      (result) => this.handleVotingResult(result),
-      () => this.updateVotingCard()
+      (result) => this.handleVotingResult(result)
     );
     this.voteManager.startVoting();
   }
@@ -253,8 +322,12 @@ export class TrialGame {
 
     const attachment = new AttachmentBuilder(cardBuffer, { name: 'trial-voting.png' });
 
+    const embed = TrialRenderer.createJuryEmbed()
+      .setImage('attachment://trial-voting.png');
+
     await this.votingMessage?.edit({
       files: [attachment],
+      embeds: [embed],
       components: [TrialRenderer.createDisabledVotingButtons()],
     });
 
@@ -303,10 +376,21 @@ export class TrialGame {
   }
 
   /**
+   * Get a random default sentence
+   */
+  private getRandomDefaultSentence(): string {
+    const randomIndex = Math.floor(Math.random() * TrialGame.DEFAULT_SENTENCES.length);
+    return TrialGame.DEFAULT_SENTENCES[randomIndex];
+  }
+
+  /**
    * Show guilty result - edit voting message to show result image, then GIF
    */
   private async showGuiltyResult(): Promise<void> {
     this.state.phase = 'result';
+
+    // Use accuser's sentence or a random default
+    const finalSentence = this.state.sentence?.trim() || this.getRandomDefaultSentence();
 
     // Generate result card with blur effect
     const cardBuffer = await TrialRenderer.generateResultCard(
@@ -321,7 +405,7 @@ export class TrialGame {
     const embed = TrialRenderer.createGuiltyResultEmbed(
       `<@${this.state.accusedId}>`,
       this.state.accusation,
-      this.state.sentence
+      finalSentence
     ).setImage('attachment://trial-result.png');
 
     // First show result with disabled voting buttons
@@ -338,7 +422,7 @@ export class TrialGame {
     const guiltyEmbed = TrialRenderer.createGuiltyResultEmbedWithGif(
       `<@${this.state.accusedId}>`,
       this.state.accusation,
-      this.state.sentence
+      finalSentence
     );
 
     await this.votingMessage?.edit({
@@ -514,6 +598,9 @@ export class TrialGame {
       } else {
         this.state.innocentVotes.add(userId);
       }
+
+      // Immediately update the voting card with new counts
+      await this.updateVotingCard();
     }
 
     await interaction.reply({

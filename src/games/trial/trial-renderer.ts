@@ -35,13 +35,14 @@ export class TrialRenderer {
    */
   static createCourtOpeningEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setDescription(BobKunPersonality.trialCourtOpening)
+      .setTitle('⚖️ COURT IS STARTING. EVERYONE BE SEATED. ⚖️')
+      .setDescription('🤫 **SHUT UP, THE COURT IS IN SESSION.**')
       .setColor(0xFFD700)
-      .setImage('https://c.tenor.com/bOBzEJLVxhIAAAAd/tenor.gif');
+      .setImage('https://c.tenor.com/IfF54WALGpsAAAAd/tenor.gif');
   }
 
   /**
-   * Create defense stage embed
+   * Create defense stage embed (without GIF)
    */
   static createDefenseEmbed(
     accusedMention: string,
@@ -55,9 +56,10 @@ export class TrialRenderer {
     return new EmbedBuilder()
       .setTitle('⚖️ DEFENSE STAGE')
       .setDescription(
-        `${BobKunPersonality.trialAccusation}\n\n` +
+        `🚨 **A VERY SERIOUS ACCUSATION HAS BEEN MADE.** 🚨\n\n` +
         `${accusedMention} has been accused of **"${accusation}"** by ${accuserMention}.\n\n` +
-        BobKunPersonality.trialDefense(accusedMention, timeStr)
+        `🗣️ ${accusedMention}, what do you have to say for yourself?!\n\n` +
+        `⏱️ You have **${timeStr}**. Make it count. 😭`
       )
       .setColor(0xFFA500)
       .setTimestamp();
@@ -76,11 +78,12 @@ export class TrialRenderer {
       ? `${Math.floor(remainingSeconds / 60)}:${(remainingSeconds % 60).toString().padStart(2, '0')}`
       : `${remainingSeconds}`;
     return new EmbedBuilder()
-      .setTitle('⚖️ DEFENSE STAGE')
+      .setTitle('⚖️ BOB KUN COURT IS NOW IN SESSION ⚖️')
       .setDescription(
-        `${BobKunPersonality.trialAccusation}\n\n` +
+        `🚨 **A VERY SERIOUS ACCUSATION HAS BEEN MADE.** 🚨\n\n` +
         `${accusedMention} has been accused of **"${accusation}"** by ${accuserMention}.\n\n` +
-        BobKunPersonality.trialDefense(accusedMention, timeStr)
+        `🗣️ ${accusedMention}, what do you have to say for yourself?!\n\n` +
+        `⏱️ You have **${timeStr}**. Make it count. 😭`
       )
       .setColor(0xFFA500)
       .setImage('https://c.tenor.com/dCK5UBjLY7YAAAAC/tenor.gif')
