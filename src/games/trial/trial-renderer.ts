@@ -64,6 +64,30 @@ export class TrialRenderer {
   }
 
   /**
+   * Create defense embed with GIF in the same embed
+   */
+  static createDefenseEmbedWithGif(
+    accusedMention: string,
+    accuserMention: string,
+    accusation: string,
+    remainingSeconds: number
+  ): EmbedBuilder {
+    const timeStr = remainingSeconds >= 60 
+      ? `${Math.floor(remainingSeconds / 60)}:${(remainingSeconds % 60).toString().padStart(2, '0')}`
+      : `${remainingSeconds}`;
+    return new EmbedBuilder()
+      .setTitle('⚖️ DEFENSE STAGE')
+      .setDescription(
+        `${BobKunPersonality.trialAccusation}\n\n` +
+        `${accusedMention} has been accused of **"${accusation}"** by ${accuserMention}.\n\n` +
+        BobKunPersonality.trialDefense(accusedMention, timeStr)
+      )
+      .setColor(0xFFA500)
+      .setImage('https://c.tenor.com/dCK5UBjLY7YAAAAC/tenor.gif')
+      .setTimestamp();
+  }
+
+  /**
    * Create defense embed with GIF
    */
   static createDefenseGifEmbed(): EmbedBuilder {

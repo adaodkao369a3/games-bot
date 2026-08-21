@@ -47,35 +47,66 @@ export class TrialGame {
   }
 
   /**
-   * Show court opening with GIF
+   * Show court opening with defense text and GIF in single embed
    */
   private async showCourtOpening(): Promise<void> {
-    this.state.phase = 'opening';
+    this.state.phase = 'defense';
+    this.state.defenseEndsAt = Date.now() + (this.state.defenseDurationSeconds * 1000);
 
-    const embed = TrialRenderer.createCourtOpeningEmbed();
-    await this.currentMessage?.edit({
-      content: null,
-      embeds: [embed],
-      components: [],
+    // Download accused avatar for later use
+    try {
+      const guild = await this.currentMessage?.client.guilds.fetch(this.state.guildId);
+      if (guild) {
+        const accusedMember = await guild.members.fetch(this.state.accusedId);
+        const avatarUrl = accusedMember?.user?.avatarURL();
+        if (avatarUrl) {
+          this.avatarBuffer = await TrialRenderer.downloadAvatar(avatarUrl);
+        }
+      }
+    } catch (error) {
+      console.error('[TrialGame] Failed to download avatar:', error);
+    }
+
+    // Create defense message with GIF in the same embed
+    const defenseEmbed = TrialRenderer.createDefenseEmbedWithGif(
+      `<@${this.state.accusedId}>`,
+      `<@${this.state.accuserId}>`,
+      this.state.accusation,
+      this.state.defenseDurationSeconds
+    );
+
+    this.defenseMessage = await (this.currentMessage?.channel as TextChannel).send({
+      embeds: [defenseEmbed],
     });
 
-    // Wait 5 seconds then proceed to defense
-    await this.delay(this.COURT_OPENING_DURATION);
-    await this.showDefenseGif();
+    // Start 4-second timer to remove GIF
+    this.startGifRemovalTimer();
+
+    // Start countdown updates
+    this.updateDefenseCountdown();
   }
 
   /**
-   * Show defense GIF then create defense message
+   * Start 4-second timer to remove GIF from defense message
    */
-  private async showDefenseGif(): Promise<void> {
-    const embed = TrialRenderer.createDefenseGifEmbed();
-    await this.currentMessage?.edit({
-      embeds: [embed],
-    });
+  private startGifRemovalTimer(): void {
+    const gifTimeout = setTimeout(async () => {
+      if (this.state.phase === 'defense') {
+        // Remove GIF, keep defense text
+        const remaining = Math.max(0, Math.ceil((this.state.defenseEndsAt! - Date.now()) / 1000));
+        const embed = TrialRenderer.createDefenseEmbed(
+          `<@${this.state.accusedId}>`,
+          `<@${this.state.accuserId}>`,
+          this.state.accusation,
+          remaining
+        );
+        await this.defenseMessage?.edit({
+          embeds: [embed],
+        });
+      }
+    }, 4000); // 4 seconds
 
-    // Wait 5 seconds then create defense message
-    await this.delay(this.DEFENSE_GIF_DURATION);
-    await this.startDefenseStage();
+    this.timers.push(gifTimeout as any);
   }
 
   /**
@@ -85,38 +116,26 @@ export class TrialGame {
     this.state.phase = 'defense';
     this.state.defenseEndsAt = Date.now() + (this.state.defenseDurationSeconds * 1000);
 
-    // Download accused avatar for later use (only if not already downloaded)
-    if (!this.avatarBuffer) {
-      try {
-        const guild = await this.currentMessage?.client.guilds.fetch(this.state.guildId);
-        if (guild) {
-          const accusedMember = await guild.members.fetch(this.state.accusedId);
-          const avatarUrl = accusedMember?.user?.avatarURL();
-          if (avatarUrl) {
-            this.avatarBuffer = await TrialRenderer.downloadAvatar(avatarUrl);
-          }
-        }
-      } catch (error) {
-        console.error('[TrialGame] Failed to download avatar:', error);
-      }
-    }
-
-    const defenseEmbed = TrialRenderer.createDefenseEmbed(
+    const defenseEmbed = TrialRenderer.createDefenseEmbedWithGif(
       `<@${this.state.accusedId}>`,
       `<@${this.state.accuserId}>`,
       this.state.accusation,
       this.state.defenseDurationSeconds
     );
 
-    // If defenseMessage exists (after draw), edit it. Otherwise create new.
+    // If defenseMessage exists (after draw), edit it with GIF. Otherwise create new.
     if (this.defenseMessage) {
       await this.defenseMessage.edit({
         embeds: [defenseEmbed],
       });
+      // Start 4-second timer to remove GIF
+      this.startGifRemovalTimer();
     } else {
       this.defenseMessage = await (this.currentMessage?.channel as TextChannel).send({
         embeds: [defenseEmbed],
       });
+      // Start 4-second timer to remove GIF
+      this.startGifRemovalTimer();
     }
 
     // Start countdown updates
@@ -251,7 +270,7 @@ export class TrialGame {
   }
 
   /**
-   * Handle draw - edit voting message into defense message
+   * Handle draw - edit voting message into defense message with GIF
    */
   private async handleDraw(): Promise<void> {
     if (this.state.voteRound >= 3) {
@@ -275,19 +294,16 @@ export class TrialGame {
     this.state.guiltyVotes.clear();
     this.state.innocentVotes.clear();
 
-    // Show dramatic draw transition on voting message
-    await this.showDrawTransition();
-
     // votingMessage becomes the new defenseMessage
     this.defenseMessage = this.votingMessage;
     this.votingMessage = undefined;
 
-    // Start defense stage (will edit the defense message)
+    // Start defense stage (will edit the defense message with GIF)
     await this.startDefenseStage();
   }
 
   /**
-   * Show guilty result
+   * Show guilty result - edit voting message to show result image, then GIF
    */
   private async showGuiltyResult(): Promise<void> {
     this.state.phase = 'result';
@@ -315,8 +331,8 @@ export class TrialGame {
       components: [TrialRenderer.createDisabledVotingButtons()],
     });
 
-    // Wait a moment then show guilty GIF with action buttons
-    await this.delay(1500);
+    // Wait 5 seconds then show guilty GIF with action buttons
+    await this.delay(5000);
 
     // Show guilty GIF with jump button only (sentence is displayed in embed text)
     const guiltyEmbed = TrialRenderer.createGuiltyResultEmbedWithGif(
@@ -356,7 +372,7 @@ export class TrialGame {
   }
 
   /**
-   * Show innocent result
+   * Show innocent result - edit voting message to show result image, then GIF
    */
   private async showInnocentResult(): Promise<void> {
     this.state.phase = 'innocent';
@@ -381,8 +397,8 @@ export class TrialGame {
       components: [TrialRenderer.createDisabledVotingButtons()],
     });
 
-    // Wait a moment then show innocent GIF with mute button
-    await this.delay(1500);
+    // Wait 5 seconds then show innocent GIF with mute button
+    await this.delay(5000);
 
     // Show innocent GIF with mute button
     const innocentEmbed = TrialRenderer.createInnocentResultEmbedWithGif();
@@ -413,29 +429,6 @@ export class TrialGame {
     }, 10000); // 10 seconds
 
     this.timers.push(muteTimeout as any);
-  }
-
-  /**
-   * Show dramatic draw transition
-   */
-  private async showDrawTransition(): Promise<void> {
-    const drawMessage = this.state.voteRound === 2 
-      ? BobKunPersonality.trialDrawFirst
-      : BobKunPersonality.trialDrawSecond;
-
-    const embed = new EmbedBuilder()
-      .setTitle('⚖️ DRAW')
-      .setDescription(drawMessage)
-      .setColor(0xFFA500)
-      .setTimestamp();
-
-    await this.votingMessage?.edit({
-      embeds: [embed],
-      components: [],
-    });
-
-    // Wait 3 seconds for dramatic effect
-    await this.delay(3000);
   }
 
   /**
