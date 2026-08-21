@@ -15,6 +15,7 @@ export class TrialGame {
   private avatarBuffer?: Buffer;
   private courtGifEndsAt?: number; // Timestamp when court GIF should be removed
   private defenseGifEndsAt?: number; // Timestamp when defense GIF should be removed
+  private defenseGifVisible: boolean = false; // Track if defense GIF is currently visible
   
   private readonly COURT_GIF_DURATION = 4000; // 4 seconds
   private readonly DEFENSE_GIF_DURATION = 4000; // 4 seconds
@@ -134,6 +135,7 @@ export class TrialGame {
 
     // Set timestamp for defense GIF removal
     this.defenseGifEndsAt = Date.now() + this.DEFENSE_GIF_DURATION;
+    this.defenseGifVisible = true;
 
     // Start defense GIF timer
     this.startDefenseGifTimer();
@@ -161,6 +163,8 @@ export class TrialGame {
    */
   private async removeDefenseGif(): Promise<void> {
     if (this.state.phase !== 'defense') return;
+
+    this.defenseGifVisible = false;
 
     const remaining = Math.max(0, Math.ceil((this.state.defenseEndsAt! - Date.now()) / 1000));
     const embed = TrialRenderer.createDefenseEmbed(
@@ -196,6 +200,7 @@ export class TrialGame {
       });
       // Set timestamp for defense GIF removal
       this.defenseGifEndsAt = Date.now() + this.DEFENSE_GIF_DURATION;
+      this.defenseGifVisible = true;
       // Start defense GIF timer
       this.startDefenseGifTimer();
     } else {
@@ -204,6 +209,7 @@ export class TrialGame {
       });
       // Set timestamp for defense GIF removal
       this.defenseGifEndsAt = Date.now() + this.DEFENSE_GIF_DURATION;
+      this.defenseGifVisible = true;
       // Start defense GIF timer
       this.startDefenseGifTimer();
     }
@@ -219,6 +225,16 @@ export class TrialGame {
     const updateInterval = setInterval(async () => {
       if (this.state.phase !== 'defense') {
         clearInterval(updateInterval);
+        return;
+      }
+
+      // Skip editing if GIF is still visible (first 4 seconds)
+      if (this.defenseGifVisible) {
+        const remaining = Math.max(0, Math.ceil((this.state.defenseEndsAt! - Date.now()) / 1000));
+        if (remaining <= 0) {
+          clearInterval(updateInterval);
+          await this.startJuryVoting();
+        }
         return;
       }
 

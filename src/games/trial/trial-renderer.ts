@@ -291,7 +291,7 @@ export class TrialRenderer {
     return new EmbedBuilder()
       .setDescription(description)
       .setColor(0xFF0000)
-      .setImage('https://c.tenor.com/SCJRAgBurdcAAAAd/tenor.gif')
+      .setImage('https://c.tenor.com/ihJgocJs-iYAAAAC/tenor.gif')
       .setTimestamp();
   }
 
