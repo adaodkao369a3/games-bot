@@ -10,6 +10,7 @@ import { handleWheelCommand } from '../commands/wheel.js';
 import { handleWheelFontTestCommand } from '../commands/wheelFontTest.js';
 import { handleWheelTestCommand } from '../commands/wheelTest.js';
 import { handleHelpCommand } from '../commands/help.js';
+import { handleBobkunCommand } from '../commands/bobkun.js';
 import { handleQuickDrawCommand, handleQuickDrawInteraction } from '../commands/quickdraw.js';
 import { handleQuickDrawMaxCommand, handleQuickDrawMaxInteraction } from '../commands/quickdrawmax.js';
 import { handleRouletteCommand, handleRouletteInteraction } from '../commands/roulette.js';
@@ -109,6 +110,11 @@ export class DiscordClient {
 
       if (command === 'help') {
         await handleHelpCommand(message);
+        return;
+      }
+
+      if (command === 'bobkun') {
+        await handleBobkunCommand(message);
         return;
       }
 
