@@ -1,4 +1,4 @@
-import { AttachmentBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from 'discord.js';
+import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import { QuoteImageGenerator, QuoteMessageData } from '../utils/quote-image-generator.js';
 
 // ============================================================
@@ -16,11 +16,40 @@ interface QuoteData {
 const activeQuotes = new Map<string, QuoteData>();
 
 // ============================================================
+// ROLE PERMISSIONS
+// ============================================================
+
+const ALLOWED_ROLES = [
+  '1540782365893337100', // booster
+  '1535285114618249246', // producer
+];
+
+function hasPermission(member: any): boolean {
+  // Check if user is admin
+  if (member.permissions.has('Administrator')) {
+    return true;
+  }
+  
+  // Check if user has any of the allowed roles
+  return member.roles.cache.some((role: any) => 
+    ALLOWED_ROLES.includes(role.id)
+  );
+}
+
+// ============================================================
 // COMMAND HANDLER
 // ============================================================
 
 export async function handleQuoteCommand(message: any, args: string[]): Promise<void> {
   try {
+    // Check permissions
+    if (!message.member || !hasPermission(message.member)) {
+      await message.reply({
+        content: 'You do not have permission to use this command.',
+      });
+      return;
+    }
+
     // Check if this is a reply
     if (!message.reference) {
       await message.reply({
@@ -139,25 +168,10 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       .setColor('#0099ff')
       .setTimestamp();
 
-    // Create buttons
-    const colorButton = new ButtonBuilder()
-      .setCustomId(`quote_${quoteId}_color`)
-      .setLabel('🎨 Color')
-      .setStyle(ButtonStyle.Primary);
-
-    const bwButton = new ButtonBuilder()
-      .setCustomId(`quote_${quoteId}_bw`)
-      .setLabel('🖤 B&W')
-      .setStyle(ButtonStyle.Secondary);
-
-    const row = new ActionRowBuilder<ButtonBuilder>()
-      .addComponents(colorButton, bwButton);
-
     // Send the message to the original channel first
     const originalMessage = await message.channel.send({
       embeds: [embed],
       files: [attachment],
-      components: [row],
     });
 
     // Redirect to directors cut channel
@@ -168,7 +182,6 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
         await directorsCutChannel.send({
           embeds: [embed],
           files: [attachment],
-          components: [row],
         });
       }
     } catch (error) {
@@ -179,89 +192,6 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
     console.error('[Quote Command] Error:', error);
     await message.reply({
       content: 'An error occurred while generating the quote.',
-    });
-  }
-}
-
-// ============================================================
-// INTERACTION HANDLER
-// ============================================================
-
-export async function handleQuoteInteraction(interaction: any): Promise<void> {
-  try {
-    const customId = interaction.customId;
-    
-    if (!customId.startsWith('quote_')) {
-      return;
-    }
-
-    const parts = customId.split('_');
-    const quoteId = parts[1];
-    const style = parts[2] as 'color' | 'bw';
-
-    const quoteData = activeQuotes.get(quoteId);
-
-    if (!quoteData) {
-      await interaction.reply({
-        content: 'This quote has expired.',
-        ephemeral: true,
-      });
-      return;
-    }
-
-    // Update the style
-    quoteData.currentStyle = style;
-
-    // Regenerate the image
-    const imageBuffer = await QuoteImageGenerator.generateQuoteImage({
-      message1: quoteData.message1,
-      message2: quoteData.message2,
-      style: quoteData.currentStyle,
-    });
-
-    // Create attachment
-    const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
-
-    // Build user mentions string
-    let mentions = `<@${quoteData.message1.userId}>`;
-    if (quoteData.message2) {
-      mentions += ` and <@${quoteData.message2.userId}>`;
-    }
-
-    // Create embed with image
-    const embed = new EmbedBuilder()
-      .setTitle('Quote')
-      .setDescription(`Quoting ${mentions}`)
-      .setImage('attachment://quote.png')
-      .setColor('#0099ff')
-      .setTimestamp();
-
-    // Create buttons
-    const colorButton = new ButtonBuilder()
-      .setCustomId(`quote_${quoteId}_color`)
-      .setLabel('🎨 Color')
-      .setStyle(ButtonStyle.Primary);
-
-    const bwButton = new ButtonBuilder()
-      .setCustomId(`quote_${quoteId}_bw`)
-      .setLabel('🖤 B&W')
-      .setStyle(ButtonStyle.Secondary);
-
-    const row = new ActionRowBuilder<ButtonBuilder>()
-      .addComponents(colorButton, bwButton);
-
-    // Update the message
-    await interaction.update({
-      embeds: [embed],
-      files: [attachment],
-      components: [row],
-    });
-
-  } catch (error) {
-    console.error('[Quote Interaction] Error:', error);
-    await interaction.reply({
-      content: 'An error occurred while updating the quote.',
-      ephemeral: true,
     });
   }
 }
