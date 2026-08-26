@@ -1,4 +1,4 @@
-import { Message, EmbedBuilder } from 'discord.js';
+import { Message, EmbedBuilder, TextChannel } from 'discord.js';
 
 /**
  * Handle the bobkun command - Server guide with arcade theme
@@ -6,6 +6,12 @@ import { Message, EmbedBuilder } from 'discord.js';
 export async function handleBobkunCommand(message: Message): Promise<void> {
   try {
     const botAvatar = message.client.user.displayAvatarURL();
+    
+    // Only allow in guild text channels
+    if (!(message.channel instanceof TextChannel)) {
+      await message.reply('This command can only be used in server text channels!');
+      return;
+    }
 
     const embed = new EmbedBuilder()
       .setTitle('🕹️ BOB\'S ARCADE')
