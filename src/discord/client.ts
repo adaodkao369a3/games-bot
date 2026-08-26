@@ -18,7 +18,7 @@ import { handleRouletteMaxCommand, handleRouletteMaxInteraction } from '../comma
 import { handlePissCompCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
 import { handleSmashMaxCommand, handleSmashMaxInteraction } from '../commands/smashmax.js';
 import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } from '../commands/trial.js';
-import { handleQuoteCommand, handleQuoteInteraction } from '../commands/quote.js';
+import { handleQuoteCommand } from '../commands/quote.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -211,11 +211,6 @@ export class DiscordClient {
 
     if (customId.startsWith('trial_')) {
       await handleTrialInteraction(interaction);
-      return;
-    }
-
-    if (customId.startsWith('quote_')) {
-      await handleQuoteInteraction(interaction);
       return;
     }
     
