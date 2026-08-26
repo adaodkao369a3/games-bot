@@ -82,39 +82,35 @@ function extractTextParts(content: string): QuoteTextPart[] {
   return parts;
 }
 
-// Extract Unicode emojis from text
+// Extract Unicode emojis as complete grapheme clusters so sequences like
+// skin-tone variants, flags, keycaps, and ZWJ emojis stay together.
 function extractUnicodeEmojis(text: string): QuoteTextPart[] {
   const parts: QuoteTextPart[] = [];
-  const unicodeEmojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
-  let lastIndex = 0;
-  let match;
-  
-  while ((match = unicodeEmojiRegex.exec(text)) !== null) {
-    // Add text before emoji
-    if (match.index > lastIndex) {
-      const beforeText = text.slice(lastIndex, match.index);
-      if (beforeText.trim()) {
-        parts.push({ type: 'text', value: beforeText });
-      }
+  const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  let textBuffer = '';
+
+  const flushText = () => {
+    if (textBuffer) {
+      parts.push({ type: 'text', value: textBuffer });
+      textBuffer = '';
     }
-    
-    // Add Unicode emoji
-    parts.push({ 
-      type: 'unicodeEmoji', 
-      value: match[0]
-    });
-    
-    lastIndex = unicodeEmojiRegex.lastIndex;
-  }
-  
-  // Add remaining text
-  if (lastIndex < text.length) {
-    const remaining = text.slice(lastIndex);
-    if (remaining.trim()) {
-      parts.push({ type: 'text', value: remaining });
+  };
+
+  for (const { segment } of segmenter.segment(text)) {
+    // Extended pictographic catches normal emoji as well as many emoji
+    // sequences that do not carry Emoji_Presentation on every code point.
+    const isEmoji = /\p{Extended_Pictographic}/u.test(segment) ||
+      /\p{Emoji_Presentation}/u.test(segment);
+
+    if (isEmoji) {
+      flushText();
+      parts.push({ type: 'unicodeEmoji', value: segment });
+    } else {
+      textBuffer += segment;
     }
   }
-  
+
+  flushText();
   return parts;
 }
 
@@ -185,8 +181,9 @@ async function processEmojis(textParts: QuoteTextPart[]): Promise<QuoteTextPart[
       const match = part.value.match(/<(a)?:\w+:(\d+)>/);
       if (match) {
         const emojiId = match[2];
+        const extension = match[1] ? 'gif' : 'png';
         try {
-          const url = `https://cdn.discordapp.com/emojis/${emojiId}.png`;
+          const url = `https://cdn.discordapp.com/emojis/${emojiId}.${extension}?quality=lossless`;
           const buffer = await downloadImage(url);
           const dimensions = await getImageDimensions(buffer);
           
@@ -209,7 +206,7 @@ async function processEmojis(textParts: QuoteTextPart[]): Promise<QuoteTextPart[
       try {
         // Download Twemoji for Unicode emoji
         const codepoint = Array.from(part.value).map(char => char.codePointAt(0)!.toString(16)).join('-');
-        const url = `https://twemoji.maxcdn.com/v/latest/72x72/${codepoint}.png`;
+        const url = `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/${codepoint}.png`;
         const buffer = await downloadImage(url);
         const dimensions = await getImageDimensions(buffer);
         
