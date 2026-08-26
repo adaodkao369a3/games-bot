@@ -402,6 +402,11 @@ export class QuoteImageGenerator {
     const textRegionCenterX = textRegionX + textRegionWidth / 2;
     const textRegionCenterY = this.IMAGE_HEIGHT * 0.5;
 
+    // Strict text box boundaries for quote text
+    const textAreaX = textRegionX + 40; // 40px padding from left edge
+    const textAreaWidth = textRegionWidth - 80; // 520px (600 - 80)
+    const textAreaCenterX = textAreaX + textAreaWidth / 2;
+
     // Build text content from text parts
     const textContent = message.textParts
       .filter(part => part.type === 'text')
@@ -427,8 +432,8 @@ export class QuoteImageGenerator {
       const reservedHeight = dividerHeight + usernameSpacing + usernameHeight + postTextSpacing;
       const availableQuoteHeight = textRegionHeight - reservedHeight;
       
-      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, textRegionWidth - 100, availableQuoteHeight);
-      const quoteLines = this.getQuoteLines(ctx, textContent, textRegionWidth - 100, quoteFontSize);
+      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, textAreaWidth, availableQuoteHeight);
+      const quoteLines = this.getQuoteLines(ctx, textContent, textAreaWidth, quoteFontSize);
       const quoteLineHeight = quoteFontSize * 1.25;
       textHeight = quoteLines.length * quoteLineHeight;
       contentHeight += textHeight;
@@ -454,25 +459,25 @@ export class QuoteImageGenerator {
     if (shouldRenderText) {
       this.drawTextGradient(
         ctx,
-        textRegionX + 50,
+        textAreaX,
         currentY - 20,
-        textRegionWidth - 100,
+        textAreaWidth,
         textHeight + 40
       );
       
       // Recalculate with height constraint (same as above)
       const reservedHeight = dividerHeight + usernameSpacing + usernameHeight + postTextSpacing;
       const availableQuoteHeight = textRegionHeight - reservedHeight;
-      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, textRegionWidth - 100, availableQuoteHeight);
-      const quoteLines = this.getQuoteLines(ctx, textContent, textRegionWidth - 100, quoteFontSize);
+      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, textAreaWidth, availableQuoteHeight);
+      const quoteLines = this.getQuoteLines(ctx, textContent, textAreaWidth, quoteFontSize);
       const quoteLineHeight = quoteFontSize * 1.25;
       
       await this.drawInlineTextWithEmojis(
         ctx,
         message.textParts,
-        textRegionCenterX,
+        textAreaCenterX,
         currentY,
-        textRegionWidth - 100,
+        textAreaWidth,
         'center',
         quoteFontSize
       );
@@ -485,9 +490,9 @@ export class QuoteImageGenerator {
       await this.drawLargeMedia(
         ctx,
         message.media,
-        textRegionCenterX - (textRegionWidth - 100) / 2,
+        textAreaCenterX - textAreaWidth / 2,
         currentY,
-        textRegionWidth - 100,
+        textAreaWidth,
         mediaHeight
       );
       currentY += mediaHeight;
@@ -497,7 +502,7 @@ export class QuoteImageGenerator {
     if (shouldRenderText || (message.media && message.media.length > 0)) {
       this.drawDividerBar(
         ctx,
-        textRegionCenterX,
+        textAreaCenterX,
         currentY + usernameSpacing,
         120
       );
@@ -507,7 +512,7 @@ export class QuoteImageGenerator {
     this.drawUsername(
       ctx,
       message.username,
-      textRegionCenterX,
+      textAreaCenterX,
       currentY + usernameSpacing + dividerHeight,
       true,
       'center'
@@ -1051,8 +1056,8 @@ export class QuoteImageGenerator {
     maxWidth: number,
     maxHeight: number = 400
   ): number {
-    const preferredSize = 68;
-    const minimumSize = 34;
+    const preferredSize = 64;
+    const minimumSize = 28;
 
     for (
       let size = preferredSize;
@@ -1072,8 +1077,17 @@ export class QuoteImageGenerator {
       const lineHeight = size * 1.25;
       const totalHeight = lines.length * lineHeight;
 
+      // Check if all lines fit within width constraint
+      let allLinesFitWidth = true;
+      for (const line of lines) {
+        if (ctx.measureText(line).width > maxWidth) {
+          allLinesFitWidth = false;
+          break;
+        }
+      }
+
       // Check if text fits within both width and height constraints
-      if (totalHeight <= maxHeight) {
+      if (allLinesFitWidth && totalHeight <= maxHeight) {
         return size;
       }
     }
@@ -1386,38 +1400,56 @@ export class QuoteImageGenerator {
 
     const lines: string[] = [];
 
-    let currentLine =
-      words[0];
-
-    for (
-      let i = 1;
-      i < words.length;
-      i++
-    ) {
-      const testLine =
-        currentLine +
-        ' ' +
-        words[i];
-
-      if (
-        ctx.measureText(testLine)
-          .width <= maxWidth
-      ) {
-        currentLine =
-          testLine;
+    for (const word of words) {
+      // Check if the word itself is wider than maxWidth
+      if (ctx.measureText(word).width > maxWidth) {
+        // Split the word character by character
+        const charLines = this.splitLongWord(ctx, word, maxWidth);
+        lines.push(...charLines);
       } else {
-        lines.push(
-          currentLine
-        );
+        // Normal word wrapping
+        if (lines.length === 0) {
+          lines.push(word);
+        } else {
+          const lastLine = lines[lines.length - 1];
+          const testLine = lastLine + ' ' + word;
 
-        currentLine =
-          words[i];
+          if (ctx.measureText(testLine).width <= maxWidth) {
+            lines[lines.length - 1] = testLine;
+          } else {
+            lines.push(word);
+          }
+        }
       }
     }
 
-    lines.push(
-      currentLine
-    );
+    return lines;
+  }
+
+  private static splitLongWord(
+    ctx: SKRSContext2D,
+    word: string,
+    maxWidth: number
+  ): string[] {
+    const lines: string[] = [];
+    let currentLine = '';
+
+    for (const char of word) {
+      const testLine = currentLine + char;
+
+      if (ctx.measureText(testLine).width <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) {
+          lines.push(currentLine);
+        }
+        currentLine = char;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
 
     return lines;
   }
