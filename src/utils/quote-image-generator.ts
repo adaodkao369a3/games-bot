@@ -80,15 +80,15 @@ export class QuoteImageGenerator {
   private static readonly IMAGE_HEIGHT = 800;
 
   /*
-   * Large diagonal PFPs.
+   * PFP size for two-message quotes.
    *
-   * IMPORTANT:
-   * These are intentionally larger than the available
-   * quarter-space so the two images overlap slightly.
-   *
-   * This creates the "almost touching tips" look.
+   * These are anchored to corners but occupy only ~50% of their
+   * respective section visually, creating an "emerging from corner" effect.
    */
-  private static readonly PFP_SIZE = 620;
+  private static readonly PFP_SIZE = 400;
+  
+  // Single quote PFP size: 50% of image width with no margins
+  private static readonly SINGLE_PFP_SIZE = 600;
 
   // ==========================================================
   // MAIN GENERATOR
@@ -182,7 +182,7 @@ export class QuoteImageGenerator {
     message: QuoteMessageData,
     style: 'color' | 'bw'
   ): void {
-    const pfpSize = this.PFP_SIZE;
+    const pfpSize = this.SINGLE_PFP_SIZE;
 
     /*
      * ABSOLUTELY NO PADDING.
@@ -190,6 +190,7 @@ export class QuoteImageGenerator {
      * The PFP touches:
      * - top edge
      * - left edge
+     * Takes up 50% of the image width
      */
     const pfpX = 0;
     const pfpY = 0;
@@ -600,153 +601,107 @@ export class QuoteImageGenerator {
 
     if (direction === 'right-bottom') {
       // ------------------------------------------------------
-      // RIGHT FADE
+      // COMBINED FADE: Right + Bottom with radial component
       // ------------------------------------------------------
-
-      const rightGradient =
-        ctx.createLinearGradient(
-          x + width * 0.48,
-          y,
-          x + width,
-          y
-        );
-
-      rightGradient.addColorStop(
-        0,
-        'rgba(0,0,0,0)'
+      
+      // Start fade at 45% of the image
+      const fadeStart = 0.45;
+      
+      // Create radial gradient from corner for smooth diagonal fade
+      const centerX = x + width * 0.3;
+      const centerY = y + height * 0.3;
+      const radius = Math.max(width, height) * 0.8;
+      
+      const radialGradient = ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, radius
       );
-
-      rightGradient.addColorStop(
-        0.55,
-        'rgba(0,0,0,0.35)'
+      
+      radialGradient.addColorStop(0, 'rgba(0,0,0,0)');
+      radialGradient.addColorStop(0.4, 'rgba(0,0,0,0.2)');
+      radialGradient.addColorStop(0.7, 'rgba(0,0,0,0.6)');
+      radialGradient.addColorStop(1, 'rgba(0,0,0,1)');
+      
+      ctx.fillStyle = radialGradient;
+      ctx.fillRect(x, y, width, height);
+      
+      // Add stronger linear gradient on right edge
+      const rightGradient = ctx.createLinearGradient(
+        x + width * fadeStart, y,
+        x + width, y
       );
-
-      rightGradient.addColorStop(
-        1,
-        'rgba(0,0,0,1)'
+      
+      rightGradient.addColorStop(0, 'rgba(0,0,0,0)');
+      rightGradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
+      rightGradient.addColorStop(1, 'rgba(0,0,0,1)');
+      
+      ctx.fillStyle = rightGradient;
+      ctx.fillRect(x + width * fadeStart, y, width * (1 - fadeStart), height);
+      
+      // Add stronger linear gradient on bottom edge
+      const bottomGradient = ctx.createLinearGradient(
+        x, y + height * fadeStart,
+        x, y + height
       );
-
-      ctx.fillStyle =
-        rightGradient;
-
-      ctx.fillRect(
-        x + width * 0.48,
-        y,
-        width * 0.52,
-        height
-      );
-
-      // ------------------------------------------------------
-      // BOTTOM FADE
-      // ------------------------------------------------------
-
-      const bottomGradient =
-        ctx.createLinearGradient(
-          x,
-          y + height * 0.48,
-          x,
-          y + height
-        );
-
-      bottomGradient.addColorStop(
-        0,
-        'rgba(0,0,0,0)'
-      );
-
-      bottomGradient.addColorStop(
-        0.55,
-        'rgba(0,0,0,0.35)'
-      );
-
-      bottomGradient.addColorStop(
-        1,
-        'rgba(0,0,0,1)'
-      );
-
-      ctx.fillStyle =
-        bottomGradient;
-
-      ctx.fillRect(
-        x,
-        y + height * 0.48,
-        width,
-        height * 0.52
-      );
+      
+      bottomGradient.addColorStop(0, 'rgba(0,0,0,0)');
+      bottomGradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
+      bottomGradient.addColorStop(1, 'rgba(0,0,0,1)');
+      
+      ctx.fillStyle = bottomGradient;
+      ctx.fillRect(x, y + height * fadeStart, width, height * (1 - fadeStart));
 
     } else {
       // ------------------------------------------------------
-      // TOP FADE
+      // COMBINED FADE: Top + Left with radial component
       // ------------------------------------------------------
-
-      const topGradient =
-        ctx.createLinearGradient(
-          x,
-          y,
-          x,
-          y + height * 0.48
-        );
-
-      topGradient.addColorStop(
-        0,
-        'rgba(0,0,0,1)'
+      
+      // Start fade at 45% of the image
+      const fadeStart = 0.45;
+      
+      // Create radial gradient from corner for smooth diagonal fade
+      const centerX = x + width * 0.7;
+      const centerY = y + height * 0.7;
+      const radius = Math.max(width, height) * 0.8;
+      
+      const radialGradient = ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, radius
       );
-
-      topGradient.addColorStop(
-        0.45,
-        'rgba(0,0,0,0.35)'
+      
+      radialGradient.addColorStop(0, 'rgba(0,0,0,0)');
+      radialGradient.addColorStop(0.4, 'rgba(0,0,0,0.2)');
+      radialGradient.addColorStop(0.7, 'rgba(0,0,0,0.6)');
+      radialGradient.addColorStop(1, 'rgba(0,0,0,1)');
+      
+      ctx.fillStyle = radialGradient;
+      ctx.fillRect(x, y, width, height);
+      
+      // Add stronger linear gradient on top edge
+      const topGradient = ctx.createLinearGradient(
+        x, y,
+        x, y + height * fadeStart
       );
-
-      topGradient.addColorStop(
-        1,
-        'rgba(0,0,0,0)'
+      
+      topGradient.addColorStop(0, 'rgba(0,0,0,1)');
+      topGradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
+      topGradient.addColorStop(1, 'rgba(0,0,0,0)');
+      
+      ctx.fillStyle = topGradient;
+      ctx.fillRect(x, y, width, height * fadeStart);
+      
+      // Add stronger linear gradient on left edge
+      const leftGradient = ctx.createLinearGradient(
+        x, y,
+        x + width * fadeStart, y
       );
-
-      ctx.fillStyle =
-        topGradient;
-
-      ctx.fillRect(
-        x,
-        y,
-        width,
-        height * 0.48
-      );
-
-      // ------------------------------------------------------
-      // LEFT FADE
-      // ------------------------------------------------------
-
-      const leftGradient =
-        ctx.createLinearGradient(
-          x,
-          y,
-          x + width * 0.48,
-          y
-        );
-
-      leftGradient.addColorStop(
-        0,
-        'rgba(0,0,0,1)'
-      );
-
-      leftGradient.addColorStop(
-        0.45,
-        'rgba(0,0,0,0.35)'
-      );
-
-      leftGradient.addColorStop(
-        1,
-        'rgba(0,0,0,0)'
-      );
-
-      ctx.fillStyle =
-        leftGradient;
-
-      ctx.fillRect(
-        x,
-        y,
-        width * 0.48,
-        height
-      );
+      
+      leftGradient.addColorStop(0, 'rgba(0,0,0,1)');
+      leftGradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
+      leftGradient.addColorStop(1, 'rgba(0,0,0,0)');
+      
+      ctx.fillStyle = leftGradient;
+      ctx.fillRect(x, y, width * fadeStart, height);
     }
 
     ctx.restore();
@@ -772,7 +727,7 @@ export class QuoteImageGenerator {
       y + height / 2;
 
     const radius =
-      Math.max(width, height) * 0.72;
+      Math.max(width, height) * 0.85;
 
     const gradient =
       ctx.createRadialGradient(
@@ -786,17 +741,17 @@ export class QuoteImageGenerator {
 
     gradient.addColorStop(
       0,
-      'rgba(0,0,0,0.88)'
+      'rgba(0,0,0,0.75)'
     );
 
     gradient.addColorStop(
-      0.35,
-      'rgba(0,0,0,0.68)'
+      0.4,
+      'rgba(0,0,0,0.5)'
     );
 
     gradient.addColorStop(
       0.7,
-      'rgba(0,0,0,0.28)'
+      'rgba(0,0,0,0.2)'
     );
 
     gradient.addColorStop(
@@ -840,7 +795,7 @@ export class QuoteImageGenerator {
       const lines =
         this.wrapText(
           ctx,
-          `"${text}"`,
+          text,
           maxWidth
         );
 
@@ -867,7 +822,7 @@ export class QuoteImageGenerator {
 
     return this.wrapText(
       ctx,
-      `"${text}"`,
+      text,
       maxWidth
     );
   }
@@ -956,7 +911,7 @@ export class QuoteImageGenerator {
     const lines =
       this.wrapText(
         ctx,
-        `"${text}"`,
+        text,
         maxWidth
       );
 
