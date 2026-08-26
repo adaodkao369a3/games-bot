@@ -38,7 +38,7 @@ export async function handleBobkunCommand(message: Message): Promise<void> {
     embed.setTimestamp();
     embed.setThumbnail(botAvatar);
 
-    await message.reply({
+    await message.channel.send({
       embeds: [embed],
     });
   } catch (error) {
