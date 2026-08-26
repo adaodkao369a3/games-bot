@@ -388,14 +388,24 @@ export class QuoteImageGenerator {
 
     // RIGHT HALF: permanently reserved for quote/media + fixed author area.
     const hasMedia = !!message.media?.length;
-    const layout = hasMedia ? this.SINGLE_WITH_MEDIA : this.SINGLE_NO_MEDIA;
     const centerX = 900;
 
+    // Keep the two layout types separate so TypeScript can correctly
+    // narrow mediaBox. The quote box, bar, and username remain fixed
+    // regardless of quote length.
+    const quoteLayout = hasMedia
+      ? this.SINGLE_WITH_MEDIA
+      : this.SINGLE_NO_MEDIA;
+
     if (hasMedia) {
+      const mediaLayout = this.SINGLE_WITH_MEDIA;
       await this.drawLargeMedia(
-        ctx, message.media,
-        layout.mediaBox.x, layout.mediaBox.y,
-        layout.mediaBox.width, layout.mediaBox.height
+        ctx,
+        message.media,
+        mediaLayout.mediaBox.x,
+        mediaLayout.mediaBox.y,
+        mediaLayout.mediaBox.width,
+        mediaLayout.mediaBox.height
       );
     }
 
@@ -403,27 +413,48 @@ export class QuoteImageGenerator {
       const fit = this.fitQuoteInBox(
         ctx,
         message.textParts,
-        layout.quoteBox,
+        quoteLayout.quoteBox,
         { preferredSize: hasMedia ? 46 : 64, minimumSize: 20 }
       );
 
       this.drawTextGradient(
         ctx,
-        layout.quoteBox.x,
-        layout.quoteBox.y,
-        layout.quoteBox.width,
-        layout.quoteBox.height
+        quoteLayout.quoteBox.x,
+        quoteLayout.quoteBox.y,
+        quoteLayout.quoteBox.width,
+        quoteLayout.quoteBox.height
       );
 
-      const startY = layout.quoteBox.y + (layout.quoteBox.height - fit.blockHeight) / 2;
+      const startY =
+        quoteLayout.quoteBox.y +
+        (quoteLayout.quoteBox.height - fit.blockHeight) / 2;
+
       await this.drawInlineTextWithEmojis(
-        ctx, fit.lines, centerX, startY, fit.fontSize, 'center'
+        ctx,
+        fit.lines,
+        centerX,
+        startY,
+        fit.fontSize,
+        'center'
       );
     }
 
     // FIXED: this area never follows quote length.
-    this.drawDividerBar(ctx, centerX, layout.barY, layout.barWidth);
-    this.drawUsername(ctx, message.username, centerX, layout.usernameY, true, 'center');
+    this.drawDividerBar(
+      ctx,
+      centerX,
+      quoteLayout.barY,
+      quoteLayout.barWidth
+    );
+
+    this.drawUsername(
+      ctx,
+      message.username,
+      centerX,
+      quoteLayout.usernameY,
+      true,
+      'center'
+    );
   }
 
   // ==========================================================
