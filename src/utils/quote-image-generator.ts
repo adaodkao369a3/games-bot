@@ -338,7 +338,7 @@ export class QuoteImageGenerator {
 
   private static async drawSingleMessageLayout(
     ctx: SKRSContext2D,
-    avatar: Image,
+    avatar: any,
     message: QuoteMessageData,
     style: 'color' | 'bw'
   ): Promise<void> {
