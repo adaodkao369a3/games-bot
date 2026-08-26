@@ -97,34 +97,35 @@ try {
 // TYPES
 // ============================================================
 
-export interface QuoteAttachment {
+export interface QuoteMedia {
+  type: 'image' | 'gif' | 'sticker';
   buffer: Buffer;
   width: number;
   height: number;
-  contentType: string;
+  url: string; // For deduplication
 }
 
-export interface QuoteSticker {
-  buffer: Buffer;
-  width: number;
-  height: number;
-}
-
-export interface QuoteEmoji {
-  buffer: Buffer;
-  width: number;
-  height: number;
-  originalText: string; // The <:name:id> or <a:name:id> text
+export interface QuoteTextPart {
+  type: 'text' | 'unicodeEmoji' | 'customEmoji';
+  value: string;
+  buffer?: Buffer; // For emoji images
+  width?: number;
+  height?: number;
 }
 
 export interface QuoteMessageData {
   username: string;
   userId: string;
-  content: string;
   avatarBuffer: Buffer;
-  attachments?: QuoteAttachment[];
-  stickers?: QuoteSticker[];
-  customEmojis?: QuoteEmoji[];
+  
+  // Text content broken into parts (text, unicode emojis, custom emojis)
+  textParts: QuoteTextPart[];
+  
+  // Media attachments (images, gifs, stickers)
+  media: QuoteMedia[];
+  
+  // Whether the message has actual text content
+  hasText: boolean;
 }
 
 export interface QuoteImageData {
@@ -236,53 +237,12 @@ export class QuoteImageGenerator {
   }
 
   // ==========================================================
-  // CUSTOM EMOJI RENDERING
+  // LARGE MEDIA RENDERING
   // ==========================================================
 
-  private static drawCustomEmojis(
+  private static async drawLargeMedia(
     ctx: SKRSContext2D,
-    message: QuoteMessageData,
-    text: string,
-    x: number,
-    y: number,
-    maxWidth: number,
-    fontSize: number
-  ): void {
-    if (!message.customEmojis || message.customEmojis.length === 0) {
-      return;
-    }
-
-    // For now, we'll render custom emojis as small inline images
-    // This is a simplified approach - a full implementation would need
-    // to measure text with emoji placeholders and position them correctly
-    // For the scope of this task, we'll render them below the text
-    const emojiSize = fontSize * 1.2;
-    let emojiX = x;
-    const emojiY = y + fontSize + 5;
-
-    message.customEmojis.forEach((emoji) => {
-      // Scale emoji to fit
-      const scaled = this.fitWithinBounds(
-        emoji.width,
-        emoji.height,
-        emojiSize,
-        emojiSize
-      );
-
-      // Load and draw emoji (this would need to be async in a full implementation)
-      // For now, we'll skip actual rendering since this method is synchronous
-      // The emoji images are already downloaded and stored in the buffer
-      emojiX += scaled.width + 5;
-    });
-  }
-
-  // ==========================================================
-  // EMBEDDED MEDIA RENDERING
-  // ==========================================================
-
-  private static async drawEmbeddedMedia(
-    ctx: SKRSContext2D,
-    media: QuoteAttachment[] | QuoteSticker[] | QuoteEmoji[],
+    media: QuoteMedia[],
     x: number,
     y: number,
     maxWidth: number,
@@ -296,7 +256,7 @@ export class QuoteImageGenerator {
     const isSingle = mediaCount === 1;
 
     if (isSingle) {
-      // Single image: fit within bounds
+      // Single image: fit within bounds with object-fit: contain behavior
       const item = media[0];
       const scaled = this.fitWithinBounds(
         item.width,
@@ -315,7 +275,7 @@ export class QuoteImageGenerator {
         scaled.height
       );
     } else {
-      // Multiple images: create a small grid
+      // Multiple images: create a grid
       const cols = Math.ceil(Math.sqrt(mediaCount));
       const rows = Math.ceil(mediaCount / cols);
       const cellWidth = maxWidth / cols;
@@ -330,8 +290,8 @@ export class QuoteImageGenerator {
         const scaled = this.fitWithinBounds(
           item.width,
           item.height,
-          cellWidth - 4, // Small padding
-          cellHeight - 4
+          cellWidth - 8, // Padding
+          cellHeight - 8
         );
 
         const image = await this.loadImageFromBuffer(item.buffer);
@@ -346,6 +306,14 @@ export class QuoteImageGenerator {
       }
     }
   }
+
+  // ==========================================================
+  // CUSTOM EMOJI RENDERING (REMOVED - will be handled in text parts)
+  // ==========================================================
+
+  // ==========================================================
+  // EMBEDDED MEDIA RENDERING (REMOVED - will be handled with new media system)
+  // ==========================================================
 
   private static fitWithinBounds(
     width: number,
@@ -431,92 +399,94 @@ export class QuoteImageGenerator {
     const textCenterY =
       this.IMAGE_HEIGHT * 0.5;
 
-    /*
-     * Large soft black area behind the text.
-     */
-    this.drawTextGradient(
-      ctx,
-      textCenterX - 300,
-      textCenterY - 170,
-      600,
-      340
-    );
+    // Build text content from text parts
+    const textContent = message.textParts
+      .filter(part => part.type === 'text')
+      .map(part => part.value)
+      .join('');
 
-    const quoteFontSize =
-      this.getQuoteFontSize(
+    // Only render text if there's actual text content
+    const shouldRenderText = message.hasText && textContent.trim();
+    
+    // Calculate content height based on what we have
+    let contentHeight = 0;
+    let textHeight = 0;
+    let mediaHeight = 0;
+    
+    if (shouldRenderText) {
+      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, 500);
+      const quoteLines = this.getQuoteLines(ctx, textContent, 500, quoteFontSize);
+      const quoteLineHeight = quoteFontSize * 1.25;
+      textHeight = quoteLines.length * quoteLineHeight;
+      contentHeight += textHeight;
+    }
+    
+    if (message.media && message.media.length > 0) {
+      // Calculate media height (large, as primary content)
+      const maxMediaHeight = 250; // Large media area
+      mediaHeight = maxMediaHeight;
+      if (shouldRenderText) {
+        contentHeight += 20; // Spacing between text and media
+      }
+      contentHeight += mediaHeight;
+    }
+    
+    const usernameSpacing = 35;
+    const usernameHeight = 42;
+    const totalHeight = contentHeight + usernameSpacing + usernameHeight;
+    
+    // Vertically center the complete content block
+    const contentStartY = textCenterY - totalHeight / 2;
+    let currentY = contentStartY;
+    
+    // Draw text gradient only if we have text
+    if (shouldRenderText) {
+      this.drawTextGradient(
         ctx,
-        message.content,
-        500
+        textCenterX - 300,
+        currentY - 20,
+        600,
+        textHeight + 40
       );
-
-    const quoteLines =
-      this.getQuoteLines(
+      
+      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, 500);
+      const quoteLines = this.getQuoteLines(ctx, textContent, 500, quoteFontSize);
+      const quoteLineHeight = quoteFontSize * 1.25;
+      
+      this.drawQuoteText(
         ctx,
-        message.content,
+        textContent,
+        textCenterX,
+        currentY,
         500,
+        'center',
         quoteFontSize
       );
-
-    const quoteLineHeight =
-      quoteFontSize * 1.25;
-
-    const quoteBlockHeight =
-      quoteLines.length * quoteLineHeight;
-
-    const usernameSpacing = 35;
-
-    const totalHeight =
-      quoteBlockHeight +
-      usernameSpacing +
-      42;
-
-    /*
-     * Vertically center the COMPLETE quote block,
-     * including username.
-     */
-    const quoteStartY =
-      textCenterY -
-      totalHeight / 2;
-
-    this.drawQuoteText(
-      ctx,
-      message.content,
-      textCenterX,
-      quoteStartY,
-      500,
-      'center',
-      quoteFontSize
-    );
-
+      
+      currentY += textHeight + 20;
+    }
+    
+    // Draw media as large primary content
+    if (message.media && message.media.length > 0) {
+      await this.drawLargeMedia(
+        ctx,
+        message.media,
+        textCenterX - 250,
+        currentY,
+        500,
+        mediaHeight
+      );
+      currentY += mediaHeight;
+    }
+    
+    // Draw username
     this.drawUsername(
       ctx,
       message.username,
       textCenterX,
-      quoteStartY +
-        quoteBlockHeight +
-        usernameSpacing,
+      currentY + usernameSpacing,
       true,
       'center'
-    );
-
-    // Draw embedded media (attachments, stickers, custom emojis)
-    const mediaY = quoteStartY + totalHeight + 10;
-    const mediaHeight = 100; // Small embedded media area
-    await this.drawEmbeddedMedia(
-      ctx,
-      message.attachments || [],
-      textCenterX - 250,
-      mediaY,
-      500,
-      mediaHeight
-    );
-    await this.drawEmbeddedMedia(
-      ctx,
-      message.stickers || [],
-      textCenterX - 250,
-      mediaY + mediaHeight + 10,
-      500,
-      mediaHeight / 2
     );
   }
 
@@ -648,67 +618,89 @@ export class QuoteImageGenerator {
     const topTextCenterY =
       this.IMAGE_HEIGHT * 0.25;
 
-    this.drawTextGradient(
-      ctx,
-      topTextCenterX - 290,
-      topTextCenterY - 150,
-      580,
-      300
-    );
+    // Build text content from text parts
+    const topTextContent = message1.textParts
+      .filter(part => part.type === 'text')
+      .map(part => part.value)
+      .join('');
 
-    const topFontSize =
-      this.getQuoteFontSize(
+    const shouldRenderTopText = message1.hasText && topTextContent.trim();
+    
+    // Calculate content height for top message
+    let topContentHeight = 0;
+    let topTextHeight = 0;
+    let topMediaHeight = 0;
+    
+    if (shouldRenderTopText) {
+      const topFontSize = this.getQuoteFontSize(ctx, topTextContent, 500);
+      const topLines = this.getQuoteLines(ctx, topTextContent, 500, topFontSize);
+      const topLineHeight = topFontSize * 1.25;
+      topTextHeight = topLines.length * topLineHeight;
+      topContentHeight += topTextHeight;
+    }
+    
+    if (message1.media && message1.media.length > 0) {
+      const maxMediaHeight = 100; // Smaller for two-message layout
+      topMediaHeight = maxMediaHeight;
+      if (shouldRenderTopText) {
+        topContentHeight += 15; // Spacing
+      }
+      topContentHeight += topMediaHeight;
+    }
+    
+    const topUsernameSpacing = 25;
+    const topUsernameHeight = 32;
+    const topTotalHeight = topContentHeight + topUsernameSpacing + topUsernameHeight;
+    
+    // Center the entire block in the top-right quarter
+    const topContentStartY = topTextCenterY - topTotalHeight / 2;
+    let currentTopY = topContentStartY;
+    
+    // Draw text gradient only if we have text
+    if (shouldRenderTopText) {
+      this.drawTextGradient(
         ctx,
-        message1.content,
-        500
+        topTextCenterX - 290,
+        currentTopY - 15,
+        580,
+        topTextHeight + 30
       );
-
-    const topLines =
-      this.getQuoteLines(
+      
+      const topFontSize = this.getQuoteFontSize(ctx, topTextContent, 500);
+      const topLines = this.getQuoteLines(ctx, topTextContent, 500, topFontSize);
+      
+      this.drawQuoteText(
         ctx,
-        message1.content,
+        topTextContent,
+        topTextCenterX,
+        currentTopY,
         500,
+        'center',
         topFontSize
       );
-
-    const topLineHeight =
-      topFontSize * 1.25;
-
-    const topQuoteHeight =
-      topLines.length * topLineHeight;
-
-    const topUsernameSpacing = 30;
-
-    const topTotalHeight =
-      topQuoteHeight +
-      topUsernameSpacing +
-      42;
-
-    /*
-     * Center the ENTIRE quote + username block
-     * inside the top-right quarter.
-     */
-    const topQuoteY =
-      topTextCenterY -
-      topTotalHeight / 2;
-
-    this.drawQuoteText(
-      ctx,
-      message1.content,
-      topTextCenterX,
-      topQuoteY,
-      500,
-      'center',
-      topFontSize
-    );
-
+      
+      currentTopY += topTextHeight + 15;
+    }
+    
+    // Draw media for top message
+    if (message1.media && message1.media.length > 0) {
+      await this.drawLargeMedia(
+        ctx,
+        message1.media,
+        topTextCenterX - 240,
+        currentTopY,
+        480,
+        topMediaHeight
+      );
+      currentTopY += topMediaHeight;
+    }
+    
+    // Draw username
     this.drawUsername(
       ctx,
       message1.username,
       topTextCenterX,
-      topQuoteY +
-        topQuoteHeight +
-        topUsernameSpacing,
+      currentTopY + topUsernameSpacing,
       true,
       'center'
     );
@@ -728,82 +720,91 @@ export class QuoteImageGenerator {
     const bottomTextCenterY =
       this.IMAGE_HEIGHT * 0.75;
 
-    this.drawTextGradient(
-      ctx,
-      bottomTextCenterX - 290,
-      bottomTextCenterY - 150,
-      580,
-      300
-    );
+    // Build text content from text parts
+    const bottomTextContent = message2.textParts
+      .filter(part => part.type === 'text')
+      .map(part => part.value)
+      .join('');
 
-    const bottomFontSize =
-      this.getQuoteFontSize(
+    const shouldRenderBottomText = message2.hasText && bottomTextContent.trim();
+    
+    // Calculate content height for bottom message
+    let bottomContentHeight = 0;
+    let bottomTextHeight = 0;
+    let bottomMediaHeight = 0;
+    
+    if (shouldRenderBottomText) {
+      const bottomFontSize = this.getQuoteFontSize(ctx, bottomTextContent, 500);
+      const bottomLines = this.getQuoteLines(ctx, bottomTextContent, 500, bottomFontSize);
+      const bottomLineHeight = bottomFontSize * 1.25;
+      bottomTextHeight = bottomLines.length * bottomLineHeight;
+      bottomContentHeight += bottomTextHeight;
+    }
+    
+    if (message2.media && message2.media.length > 0) {
+      const maxMediaHeight = 100; // Smaller for two-message layout
+      bottomMediaHeight = maxMediaHeight;
+      if (shouldRenderBottomText) {
+        bottomContentHeight += 15; // Spacing
+      }
+      bottomContentHeight += bottomMediaHeight;
+    }
+    
+    const bottomUsernameSpacing = 25;
+    const bottomUsernameHeight = 32;
+    const bottomTotalHeight = bottomContentHeight + bottomUsernameSpacing + bottomUsernameHeight;
+    
+    // Center the complete block in the bottom-left quarter
+    const bottomContentStartY = bottomTextCenterY - bottomTotalHeight / 2;
+    let currentBottomY = bottomContentStartY;
+    
+    // Draw text gradient only if we have text
+    if (shouldRenderBottomText) {
+      this.drawTextGradient(
         ctx,
-        message2.content,
-        500
+        bottomTextCenterX - 290,
+        currentBottomY - 15,
+        580,
+        bottomTextHeight + 30
       );
-
-    const bottomLines =
-      this.getQuoteLines(
+      
+      const bottomFontSize = this.getQuoteFontSize(ctx, bottomTextContent, 500);
+      const bottomLines = this.getQuoteLines(ctx, bottomTextContent, 500, bottomFontSize);
+      
+      this.drawQuoteText(
         ctx,
-        message2.content,
+        bottomTextContent,
+        bottomTextCenterX,
+        currentBottomY,
         500,
+        'center',
         bottomFontSize
       );
-
-    const bottomLineHeight =
-      bottomFontSize * 1.25;
-
-    const bottomQuoteHeight =
-      bottomLines.length *
-      bottomLineHeight;
-
-    const bottomUsernameSpacing = 30;
-
-    const bottomTotalHeight =
-      bottomQuoteHeight +
-      bottomUsernameSpacing +
-      42;
-
-    /*
-     * Center the COMPLETE block in the
-     * bottom-left quarter.
-     */
-    const bottomQuoteY =
-      bottomTextCenterY -
-      bottomTotalHeight / 2;
-
-    this.drawQuoteText(
-      ctx,
-      message2.content,
-      bottomTextCenterX,
-      bottomQuoteY,
-      500,
-      'center',
-      bottomFontSize
-    );
-
+      
+      currentBottomY += bottomTextHeight + 15;
+    }
+    
+    // Draw media for bottom message
+    if (message2.media && message2.media.length > 0) {
+      await this.drawLargeMedia(
+        ctx,
+        message2.media,
+        bottomTextCenterX - 240,
+        currentBottomY,
+        480,
+        bottomMediaHeight
+      );
+      currentBottomY += bottomMediaHeight;
+    }
+    
+    // Draw username
     this.drawUsername(
       ctx,
       message2.username,
       bottomTextCenterX,
-      bottomQuoteY +
-        bottomQuoteHeight +
-        bottomUsernameSpacing,
+      currentBottomY + bottomUsernameSpacing,
       true,
       'center'
-    );
-
-    // Draw embedded media for message 2
-    const bottomMediaY = bottomQuoteY + bottomTotalHeight + 10;
-    const bottomMediaHeight = 60; // Smaller for two-message layout
-    await this.drawEmbeddedMedia(
-      ctx,
-      message2.attachments || [],
-      bottomTextCenterX - 240,
-      bottomMediaY,
-      480,
-      bottomMediaHeight
     );
   }
 

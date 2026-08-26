@@ -1,5 +1,5 @@
 import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
-import { QuoteImageGenerator, QuoteMessageData, QuoteAttachment, QuoteSticker, QuoteEmoji } from '../utils/quote-image-generator.js';
+import { QuoteImageGenerator, QuoteMessageData, QuoteMedia, QuoteTextPart } from '../utils/quote-image-generator.js';
 import { loadImage } from '@napi-rs/canvas';
 
 // ============================================================
@@ -17,7 +17,7 @@ interface QuoteData {
 const activeQuotes = new Map<string, QuoteData>();
 
 // ============================================================
-// MEDIA DOWNLOADING HELPERS
+// MESSAGE CONTENT EXTRACTION
 // ============================================================
 
 async function downloadImage(url: string): Promise<Buffer> {
@@ -36,120 +36,158 @@ async function getImageDimensions(buffer: Buffer): Promise<{ width: number; heig
 
 const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
 
-async function processAttachments(message: any): Promise<QuoteAttachment[]> {
-  const attachments: QuoteAttachment[] = [];
+// Extract text parts from message content, handling custom emojis
+function extractTextParts(content: string): QuoteTextPart[] {
+  const parts: QuoteTextPart[] = [];
+  const customEmojiRegex = /<(a)?:\w+:(\d+)>/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = customEmojiRegex.exec(content)) !== null) {
+    // Add text before emoji
+    if (match.index > lastIndex) {
+      const text = content.slice(lastIndex, match.index);
+      if (text.trim()) {
+        parts.push({ type: 'text', value: text });
+      }
+    }
+    
+    // Add custom emoji placeholder (will be processed later)
+    parts.push({ 
+      type: 'customEmoji', 
+      value: match[0]
+    });
+    
+    lastIndex = customEmojiRegex.lastIndex;
+  }
   
+  // Add remaining text
+  if (lastIndex < content.length) {
+    const text = content.slice(lastIndex);
+    if (text.trim()) {
+      parts.push({ type: 'text', value: text });
+    }
+  }
+  
+  return parts;
+}
+
+// Extract media from Discord message with deduplication
+async function extractMedia(message: any): Promise<QuoteMedia[]> {
+  const media: QuoteMedia[] = [];
+  const seenUrls = new Set<string>();
+  
+  // Process attachments
   for (const attachment of message.attachments.values()) {
     if (!SUPPORTED_IMAGE_TYPES.includes(attachment.contentType)) {
       continue;
     }
     
+    if (seenUrls.has(attachment.url)) {
+      continue;
+    }
+    seenUrls.add(attachment.url);
+    
     try {
       const buffer = await downloadImage(attachment.url);
       const dimensions = await getImageDimensions(buffer);
       
-      attachments.push({
+      media.push({
+        type: attachment.contentType === 'image/gif' ? 'gif' : 'image',
         buffer,
         width: dimensions.width,
         height: dimensions.height,
-        contentType: attachment.contentType,
+        url: attachment.url,
       });
     } catch (error) {
       console.error('[Quote Command] Error downloading attachment:', error);
     }
   }
   
-  return attachments;
-}
-
-async function processStickers(message: any): Promise<QuoteSticker[]> {
-  const stickers: QuoteSticker[] = [];
-  
+  // Process stickers
   for (const sticker of message.stickers.values()) {
+    if (seenUrls.has(sticker.url)) {
+      continue;
+    }
+    seenUrls.add(sticker.url);
+    
     try {
-      // Use sticker URL (Discord CDN)
-      const url = sticker.url;
-      const buffer = await downloadImage(url);
+      const buffer = await downloadImage(sticker.url);
       const dimensions = await getImageDimensions(buffer);
       
-      stickers.push({
+      media.push({
+        type: 'sticker',
         buffer,
         width: dimensions.width,
         height: dimensions.height,
+        url: sticker.url,
       });
     } catch (error) {
       console.error('[Quote Command] Error downloading sticker:', error);
     }
   }
   
-  return stickers;
+  return media;
 }
 
-// Parse custom emojis from content: <:name:id> or <a:name:id>
-function parseCustomEmojis(content: string): string[] {
-  const emojiRegex = /<(a)?:\w+:(\d+)>/g;
-  const emojis: string[] = [];
-  let match;
+// Process custom emojis and download their images
+async function processCustomEmojis(textParts: QuoteTextPart[]): Promise<QuoteTextPart[]> {
+  const processedParts: QuoteTextPart[] = [];
   
-  while ((match = emojiRegex.exec(content)) !== null) {
-    emojis.push(match[0]);
-  }
-  
-  return emojis;
-}
-
-async function processCustomEmojis(content: string): Promise<{ processedContent: string; emojis: QuoteEmoji[] }> {
-  const emojis: QuoteEmoji[] = [];
-  const emojiRegex = /<(a)?:\w+:(\d+)>/g;
-  let processedContent = content;
-  
-  for (const match of content.matchAll(emojiRegex)) {
-    const originalText = match[0];
-    const emojiId = match[2];
-    
-    try {
-      // Download static version from Discord CDN
-      const url = `https://cdn.discordapp.com/emojis/${emojiId}.png`;
-      const buffer = await downloadImage(url);
-      const dimensions = await getImageDimensions(buffer);
-      
-      emojis.push({
-        buffer,
-        width: dimensions.width,
-        height: dimensions.height,
-        originalText,
-      });
-      
-      // Replace with a placeholder for rendering
-      processedContent = processedContent.replace(originalText, '📷');
-    } catch (error) {
-      console.error('[Quote Command] Error downloading custom emoji:', error);
+  for (const part of textParts) {
+    if (part.type === 'customEmoji') {
+      const match = part.value.match(/<(a)?:\w+:(\d+)>/);
+      if (match) {
+        const emojiId = match[2];
+        try {
+          const url = `https://cdn.discordapp.com/emojis/${emojiId}.png`;
+          const buffer = await downloadImage(url);
+          const dimensions = await getImageDimensions(buffer);
+          
+          processedParts.push({
+            type: 'customEmoji',
+            value: '', // Empty value since we'll render the image
+            buffer,
+            width: dimensions.width,
+            height: dimensions.height,
+          });
+        } catch (error) {
+          console.error('[Quote Command] Error downloading custom emoji:', error);
+          // Fallback to text representation
+          processedParts.push(part);
+        }
+      } else {
+        processedParts.push(part);
+      }
+    } else {
+      processedParts.push(part);
     }
   }
   
-  return { processedContent, emojis };
+  return processedParts;
 }
 
-async function buildQuoteMessageData(message: any): Promise<QuoteMessageData> {
+// Main extraction function
+async function extractQuoteMessageData(message: any): Promise<QuoteMessageData> {
   const avatarBuffer = await downloadImage(message.author.displayAvatarURL({ size: 256 }));
   
-  // Process attachments
-  const attachments = await processAttachments(message);
+  // Extract text parts
+  const rawTextParts = extractTextParts(message.content);
+  const textParts = await processCustomEmojis(rawTextParts);
   
-  // Process stickers
-  const stickers = await processStickers(message);
+  // Extract media
+  const media = await extractMedia(message);
   
-  // Process custom emojis
-  const { processedContent, emojis } = await processCustomEmojis(message.content);
+  // Determine if message has actual text
+  const hasText = textParts.some(part => part.type === 'text' && part.value.trim());
   
   return {
     username: message.author.displayName || message.author.username,
     userId: message.author.id,
-    content: processedContent,
     avatarBuffer,
-    attachments: attachments.length > 0 ? attachments : undefined,
-    stickers: stickers.length > 0 ? stickers : undefined,
-    customEmojis: emojis.length > 0 ? emojis : undefined,
+    textParts,
+    media,
+    hasText,
   };
 }
 
@@ -238,8 +276,8 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       }
 
       // Build quote data for both messages
-      const message1Data = await buildQuoteMessageData(messageB);
-      const message2Data = await buildQuoteMessageData(messageA);
+      const message1Data = await extractQuoteMessageData(messageB);
+      const message2Data = await extractQuoteMessageData(messageA);
 
       quoteData = {
         messageId: message.id,
@@ -254,7 +292,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       // Single message quote: just the replied-to message (Message A)
       const quotedMessage = messageA;
 
-      const message1Data = await buildQuoteMessageData(quotedMessage);
+      const message1Data = await extractQuoteMessageData(quotedMessage);
 
       quoteData = {
         messageId: message.id,
