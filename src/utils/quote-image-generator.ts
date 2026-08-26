@@ -405,8 +405,8 @@ export class QuoteImageGenerator {
       .map(part => part.value)
       .join('');
 
-    // Only render text if there's actual text content
-    const shouldRenderText = message.hasText && textContent.trim();
+    // Only render text if there's actual text or emoji content
+    const shouldRenderText = message.hasText;
     
     // Calculate content height based on what we have
     let contentHeight = 0;
@@ -453,9 +453,9 @@ export class QuoteImageGenerator {
       const quoteLines = this.getQuoteLines(ctx, textContent, 500, quoteFontSize);
       const quoteLineHeight = quoteFontSize * 1.25;
       
-      this.drawQuoteText(
+      await this.drawInlineTextWithEmojis(
         ctx,
-        textContent,
+        message.textParts,
         textCenterX,
         currentY,
         500,
@@ -624,7 +624,7 @@ export class QuoteImageGenerator {
       .map(part => part.value)
       .join('');
 
-    const shouldRenderTopText = message1.hasText && topTextContent.trim();
+    const shouldRenderTopText = message1.hasText;
     
     // Calculate content height for top message
     let topContentHeight = 0;
@@ -669,9 +669,9 @@ export class QuoteImageGenerator {
       const topFontSize = this.getQuoteFontSize(ctx, topTextContent, 500);
       const topLines = this.getQuoteLines(ctx, topTextContent, 500, topFontSize);
       
-      this.drawQuoteText(
+      await this.drawInlineTextWithEmojis(
         ctx,
-        topTextContent,
+        message1.textParts,
         topTextCenterX,
         currentTopY,
         500,
@@ -726,7 +726,7 @@ export class QuoteImageGenerator {
       .map(part => part.value)
       .join('');
 
-    const shouldRenderBottomText = message2.hasText && bottomTextContent.trim();
+    const shouldRenderBottomText = message2.hasText;
     
     // Calculate content height for bottom message
     let bottomContentHeight = 0;
@@ -771,9 +771,9 @@ export class QuoteImageGenerator {
       const bottomFontSize = this.getQuoteFontSize(ctx, bottomTextContent, 500);
       const bottomLines = this.getQuoteLines(ctx, bottomTextContent, 500, bottomFontSize);
       
-      this.drawQuoteText(
+      await this.drawInlineTextWithEmojis(
         ctx,
-        bottomTextContent,
+        message2.textParts,
         bottomTextCenterX,
         currentBottomY,
         500,
@@ -1097,6 +1097,146 @@ export class QuoteImageGenerator {
     );
 
     ctx.restore();
+  }
+
+  // ==========================================================
+  // INLINE TEXT + EMOJI RENDERER
+  // ==========================================================
+
+  private static async drawInlineTextWithEmojis(
+    ctx: SKRSContext2D,
+    textParts: QuoteTextPart[],
+    x: number,
+    y: number,
+    maxWidth: number,
+    align: 'left' | 'right' | 'center' = 'left',
+    fontSize: number = 58
+  ): Promise<void> {
+    const lineHeight = fontSize * 1.25;
+    const emojiSize = fontSize * 1.1; // Emojis slightly larger than text
+    
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = `bold ${fontSize}px Roboto`;
+    ctx.shadowColor = 'rgba(0,0,0,0.95)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 3;
+    ctx.fillStyle = '#FFFFFF';
+    
+    // Build lines with mixed text and emoji
+    const lines = await this.buildLinesWithEmojis(ctx, textParts, maxWidth, fontSize, emojiSize);
+    
+    // Draw each line
+    for (const [lineIndex, line] of lines.entries()) {
+      const lineY = y + lineIndex * lineHeight;
+      let currentX = x;
+      
+      // Adjust X based on alignment
+      if (align === 'center') {
+        const lineWidth = this.measureLineWidth(line, fontSize, emojiSize);
+        currentX = x - lineWidth / 2;
+      } else if (align === 'right') {
+        const lineWidth = this.measureLineWidth(line, fontSize, emojiSize);
+        currentX = x - lineWidth;
+      }
+      
+      // Draw each part in the line
+      for (const part of line) {
+        if (part.type === 'text') {
+          ctx.fillText(part.value, currentX, lineY);
+          currentX += ctx.measureText(part.value).width;
+        } else if ((part.type === 'unicodeEmoji' || part.type === 'customEmoji') && part.buffer) {
+          // Draw emoji image
+          const scaled = this.fitWithinBounds(
+            part.width || emojiSize,
+            part.height || emojiSize,
+            emojiSize,
+            emojiSize
+          );
+          const image = await this.loadImageFromBuffer(part.buffer);
+          ctx.drawImage(
+            image,
+            currentX,
+            lineY + (lineHeight - scaled.height) / 2,
+            scaled.width,
+            scaled.height
+          );
+          currentX += scaled.width;
+        }
+      }
+    }
+    
+    ctx.restore();
+  }
+  
+  private static async buildLinesWithEmojis(
+    ctx: SKRSContext2D,
+    textParts: QuoteTextPart[],
+    maxWidth: number,
+    fontSize: number,
+    emojiSize: number
+  ): Promise<QuoteTextPart[][]> {
+    const lines: QuoteTextPart[][] = [];
+    let currentLine: QuoteTextPart[] = [];
+    let currentLineWidth = 0;
+    
+    for (const part of textParts) {
+      if (part.type === 'text') {
+        const words = part.value.split(' ');
+        
+        for (const word of words) {
+          const wordWidth = ctx.measureText(word + ' ').width;
+          
+          if (currentLineWidth + wordWidth <= maxWidth) {
+            // Add to current line
+            currentLine.push({ type: 'text', value: word + ' ' });
+            currentLineWidth += wordWidth;
+          } else {
+            // Start new line
+            if (currentLine.length > 0) {
+              lines.push(currentLine);
+            }
+            currentLine = [{ type: 'text', value: word + ' ' }];
+            currentLineWidth = wordWidth;
+          }
+        }
+      } else if (part.type === 'unicodeEmoji' || part.type === 'customEmoji') {
+        const emojiWidth = emojiSize;
+        
+        if (currentLineWidth + emojiWidth <= maxWidth) {
+          currentLine.push(part);
+          currentLineWidth += emojiWidth;
+        } else {
+          if (currentLine.length > 0) {
+            lines.push(currentLine);
+          }
+          currentLine = [part];
+          currentLineWidth = emojiWidth;
+        }
+      }
+    }
+    
+    // Add last line
+    if (currentLine.length > 0) {
+      lines.push(currentLine);
+    }
+    
+    return lines;
+  }
+  
+  private static measureLineWidth(line: QuoteTextPart[], fontSize: number, emojiSize: number): number {
+    let width = 0;
+    for (const part of line) {
+      if (part.type === 'text') {
+        // This is approximate - would need ctx for accurate measurement
+        width += part.value.length * fontSize * 0.6; // Rough estimate
+      } else {
+        width += emojiSize;
+      }
+    }
+    return width;
   }
 
   // ==========================================================

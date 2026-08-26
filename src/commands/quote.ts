@@ -36,36 +36,80 @@ async function getImageDimensions(buffer: Buffer): Promise<{ width: number; heig
 
 const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
 
-// Extract text parts from message content, handling custom emojis
+// Extract text parts from message content, handling custom emojis and Unicode emojis
 function extractTextParts(content: string): QuoteTextPart[] {
   const parts: QuoteTextPart[] = [];
   const customEmojiRegex = /<(a)?:\w+:(\d+)>/g;
+  const unicodeEmojiRegex = /[\p{Emoji}\u200D]+/gu;
+  let lastIndex = 0;
+  let customMatch;
+  
+  // First, find all custom emoji positions
+  const customEmojiMatches: {index: number, text: string}[] = [];
+  while ((customMatch = customEmojiRegex.exec(content)) !== null) {
+    customEmojiMatches.push({ index: customMatch.index, text: customMatch[0] });
+  }
+  
+  // Process the content, splitting by custom emojis and Unicode emojis
+  let currentIndex = 0;
+  
+  for (const customMatch of customEmojiMatches) {
+    // Process text before this custom emoji
+    const beforeText = content.slice(currentIndex, customMatch.index);
+    if (beforeText) {
+      const textParts = extractUnicodeEmojis(beforeText);
+      parts.push(...textParts);
+    }
+    
+    // Add custom emoji
+    parts.push({ 
+      type: 'customEmoji', 
+      value: customMatch.text
+    });
+    
+    currentIndex = customMatch.index + customMatch.text.length;
+  }
+  
+  // Process remaining text
+  const remainingText = content.slice(currentIndex);
+  if (remainingText) {
+    const textParts = extractUnicodeEmojis(remainingText);
+    parts.push(...textParts);
+  }
+  
+  return parts;
+}
+
+// Extract Unicode emojis from text
+function extractUnicodeEmojis(text: string): QuoteTextPart[] {
+  const parts: QuoteTextPart[] = [];
+  const unicodeEmojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
   let lastIndex = 0;
   let match;
-
-  while ((match = customEmojiRegex.exec(content)) !== null) {
+  
+  while ((match = unicodeEmojiRegex.exec(text)) !== null) {
     // Add text before emoji
     if (match.index > lastIndex) {
-      const text = content.slice(lastIndex, match.index);
-      if (text.trim()) {
-        parts.push({ type: 'text', value: text });
+      const beforeText = text.slice(lastIndex, match.index);
+      if (beforeText.trim()) {
+        parts.push({ type: 'text', value: beforeText });
       }
     }
     
-    // Add custom emoji placeholder (will be processed later)
+    // Add Unicode emoji
     parts.push({ 
-      type: 'customEmoji', 
+      type: 'unicodeEmoji', 
       value: match[0]
     });
     
-    lastIndex = customEmojiRegex.lastIndex;
+    lastIndex = unicodeEmojiRegex.lastIndex;
   }
   
   // Add remaining text
-  if (lastIndex < content.length) {
-    const text = content.slice(lastIndex);
-    if (text.trim()) {
-      parts.push({ type: 'text', value: text });
+  if (lastIndex < text.length) {
+    const remaining = text.slice(lastIndex);
+    if (remaining.trim()) {
+      parts.push({ type: 'text', value: remaining });
     }
   }
   
@@ -130,8 +174,8 @@ async function extractMedia(message: any): Promise<QuoteMedia[]> {
   return media;
 }
 
-// Process custom emojis and download their images
-async function processCustomEmojis(textParts: QuoteTextPart[]): Promise<QuoteTextPart[]> {
+// Process custom emojis and Unicode emojis, downloading their images
+async function processEmojis(textParts: QuoteTextPart[]): Promise<QuoteTextPart[]> {
   const processedParts: QuoteTextPart[] = [];
   
   for (const part of textParts) {
@@ -159,6 +203,26 @@ async function processCustomEmojis(textParts: QuoteTextPart[]): Promise<QuoteTex
       } else {
         processedParts.push(part);
       }
+    } else if (part.type === 'unicodeEmoji') {
+      try {
+        // Download Twemoji for Unicode emoji
+        const codepoint = Array.from(part.value).map(char => char.codePointAt(0)!.toString(16)).join('-');
+        const url = `https://twemoji.maxcdn.com/v/latest/72x72/${codepoint}.png`;
+        const buffer = await downloadImage(url);
+        const dimensions = await getImageDimensions(buffer);
+        
+        processedParts.push({
+          type: 'unicodeEmoji',
+          value: '', // Empty value since we'll render the image
+          buffer,
+          width: dimensions.width,
+          height: dimensions.height,
+        });
+      } catch (error) {
+        console.error('[Quote Command] Error downloading Twemoji:', error);
+        // Fallback to text representation
+        processedParts.push(part);
+      }
     } else {
       processedParts.push(part);
     }
@@ -173,13 +237,15 @@ async function extractQuoteMessageData(message: any): Promise<QuoteMessageData> 
   
   // Extract text parts
   const rawTextParts = extractTextParts(message.content);
-  const textParts = await processCustomEmojis(rawTextParts);
+  const textParts = await processEmojis(rawTextParts);
   
   // Extract media
   const media = await extractMedia(message);
   
-  // Determine if message has actual text
-  const hasText = textParts.some(part => part.type === 'text' && part.value.trim());
+  // Determine if message has actual text or emoji content
+  const hasTextContent = textParts.some(part => part.type === 'text' && part.value.trim());
+  const hasEmojiContent = textParts.some(part => part.type === 'unicodeEmoji' || part.type === 'customEmoji');
+  const hasText = hasTextContent || hasEmojiContent;
   
   return {
     username: message.author.displayName || message.author.username,
