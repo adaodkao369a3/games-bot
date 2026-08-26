@@ -128,10 +128,10 @@ export class QuoteImageGenerator {
     this.drawTextGradient(ctx, textX - 50, textY - 40, 400, 200);
 
     // Draw quote text (large, on the right)
-    this.drawQuoteText(ctx, message.content, textX, textY, 400, false);
+    this.drawQuoteText(ctx, message.content, textX, textY, 400, 'left');
 
     // Draw username underneath (larger)
-    this.drawUsername(ctx, message.username, textX, textY + 120, false, false);
+    this.drawUsername(ctx, message.username, textX, textY + 120, false, 'left');
   }
 
   /**
@@ -173,21 +173,23 @@ export class QuoteImageGenerator {
     // Apply directional fade to bottom-right PFP (top and left edges)
     this.drawDirectionalFade(ctx, pfp2X, pfp2Y, this.PFP_SIZE, this.PFP_SIZE, 'top-left');
 
-    // Message B (top-left) - text to the RIGHT of the PFP
-    const text1X = pfp1X + this.PFP_SIZE + 60;
-    const text1Y = pfp1Y + 50;
+    // Message B (top-left) - text centered in TOP-RIGHT quadrant
+    // Quadrant center: (900, 200)
+    const quadrant1CenterX = this.IMAGE_WIDTH * 0.75;
+    const quadrant1CenterY = this.IMAGE_HEIGHT * 0.25;
     
-    this.drawTextGradient(ctx, text1X - 40, text1Y - 30, 350, 180);
-    this.drawQuoteText(ctx, message1.content, text1X, text1Y, 350);
-    this.drawUsername(ctx, message1.username, text1X, text1Y + 100);
+    this.drawTextGradient(ctx, quadrant1CenterX - 200, quadrant1CenterY - 80, 400, 200);
+    this.drawQuoteText(ctx, message1.content, quadrant1CenterX, quadrant1CenterY - 40, 400, 'center'); // center-aligned
+    this.drawUsername(ctx, message1.username, quadrant1CenterX, quadrant1CenterY + 80, false, 'center');
 
-    // Message A (bottom-right) - text to the LEFT of the PFP
-    const text2X = pfp2X - 60;
-    const text2Y = pfp2Y + 50;
+    // Message A (bottom-right) - text centered in BOTTOM-LEFT quadrant
+    // Quadrant center: (300, 600)
+    const quadrant2CenterX = this.IMAGE_WIDTH * 0.25;
+    const quadrant2CenterY = this.IMAGE_HEIGHT * 0.75;
     
-    this.drawTextGradient(ctx, text2X - 310, text2Y - 30, 350, 180);
-    this.drawQuoteText(ctx, message2.content, text2X, text2Y, 350, true); // right-aligned
-    this.drawUsername(ctx, message2.username, text2X, text2Y + 100, true);
+    this.drawTextGradient(ctx, quadrant2CenterX - 200, quadrant2CenterY - 80, 400, 200);
+    this.drawQuoteText(ctx, message2.content, quadrant2CenterX, quadrant2CenterY - 40, 400, 'center'); // center-aligned
+    this.drawUsername(ctx, message2.username, quadrant2CenterX, quadrant2CenterY + 80, false, 'center');
   }
 
   /**
@@ -312,11 +314,11 @@ export class QuoteImageGenerator {
     x: number,
     y: number,
     isProminent: boolean = false,
-    rightAlign: boolean = false
+    align: 'left' | 'right' | 'center' = 'left'
   ): void {
     const fontSize = 28;
     
-    ctx.textAlign = rightAlign ? 'right' : 'left';
+    ctx.textAlign = align;
     ctx.textBaseline = 'top';
     ctx.font = `${fontSize}px Roboto`;
 
@@ -328,7 +330,7 @@ export class QuoteImageGenerator {
 
     // Draw username (subtle gray)
     ctx.fillStyle = '#888888';
-    const text = rightAlign ? `${username} —` : `— ${username}`;
+    const text = `— ${username}`;
     ctx.fillText(text, x, y);
 
     // Reset shadow
@@ -347,12 +349,12 @@ export class QuoteImageGenerator {
     x: number,
     y: number,
     maxWidth: number,
-    rightAlign: boolean = false
+    align: 'left' | 'right' | 'center' = 'left'
   ): void {
     const fontSize = 42;
     const lineHeight = fontSize * 1.4;
     
-    ctx.textAlign = rightAlign ? 'right' : 'left';
+    ctx.textAlign = align;
     ctx.textBaseline = 'top';
     ctx.font = `bold ${fontSize}px Roboto`;
 
