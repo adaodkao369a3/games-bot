@@ -333,27 +333,30 @@ export class QuoteImageGenerator {
   }
 
   // ==========================================================
-  // SINGLE QUOTE
+  // SINGLE MESSAGE QUOTE
   // ==========================================================
 
   private static async drawSingleMessageLayout(
     ctx: SKRSContext2D,
-    avatar: any,
+    avatar: Image,
     message: QuoteMessageData,
     style: 'color' | 'bw'
   ): Promise<void> {
-    const pfpSize = this.SINGLE_PFP_SIZE;
+    // ========================================================
+    // PFP - Full height, anchored at top-left
+    // ========================================================
 
     /*
-     * ABSOLUTELY NO PADDING.
-     *
-     * The PFP touches:
-     * - top edge
-     * - left edge
+     * PFP touches:
+     * - top edge (y = 0)
+     * - left edge (x = 0)
+     * - bottom edge (extends to IMAGE_HEIGHT)
      * Takes up 50% of the image width
      */
     const pfpX = 0;
     const pfpY = 0;
+    const pfpWidth = this.IMAGE_WIDTH * 0.5;
+    const pfpHeight = this.IMAGE_HEIGHT;
 
     ctx.save();
 
@@ -366,38 +369,37 @@ export class QuoteImageGenerator {
       avatar,
       pfpX,
       pfpY,
-      pfpSize,
-      pfpSize
+      pfpWidth,
+      pfpHeight
     );
 
     ctx.restore();
 
     /*
-     * Fade toward:
+     * PFP fades ONLY toward:
      * - right
      * - bottom
      *
-     * The OUTER top/left edges remain completely intact.
+     * Its top-left corner stays fully visible.
      */
     this.drawDirectionalFade(
       ctx,
       pfpX,
       pfpY,
-      pfpSize,
-      pfpSize,
+      pfpWidth,
+      pfpHeight,
       'right-bottom'
     );
 
     // ========================================================
-    // TEXT
+    // TEXT - Full right half vertically
     // ========================================================
 
-    // Center of the RIGHT HALF.
-    const textCenterX =
-      this.IMAGE_WIDTH * 0.75;
-
-    const textCenterY =
-      this.IMAGE_HEIGHT * 0.5;
+    // Right half region: x = 50% → 100%, y = 0% → 100%
+    const textRegionX = this.IMAGE_WIDTH * 0.5;
+    const textRegionWidth = this.IMAGE_WIDTH * 0.5;
+    const textRegionCenterX = textRegionX + textRegionWidth / 2;
+    const textRegionCenterY = this.IMAGE_HEIGHT * 0.5;
 
     // Build text content from text parts
     const textContent = message.textParts
@@ -414,8 +416,8 @@ export class QuoteImageGenerator {
     let mediaHeight = 0;
     
     if (shouldRenderText) {
-      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, 500);
-      const quoteLines = this.getQuoteLines(ctx, textContent, 500, quoteFontSize);
+      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, textRegionWidth - 100);
+      const quoteLines = this.getQuoteLines(ctx, textContent, textRegionWidth - 100, quoteFontSize);
       const quoteLineHeight = quoteFontSize * 1.25;
       textHeight = quoteLines.length * quoteLineHeight;
       contentHeight += textHeight;
@@ -431,34 +433,35 @@ export class QuoteImageGenerator {
       contentHeight += mediaHeight;
     }
     
-    const usernameSpacing = 35;
+    const dividerHeight = 20;
+    const usernameSpacing = 20;
     const usernameHeight = 42;
-    const totalHeight = contentHeight + usernameSpacing + usernameHeight;
+    const totalHeight = contentHeight + dividerHeight + usernameSpacing + usernameHeight;
     
-    // Vertically center the complete content block
-    const contentStartY = textCenterY - totalHeight / 2;
+    // Vertically center the complete content block within the right region
+    const contentStartY = textRegionCenterY - totalHeight / 2;
     let currentY = contentStartY;
     
     // Draw text gradient only if we have text
     if (shouldRenderText) {
       this.drawTextGradient(
         ctx,
-        textCenterX - 300,
+        textRegionX + 50,
         currentY - 20,
-        600,
+        textRegionWidth - 100,
         textHeight + 40
       );
       
-      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, 500);
-      const quoteLines = this.getQuoteLines(ctx, textContent, 500, quoteFontSize);
+      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, textRegionWidth - 100);
+      const quoteLines = this.getQuoteLines(ctx, textContent, textRegionWidth - 100, quoteFontSize);
       const quoteLineHeight = quoteFontSize * 1.25;
       
       await this.drawInlineTextWithEmojis(
         ctx,
         message.textParts,
-        textCenterX,
+        textRegionCenterX,
         currentY,
-        500,
+        textRegionWidth - 100,
         'center',
         quoteFontSize
       );
@@ -471,20 +474,30 @@ export class QuoteImageGenerator {
       await this.drawLargeMedia(
         ctx,
         message.media,
-        textCenterX - 250,
+        textRegionCenterX - (textRegionWidth - 100) / 2,
         currentY,
-        500,
+        textRegionWidth - 100,
         mediaHeight
       );
       currentY += mediaHeight;
+    }
+    
+    // Draw horizontal divider bar
+    if (shouldRenderText || (message.media && message.media.length > 0)) {
+      this.drawDividerBar(
+        ctx,
+        textRegionCenterX,
+        currentY + usernameSpacing,
+        80
+      );
     }
     
     // Draw username
     this.drawUsername(
       ctx,
       message.username,
-      textCenterX,
-      currentY + usernameSpacing,
+      textRegionCenterX,
+      currentY + usernameSpacing + dividerHeight,
       true,
       'center'
     );
@@ -695,12 +708,22 @@ export class QuoteImageGenerator {
       currentTopY += topMediaHeight;
     }
     
+    // Draw horizontal divider bar
+    if (shouldRenderTopText || (message1.media && message1.media.length > 0)) {
+      this.drawDividerBar(
+        ctx,
+        topTextCenterX,
+        currentTopY + topUsernameSpacing,
+        60
+      );
+    }
+    
     // Draw username
     this.drawUsername(
       ctx,
       message1.username,
       topTextCenterX,
-      currentTopY + topUsernameSpacing,
+      currentTopY + topUsernameSpacing + 20,
       true,
       'center'
     );
@@ -797,12 +820,22 @@ export class QuoteImageGenerator {
       currentBottomY += bottomMediaHeight;
     }
     
+    // Draw horizontal divider bar
+    if (shouldRenderBottomText || (message2.media && message2.media.length > 0)) {
+      this.drawDividerBar(
+        ctx,
+        bottomTextCenterX,
+        currentBottomY + bottomUsernameSpacing,
+        60
+      );
+    }
+    
     // Draw username
     this.drawUsername(
       ctx,
       message2.username,
       bottomTextCenterX,
-      currentBottomY + bottomUsernameSpacing,
+      currentBottomY + bottomUsernameSpacing + 20,
       true,
       'center'
     );
@@ -1096,6 +1129,29 @@ export class QuoteImageGenerator {
       y
     );
 
+    ctx.restore();
+  }
+
+  // ==========================================================
+  // DIVIDER BAR
+  // ==========================================================
+
+  private static drawDividerBar(
+    ctx: SKRSContext2D,
+    centerX: number,
+    y: number,
+    width: number
+  ): void {
+    ctx.save();
+    
+    ctx.strokeStyle = 'rgba(160, 160, 160, 0.5)';
+    ctx.lineWidth = 1;
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX - width / 2, y);
+    ctx.lineTo(centerX + width / 2, y);
+    ctx.stroke();
+    
     ctx.restore();
   }
 
