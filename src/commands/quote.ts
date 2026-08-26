@@ -1,5 +1,6 @@
 import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
-import { QuoteImageGenerator, QuoteMessageData } from '../utils/quote-image-generator.js';
+import { QuoteImageGenerator, QuoteMessageData, QuoteAttachment, QuoteSticker, QuoteEmoji } from '../utils/quote-image-generator.js';
+import { loadImage } from '@napi-rs/canvas';
 
 // ============================================================
 // QUOTE DATA STORAGE
@@ -14,6 +15,143 @@ interface QuoteData {
 }
 
 const activeQuotes = new Map<string, QuoteData>();
+
+// ============================================================
+// MEDIA DOWNLOADING HELPERS
+// ============================================================
+
+async function downloadImage(url: string): Promise<Buffer> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+async function getImageDimensions(buffer: Buffer): Promise<{ width: number; height: number }> {
+  const image = await loadImage(buffer);
+  return { width: image.width, height: image.height };
+}
+
+const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
+
+async function processAttachments(message: any): Promise<QuoteAttachment[]> {
+  const attachments: QuoteAttachment[] = [];
+  
+  for (const attachment of message.attachments.values()) {
+    if (!SUPPORTED_IMAGE_TYPES.includes(attachment.contentType)) {
+      continue;
+    }
+    
+    try {
+      const buffer = await downloadImage(attachment.url);
+      const dimensions = await getImageDimensions(buffer);
+      
+      attachments.push({
+        buffer,
+        width: dimensions.width,
+        height: dimensions.height,
+        contentType: attachment.contentType,
+      });
+    } catch (error) {
+      console.error('[Quote Command] Error downloading attachment:', error);
+    }
+  }
+  
+  return attachments;
+}
+
+async function processStickers(message: any): Promise<QuoteSticker[]> {
+  const stickers: QuoteSticker[] = [];
+  
+  for (const sticker of message.stickers.values()) {
+    try {
+      // Use sticker URL (Discord CDN)
+      const url = sticker.url;
+      const buffer = await downloadImage(url);
+      const dimensions = await getImageDimensions(buffer);
+      
+      stickers.push({
+        buffer,
+        width: dimensions.width,
+        height: dimensions.height,
+      });
+    } catch (error) {
+      console.error('[Quote Command] Error downloading sticker:', error);
+    }
+  }
+  
+  return stickers;
+}
+
+// Parse custom emojis from content: <:name:id> or <a:name:id>
+function parseCustomEmojis(content: string): string[] {
+  const emojiRegex = /<(a)?:\w+:(\d+)>/g;
+  const emojis: string[] = [];
+  let match;
+  
+  while ((match = emojiRegex.exec(content)) !== null) {
+    emojis.push(match[0]);
+  }
+  
+  return emojis;
+}
+
+async function processCustomEmojis(content: string): Promise<{ processedContent: string; emojis: QuoteEmoji[] }> {
+  const emojis: QuoteEmoji[] = [];
+  const emojiRegex = /<(a)?:\w+:(\d+)>/g;
+  let processedContent = content;
+  
+  for (const match of content.matchAll(emojiRegex)) {
+    const originalText = match[0];
+    const emojiId = match[2];
+    
+    try {
+      // Download static version from Discord CDN
+      const url = `https://cdn.discordapp.com/emojis/${emojiId}.png`;
+      const buffer = await downloadImage(url);
+      const dimensions = await getImageDimensions(buffer);
+      
+      emojis.push({
+        buffer,
+        width: dimensions.width,
+        height: dimensions.height,
+        originalText,
+      });
+      
+      // Replace with a placeholder for rendering
+      processedContent = processedContent.replace(originalText, '📷');
+    } catch (error) {
+      console.error('[Quote Command] Error downloading custom emoji:', error);
+    }
+  }
+  
+  return { processedContent, emojis };
+}
+
+async function buildQuoteMessageData(message: any): Promise<QuoteMessageData> {
+  const avatarBuffer = await downloadImage(message.author.displayAvatarURL({ size: 256 }));
+  
+  // Process attachments
+  const attachments = await processAttachments(message);
+  
+  // Process stickers
+  const stickers = await processStickers(message);
+  
+  // Process custom emojis
+  const { processedContent, emojis } = await processCustomEmojis(message.content);
+  
+  return {
+    username: message.author.displayName || message.author.username,
+    userId: message.author.id,
+    content: processedContent,
+    avatarBuffer,
+    attachments: attachments.length > 0 ? attachments : undefined,
+    stickers: stickers.length > 0 ? stickers : undefined,
+    customEmojis: emojis.length > 0 ? emojis : undefined,
+  };
+}
 
 // ============================================================
 // ROLE PERMISSIONS
@@ -80,7 +218,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       // Two-message quote: resolve the reply chain
       // Command message replies to Message A
       // Message A replies to Message B
-      // We need: Message B (top-left) + Message A (bottom-right)
+      // We need: Message B (message1/original) + Message A (message2/current)
       
       if (!messageA.reference) {
         await message.reply({
@@ -99,25 +237,15 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
         return;
       }
 
-      // Download avatars
-      const avatarBBuffer = await QuoteImageGenerator.downloadImage(messageB.author.displayAvatarURL({ size: 256 }));
-      const avatarABuffer = await QuoteImageGenerator.downloadImage(messageA.author.displayAvatarURL({ size: 256 }));
+      // Build quote data for both messages
+      const message1Data = await buildQuoteMessageData(messageB);
+      const message2Data = await buildQuoteMessageData(messageA);
 
       quoteData = {
         messageId: message.id,
         channelId: message.channel.id,
-        message1: {
-          username: messageB.author.displayName || messageB.author.username,
-          userId: messageB.author.id,
-          content: messageB.content,
-          avatarBuffer: avatarBBuffer,
-        },
-        message2: {
-          username: messageA.author.displayName || messageA.author.username,
-          userId: messageA.author.id,
-          content: messageA.content,
-          avatarBuffer: avatarABuffer,
-        },
+        message1: message1Data,
+        message2: message2Data,
         currentStyle: 'color',
       };
 
@@ -126,18 +254,12 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       // Single message quote: just the replied-to message (Message A)
       const quotedMessage = messageA;
 
-      // Download avatar
-      const avatarBuffer = await QuoteImageGenerator.downloadImage(quotedMessage.author.displayAvatarURL({ size: 256 }));
+      const message1Data = await buildQuoteMessageData(quotedMessage);
 
       quoteData = {
         messageId: message.id,
         channelId: message.channel.id,
-        message1: {
-          username: quotedMessage.author.displayName || quotedMessage.author.username,
-          userId: quotedMessage.author.id,
-          content: quotedMessage.content,
-          avatarBuffer,
-        },
+        message1: message1Data,
         currentStyle: 'color',
       };
 
