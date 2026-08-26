@@ -43,8 +43,8 @@ export interface QuoteImageData {
 export class QuoteImageGenerator {
   private static readonly IMAGE_WIDTH = 1200;
   private static readonly IMAGE_HEIGHT = 800;
-  private static readonly PFP_SIZE = 500; // Large PFP for background (30% of composition)
-  private static readonly PFP_OPACITY = 0.25; // Faded for background
+  private static readonly PFP_SIZE = 450; // Large PFP for background (30% of composition)
+  private static readonly PFP_OPACITY = 0.4; // Faded for background
 
   /**
    * Generate a quote image
@@ -105,23 +105,33 @@ export class QuoteImageGenerator {
     message: QuoteMessageData,
     style: 'color' | 'bw'
   ): void {
-    // Draw faded PFP in background (centered, large)
+    // Position PFP on the left side
+    const pfpX = 80;
+    const pfpY = (this.IMAGE_HEIGHT - this.PFP_SIZE) / 2;
+
+    // Draw faded PFP with directional edge fading (right and bottom edges fade to black)
     ctx.save();
-    ctx.globalAlpha = this.PFP_OPACITY;
     if (style === 'bw') {
       ctx.filter = 'grayscale(100%)';
     }
-    this.drawCoverImage(ctx, avatar, this.IMAGE_WIDTH / 2 - this.PFP_SIZE / 2, this.IMAGE_HEIGHT / 2 - this.PFP_SIZE / 2, this.PFP_SIZE, this.PFP_SIZE);
+    this.drawCoverImage(ctx, avatar, pfpX, pfpY, this.PFP_SIZE, this.PFP_SIZE);
     ctx.restore();
 
-    // Draw soft gradient overlay for blending
-    this.drawGradientOverlay(ctx, style);
+    // Apply directional fade to PFP (right and bottom edges)
+    this.drawDirectionalFade(ctx, pfpX, pfpY, this.PFP_SIZE, this.PFP_SIZE, 'right-bottom');
 
-    // Draw quote text (centered, clean)
-    this.drawQuoteText(ctx, message.content, this.IMAGE_WIDTH / 2, this.IMAGE_HEIGHT / 2 - 30, this.IMAGE_WIDTH - 300);
+    // Position text to the right of PFP
+    const textX = pfpX + this.PFP_SIZE + 80;
+    const textY = this.IMAGE_HEIGHT / 2 - 50;
 
-    // Draw username underneath (smaller)
-    this.drawUsername(ctx, message.username, this.IMAGE_WIDTH / 2, this.IMAGE_HEIGHT / 2 + 100);
+    // Draw soft black gradient behind text
+    this.drawTextGradient(ctx, textX - 50, textY - 40, 400, 200);
+
+    // Draw quote text (large, on the right)
+    this.drawQuoteText(ctx, message.content, textX, textY, 400, false);
+
+    // Draw username underneath (larger)
+    this.drawUsername(ctx, message.username, textX, textY + 120, false, false);
   }
 
   /**
@@ -136,33 +146,122 @@ export class QuoteImageGenerator {
     style: 'color' | 'bw'
   ): void {
     // Message B (original context) - TOP LEFT
+    const pfp1X = 80;
+    const pfp1Y = 80;
+    
     ctx.save();
-    ctx.globalAlpha = this.PFP_OPACITY;
     if (style === 'bw') {
       ctx.filter = 'grayscale(100%)';
     }
-    this.drawCoverImage(ctx, avatar1, 50, 50, this.PFP_SIZE, this.PFP_SIZE);
+    this.drawCoverImage(ctx, avatar1, pfp1X, pfp1Y, this.PFP_SIZE, this.PFP_SIZE);
     ctx.restore();
+
+    // Apply directional fade to top-left PFP (right and bottom edges)
+    this.drawDirectionalFade(ctx, pfp1X, pfp1Y, this.PFP_SIZE, this.PFP_SIZE, 'right-bottom');
 
     // Message A (reply) - BOTTOM RIGHT
+    const pfp2X = this.IMAGE_WIDTH - this.PFP_SIZE - 80;
+    const pfp2Y = this.IMAGE_HEIGHT - this.PFP_SIZE - 80;
+    
     ctx.save();
-    ctx.globalAlpha = this.PFP_OPACITY;
     if (style === 'bw') {
       ctx.filter = 'grayscale(100%)';
     }
-    this.drawCoverImage(ctx, avatar2, this.IMAGE_WIDTH - this.PFP_SIZE - 50, this.IMAGE_HEIGHT - this.PFP_SIZE - 50, this.PFP_SIZE, this.PFP_SIZE);
+    this.drawCoverImage(ctx, avatar2, pfp2X, pfp2Y, this.PFP_SIZE, this.PFP_SIZE);
     ctx.restore();
 
-    // Draw soft gradient overlay for blending
-    this.drawGradientOverlay(ctx, style);
+    // Apply directional fade to bottom-right PFP (top and left edges)
+    this.drawDirectionalFade(ctx, pfp2X, pfp2Y, this.PFP_SIZE, this.PFP_SIZE, 'top-left');
 
-    // Message B (top-left) - original context
-    this.drawQuoteText(ctx, message1.content, 50 + this.PFP_SIZE / 2, 50 + this.PFP_SIZE / 2 - 40, this.IMAGE_WIDTH / 2 - 150);
-    this.drawUsername(ctx, message1.username, 50 + this.PFP_SIZE / 2, 50 + this.PFP_SIZE / 2 + 80);
+    // Message B (top-left) - text to the RIGHT of the PFP
+    const text1X = pfp1X + this.PFP_SIZE + 60;
+    const text1Y = pfp1Y + 50;
+    
+    this.drawTextGradient(ctx, text1X - 40, text1Y - 30, 350, 180);
+    this.drawQuoteText(ctx, message1.content, text1X, text1Y, 350);
+    this.drawUsername(ctx, message1.username, text1X, text1Y + 100);
 
-    // Message A (bottom-right) - reply
-    this.drawQuoteText(ctx, message2.content, this.IMAGE_WIDTH - 50 - this.PFP_SIZE / 2, this.IMAGE_HEIGHT - 50 - this.PFP_SIZE / 2 - 40, this.IMAGE_WIDTH / 2 - 150);
-    this.drawUsername(ctx, message2.username, this.IMAGE_WIDTH - 50 - this.PFP_SIZE / 2, this.IMAGE_HEIGHT - 50 - this.PFP_SIZE / 2 + 80);
+    // Message A (bottom-right) - text to the LEFT of the PFP
+    const text2X = pfp2X - 60;
+    const text2Y = pfp2Y + 50;
+    
+    this.drawTextGradient(ctx, text2X - 310, text2Y - 30, 350, 180);
+    this.drawQuoteText(ctx, message2.content, text2X, text2Y, 350, true); // right-aligned
+    this.drawUsername(ctx, message2.username, text2X, text2Y + 100, true);
+  }
+
+  /**
+   * Draw directional edge fade for PFP
+   */
+  private static drawDirectionalFade(
+    ctx: SKRSContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    direction: 'right-bottom' | 'top-left'
+  ): void {
+    ctx.save();
+    
+    if (direction === 'right-bottom') {
+      // Fade right edge
+      const rightGradient = ctx.createLinearGradient(x + width * 0.6, y, x + width, y);
+      rightGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      rightGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
+      ctx.fillStyle = rightGradient;
+      ctx.fillRect(x + width * 0.6, y, width * 0.4, height);
+      
+      // Fade bottom edge
+      const bottomGradient = ctx.createLinearGradient(x, y + height * 0.6, x, y + height);
+      bottomGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      bottomGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
+      ctx.fillStyle = bottomGradient;
+      ctx.fillRect(x, y + height * 0.6, width, height * 0.4);
+    } else {
+      // Fade top edge
+      const topGradient = ctx.createLinearGradient(x, y, x, y + height * 0.4);
+      topGradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+      topGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = topGradient;
+      ctx.fillRect(x, y, width, height * 0.4);
+      
+      // Fade left edge
+      const leftGradient = ctx.createLinearGradient(x, y, x + width * 0.4, y);
+      leftGradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+      leftGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = leftGradient;
+      ctx.fillRect(x, y, width * 0.4, height);
+    }
+    
+    ctx.restore();
+  }
+
+  /**
+   * Draw soft black gradient behind text for readability
+   */
+  private static drawTextGradient(
+    ctx: SKRSContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): void {
+    ctx.save();
+    
+    // Create radial gradient centered on text area
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const radius = Math.max(width, height) / 1.5;
+    
+    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+    gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.4)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, width, height);
+    
+    ctx.restore();
   }
 
   /**
@@ -212,11 +311,12 @@ export class QuoteImageGenerator {
     username: string,
     x: number,
     y: number,
-    isProminent: boolean = false
+    isProminent: boolean = false,
+    rightAlign: boolean = false
   ): void {
-    const fontSize = 24;
+    const fontSize = 28;
     
-    ctx.textAlign = 'center';
+    ctx.textAlign = rightAlign ? 'right' : 'left';
     ctx.textBaseline = 'top';
     ctx.font = `${fontSize}px Roboto`;
 
@@ -228,7 +328,8 @@ export class QuoteImageGenerator {
 
     // Draw username (subtle gray)
     ctx.fillStyle = '#888888';
-    ctx.fillText(`— ${username}`, x, y);
+    const text = rightAlign ? `${username} —` : `— ${username}`;
+    ctx.fillText(text, x, y);
 
     // Reset shadow
     ctx.shadowColor = 'transparent';
@@ -246,12 +347,12 @@ export class QuoteImageGenerator {
     x: number,
     y: number,
     maxWidth: number,
-    isProminent: boolean = false
+    rightAlign: boolean = false
   ): void {
-    const fontSize = 32;
-    const lineHeight = fontSize * 1.5;
+    const fontSize = 42;
+    const lineHeight = fontSize * 1.4;
     
-    ctx.textAlign = 'center';
+    ctx.textAlign = rightAlign ? 'right' : 'left';
     ctx.textBaseline = 'top';
     ctx.font = `bold ${fontSize}px Roboto`;
 
