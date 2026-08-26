@@ -42,9 +42,9 @@ export interface QuoteImageData {
 
 export class QuoteImageGenerator {
   private static readonly IMAGE_WIDTH = 1200;
-  private static readonly IMAGE_HEIGHT = 630;
-  private static readonly PFP_SIZE = 400; // Large PFP for background
-  private static readonly PFP_OPACITY = 0.15; // Faded for background
+  private static readonly IMAGE_HEIGHT = 800;
+  private static readonly PFP_SIZE = 500; // Large PFP for background (30% of composition)
+  private static readonly PFP_OPACITY = 0.25; // Faded for background
 
   /**
    * Generate a quote image
@@ -91,21 +91,8 @@ export class QuoteImageGenerator {
    * Draw background
    */
   private static drawBackground(ctx: SKRSContext2D, style: 'color' | 'bw'): void {
-    if (style === 'color') {
-      // Gradient background
-      const gradient = ctx.createLinearGradient(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
-      gradient.addColorStop(0, '#1a1a2e');
-      gradient.addColorStop(0.5, '#16213e');
-      gradient.addColorStop(1, '#0f3460');
-      ctx.fillStyle = gradient;
-    } else {
-      // B&W background
-      const gradient = ctx.createLinearGradient(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
-      gradient.addColorStop(0, '#1a1a1a');
-      gradient.addColorStop(0.5, '#2d2d2d');
-      gradient.addColorStop(1, '#1a1a1a');
-      ctx.fillStyle = gradient;
-    }
+    // Mostly black background
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
   }
 
@@ -118,7 +105,7 @@ export class QuoteImageGenerator {
     message: QuoteMessageData,
     style: 'color' | 'bw'
   ): void {
-    // Draw faded PFP in background (centered)
+    // Draw faded PFP in background (centered, large)
     ctx.save();
     ctx.globalAlpha = this.PFP_OPACITY;
     if (style === 'bw') {
@@ -127,14 +114,14 @@ export class QuoteImageGenerator {
     this.drawCoverImage(ctx, avatar, this.IMAGE_WIDTH / 2 - this.PFP_SIZE / 2, this.IMAGE_HEIGHT / 2 - this.PFP_SIZE / 2, this.PFP_SIZE, this.PFP_SIZE);
     ctx.restore();
 
-    // Draw vignette overlay for text readability
-    this.drawVignette(ctx);
+    // Draw soft gradient overlay for blending
+    this.drawGradientOverlay(ctx, style);
 
-    // Draw username
-    this.drawUsername(ctx, message.username, this.IMAGE_WIDTH / 2, 100);
+    // Draw quote text (centered, clean)
+    this.drawQuoteText(ctx, message.content, this.IMAGE_WIDTH / 2, this.IMAGE_HEIGHT / 2 - 30, this.IMAGE_WIDTH - 300);
 
-    // Draw quote text
-    this.drawQuoteText(ctx, message.content, this.IMAGE_WIDTH / 2, this.IMAGE_HEIGHT / 2, this.IMAGE_WIDTH - 200);
+    // Draw username underneath (smaller)
+    this.drawUsername(ctx, message.username, this.IMAGE_WIDTH / 2, this.IMAGE_HEIGHT / 2 + 100);
   }
 
   /**
@@ -148,7 +135,7 @@ export class QuoteImageGenerator {
     message2: QuoteMessageData,
     style: 'color' | 'bw'
   ): void {
-    // Message A - TOP LEFT
+    // Message B (original context) - TOP LEFT
     ctx.save();
     ctx.globalAlpha = this.PFP_OPACITY;
     if (style === 'bw') {
@@ -157,28 +144,49 @@ export class QuoteImageGenerator {
     this.drawCoverImage(ctx, avatar1, 50, 50, this.PFP_SIZE, this.PFP_SIZE);
     ctx.restore();
 
-    // Message B - BOTTOM RIGHT (slightly more prominent)
+    // Message A (reply) - BOTTOM RIGHT
     ctx.save();
-    ctx.globalAlpha = this.PFP_OPACITY * 1.2; // Slightly more visible
+    ctx.globalAlpha = this.PFP_OPACITY;
     if (style === 'bw') {
       ctx.filter = 'grayscale(100%)';
     }
     this.drawCoverImage(ctx, avatar2, this.IMAGE_WIDTH - this.PFP_SIZE - 50, this.IMAGE_HEIGHT - this.PFP_SIZE - 50, this.PFP_SIZE, this.PFP_SIZE);
     ctx.restore();
 
-    // Draw vignette overlay
-    this.drawVignette(ctx);
+    // Draw soft gradient overlay for blending
+    this.drawGradientOverlay(ctx, style);
 
-    // Draw visual connection line
-    this.drawConnectionLine(ctx, style);
+    // Message B (top-left) - original context
+    this.drawQuoteText(ctx, message1.content, 50 + this.PFP_SIZE / 2, 50 + this.PFP_SIZE / 2 - 40, this.IMAGE_WIDTH / 2 - 150);
+    this.drawUsername(ctx, message1.username, 50 + this.PFP_SIZE / 2, 50 + this.PFP_SIZE / 2 + 80);
 
-    // Message A (top-left)
-    this.drawUsername(ctx, message1.username, 50 + this.PFP_SIZE / 2, 80);
-    this.drawQuoteText(ctx, message1.content, 50 + this.PFP_SIZE / 2, 200, this.IMAGE_WIDTH / 2 - 100);
+    // Message A (bottom-right) - reply
+    this.drawQuoteText(ctx, message2.content, this.IMAGE_WIDTH - 50 - this.PFP_SIZE / 2, this.IMAGE_HEIGHT - 50 - this.PFP_SIZE / 2 - 40, this.IMAGE_WIDTH / 2 - 150);
+    this.drawUsername(ctx, message2.username, this.IMAGE_WIDTH - 50 - this.PFP_SIZE / 2, this.IMAGE_HEIGHT - 50 - this.PFP_SIZE / 2 + 80);
+  }
 
-    // Message B (bottom-right, slightly larger)
-    this.drawUsername(ctx, message2.username, this.IMAGE_WIDTH - 50 - this.PFP_SIZE / 2, this.IMAGE_HEIGHT - this.PFP_SIZE - 20, true);
-    this.drawQuoteText(ctx, message2.content, this.IMAGE_WIDTH - 50 - this.PFP_SIZE / 2, this.IMAGE_HEIGHT - 250, this.IMAGE_WIDTH / 2 - 100, true);
+  /**
+   * Draw soft gradient overlay for blending PFP into black background
+   */
+  private static drawGradientOverlay(ctx: SKRSContext2D, style: 'color' | 'bw'): void {
+    // Create a radial gradient from center to edges
+    const gradient = ctx.createRadialGradient(
+      this.IMAGE_WIDTH / 2, this.IMAGE_HEIGHT / 2, 0,
+      this.IMAGE_WIDTH / 2, this.IMAGE_HEIGHT / 2, this.IMAGE_WIDTH / 1.3
+    );
+    
+    if (style === 'color') {
+      gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      gradient.addColorStop(0.6, 'rgba(0, 0, 0, 0.3)');
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
+    } else {
+      gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      gradient.addColorStop(0.6, 'rgba(0, 0, 0, 0.4)');
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
+    }
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
   }
 
   /**
@@ -197,26 +205,6 @@ export class QuoteImageGenerator {
   }
 
   /**
-   * Draw visual connection line between messages
-   */
-  private static drawConnectionLine(ctx: SKRSContext2D, style: 'color' | 'bw'): void {
-    ctx.save();
-    ctx.strokeStyle = style === 'color' ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
-    
-    // Draw curved line from top-left to bottom-right
-    ctx.beginPath();
-    ctx.moveTo(50 + this.PFP_SIZE, 50 + this.PFP_SIZE / 2);
-    ctx.quadraticCurveTo(
-      this.IMAGE_WIDTH / 2, this.IMAGE_HEIGHT / 2,
-      this.IMAGE_WIDTH - 50 - this.PFP_SIZE, this.IMAGE_HEIGHT - 50 - this.PFP_SIZE / 2
-    );
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  /**
    * Draw username with shadow
    */
   private static drawUsername(
@@ -226,21 +214,21 @@ export class QuoteImageGenerator {
     y: number,
     isProminent: boolean = false
   ): void {
-    const fontSize = isProminent ? 36 : 32;
+    const fontSize = 24;
     
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.font = `bold ${fontSize}px Roboto`;
+    ctx.font = `${fontSize}px Roboto`;
 
-    // Draw shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
+    // Draw subtle shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
 
-    // Draw username
-    ctx.fillStyle = isProminent ? '#FFD700' : '#FFFFFF';
-    ctx.fillText(username, x, y);
+    // Draw username (subtle gray)
+    ctx.fillStyle = '#888888';
+    ctx.fillText(`— ${username}`, x, y);
 
     // Reset shadow
     ctx.shadowColor = 'transparent';
@@ -260,20 +248,20 @@ export class QuoteImageGenerator {
     maxWidth: number,
     isProminent: boolean = false
   ): void {
-    const fontSize = isProminent ? 28 : 24;
-    const lineHeight = fontSize * 1.4;
+    const fontSize = 32;
+    const lineHeight = fontSize * 1.5;
     
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.font = `${fontSize}px Roboto`;
+    ctx.font = `bold ${fontSize}px Roboto`;
 
-    // Draw shadow
+    // Draw subtle shadow
     ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
     ctx.shadowBlur = 6;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
 
-    // Wrap text
+    // Wrap text with quotation marks
     const lines = this.wrapText(ctx, `"${text}"`, maxWidth);
     
     // Draw each line

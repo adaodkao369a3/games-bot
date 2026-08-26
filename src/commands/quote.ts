@@ -29,10 +29,10 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
     // Check for "2" argument for two-message quote
     const isTwoMessage = args.length > 0 && args[0] === '2';
 
-    // Fetch the replied-to message
-    const referencedMessage = await message.fetchReference();
+    // Fetch the replied-to message (Message A)
+    const messageA = await message.fetchReference();
     
-    if (!referencedMessage) {
+    if (!messageA) {
       await message.reply({
         content: 'Could not fetch the referenced message.',
       });
@@ -45,34 +45,52 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
     const quoteId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     if (isTwoMessage) {
-      // Two-message quote: Message A (replied-to) + Message B (current)
-      const messageA = referencedMessage;
-      const messageB = message;
+      // Two-message quote: resolve the reply chain
+      // Command message replies to Message A
+      // Message A replies to Message B
+      // We need: Message B (top-left) + Message A (bottom-right)
+      
+      if (!messageA.reference) {
+        await message.reply({
+          content: '`,quote 2` requires the message you\'re replying to to also be a reply to another message.',
+        });
+        return;
+      }
+
+      // Fetch Message B (the message that Message A is replying to)
+      const messageB = await messageA.fetchReference();
+      
+      if (!messageB) {
+        await message.reply({
+          content: 'Could not fetch the original message in the reply chain.',
+        });
+        return;
+      }
 
       // Download avatars
-      const avatarABuffer = await QuoteImageGenerator.downloadImage(messageA.author.displayAvatarURL({ size: 256 }));
       const avatarBBuffer = await QuoteImageGenerator.downloadImage(messageB.author.displayAvatarURL({ size: 256 }));
+      const avatarABuffer = await QuoteImageGenerator.downloadImage(messageA.author.displayAvatarURL({ size: 256 }));
 
       quoteData = {
         messageId: message.id,
         channelId: message.channel.id,
         message1: {
-          username: messageA.author.displayName || messageA.author.username,
-          content: messageA.content,
-          avatarBuffer: avatarABuffer,
-        },
-        message2: {
           username: messageB.author.displayName || messageB.author.username,
           content: messageB.content,
           avatarBuffer: avatarBBuffer,
+        },
+        message2: {
+          username: messageA.author.displayName || messageA.author.username,
+          content: messageA.content,
+          avatarBuffer: avatarABuffer,
         },
         currentStyle: 'color',
       };
 
       activeQuotes.set(quoteId, quoteData);
     } else {
-      // Single message quote: just the replied-to message
-      const quotedMessage = referencedMessage;
+      // Single message quote: just the replied-to message (Message A)
+      const quotedMessage = messageA;
 
       // Download avatar
       const avatarBuffer = await QuoteImageGenerator.downloadImage(quotedMessage.author.displayAvatarURL({ size: 256 }));
