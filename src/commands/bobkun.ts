@@ -1,12 +1,10 @@
 import { Message, EmbedBuilder } from 'discord.js';
-import { isStaff } from '../utils/permissions.js';
 
 /**
  * Handle the bobkun command - Server guide with arcade theme
  */
 export async function handleBobkunCommand(message: Message): Promise<void> {
   try {
-    const staffMember = isStaff(message.member);
     const botAvatar = message.client.user.displayAvatarURL();
 
     const embed = new EmbedBuilder()
@@ -32,17 +30,6 @@ export async function handleBobkunCommand(message: Message): Promise<void> {
         inline: false,
       },
     ]);
-
-    // Staff-only section
-    if (staffMember) {
-      embed.addFields([
-        {
-          name: '🛠️ STAFF TOOLS',
-          value: '⚙️ `,fonttest` — Test font rendering\n⚙️ `,smashtest` — Test Smash image generation\n⚙️ `,wheeltest` — Test wheel geometry\n⚙️ `,wheelfonttest` — Test wheel font rendering',
-          inline: false,
-        },
-      ]);
-    }
 
     embed.setFooter({ 
       text: '🕹️ BOB\'S ARCADE\nInsert coin. Pick a game. Cause problems.\n\n🎮 Version 1.0 • Made with ❤️ by Bob Kun',
