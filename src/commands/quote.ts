@@ -1,1120 +1,219 @@
-import {
-  createCanvas,
-  GlobalFonts,
-  loadImage,
-  SKRSContext2D,
-} from '@napi-rs/canvas';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { cwd } from 'process';
-import { existsSync } from 'fs';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const PROJECT_ROOT = cwd();
+import { AttachmentBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
+import { QuoteImageGenerator, QuoteMessageData } from '../utils/quote-image-generator.js';
 
 // ============================================================
-// FONT LOADING
+// QUOTE DATA STORAGE
 // ============================================================
 
-const fontPath = join(
-  PROJECT_ROOT,
-  'assets',
-  'fonts',
-  'Roboto-Bold.ttf'
-);
-
-let fontLoaded = false;
-
-try {
-  if (existsSync(fontPath)) {
-    const success = GlobalFonts.registerFromPath(
-      fontPath,
-      'Roboto'
-    );
-
-    if (success) {
-      fontLoaded = true;
-      console.log(
-        '[QuoteImageGenerator] Font loaded: assets/fonts/Roboto-Bold.ttf'
-      );
-    } else {
-      console.error(
-        '[QuoteImageGenerator] Font registration failed'
-      );
-    }
-  } else {
-    console.error(
-      '[QuoteImageGenerator] Font file not found: assets/fonts/Roboto-Bold.ttf'
-    );
-  }
-} catch (error) {
-  console.error(
-    '[QuoteImageGenerator] Failed to load font:',
-    error
-  );
-}
-
-// ============================================================
-// TYPES
-// ============================================================
-
-export interface QuoteMessageData {
-  username: string;
-  content: string;
-  avatarBuffer: Buffer;
-}
-
-export interface QuoteImageData {
+interface QuoteData {
+  messageId: string;
+  channelId: string;
   message1: QuoteMessageData;
   message2?: QuoteMessageData;
-  style: 'color' | 'bw';
+  currentStyle: 'color' | 'bw';
+}
+
+const activeQuotes = new Map<string, QuoteData>();
+
+// ============================================================
+// COMMAND HANDLER
+// ============================================================
+
+export async function handleQuoteCommand(message: any, args: string[]): Promise<void> {
+  try {
+    // Check if this is a reply
+    if (!message.reference) {
+      await message.reply({
+        content: 'Please reply to a message to quote it.',
+      });
+      return;
+    }
+
+    // Check for "2" argument for two-message quote
+    const isTwoMessage = args.length > 0 && args[0] === '2';
+
+    // Fetch the replied-to message (Message A)
+    const messageA = await message.fetchReference();
+    
+    if (!messageA) {
+      await message.reply({
+        content: 'Could not fetch the referenced message.',
+      });
+      return;
+    }
+
+    let quoteData: QuoteData;
+
+    // Generate unique quote ID
+    const quoteId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    if (isTwoMessage) {
+      // Two-message quote: resolve the reply chain
+      // Command message replies to Message A
+      // Message A replies to Message B
+      // We need: Message B (top-left) + Message A (bottom-right)
+      
+      if (!messageA.reference) {
+        await message.reply({
+          content: '`,quote 2` requires the message you\'re replying to to also be a reply to another message.',
+        });
+        return;
+      }
+
+      // Fetch Message B (the message that Message A is replying to)
+      const messageB = await messageA.fetchReference();
+      
+      if (!messageB) {
+        await message.reply({
+          content: 'Could not fetch the original message in the reply chain.',
+        });
+        return;
+      }
+
+      // Download avatars
+      const avatarBBuffer = await QuoteImageGenerator.downloadImage(messageB.author.displayAvatarURL({ size: 256 }));
+      const avatarABuffer = await QuoteImageGenerator.downloadImage(messageA.author.displayAvatarURL({ size: 256 }));
+
+      quoteData = {
+        messageId: message.id,
+        channelId: message.channel.id,
+        message1: {
+          username: messageB.author.displayName || messageB.author.username,
+          content: messageB.content,
+          avatarBuffer: avatarBBuffer,
+        },
+        message2: {
+          username: messageA.author.displayName || messageA.author.username,
+          content: messageA.content,
+          avatarBuffer: avatarABuffer,
+        },
+        currentStyle: 'color',
+      };
+
+      activeQuotes.set(quoteId, quoteData);
+    } else {
+      // Single message quote: just the replied-to message (Message A)
+      const quotedMessage = messageA;
+
+      // Download avatar
+      const avatarBuffer = await QuoteImageGenerator.downloadImage(quotedMessage.author.displayAvatarURL({ size: 256 }));
+
+      quoteData = {
+        messageId: message.id,
+        channelId: message.channel.id,
+        message1: {
+          username: quotedMessage.author.displayName || quotedMessage.author.username,
+          content: quotedMessage.content,
+          avatarBuffer,
+        },
+        currentStyle: 'color',
+      };
+
+      activeQuotes.set(quoteId, quoteData);
+    }
+
+    // Generate the image
+    const imageBuffer = await QuoteImageGenerator.generateQuoteImage({
+      message1: quoteData.message1,
+      message2: quoteData.message2,
+      style: quoteData.currentStyle,
+    });
+
+    // Create attachment
+    const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
+
+    // Create buttons
+    const colorButton = new ButtonBuilder()
+      .setCustomId(`quote_${quoteId}_color`)
+      .setLabel('🎨 Color')
+      .setStyle(ButtonStyle.Primary);
+
+    const bwButton = new ButtonBuilder()
+      .setCustomId(`quote_${quoteId}_bw`)
+      .setLabel('🖤 B&W')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(colorButton, bwButton);
+
+    // Send the message
+    await message.channel.send({
+      files: [attachment],
+      components: [row],
+    });
+
+  } catch (error) {
+    console.error('[Quote Command] Error:', error);
+    await message.reply({
+      content: 'An error occurred while generating the quote.',
+    });
+  }
 }
 
 // ============================================================
-// GENERATOR
+// INTERACTION HANDLER
 // ============================================================
 
-export class QuoteImageGenerator {
-  private static readonly IMAGE_WIDTH = 1200;
-  private static readonly IMAGE_HEIGHT = 800;
-
-  /*
-   * Large diagonal PFPs.
-   *
-   * IMPORTANT:
-   * These are intentionally larger than the available
-   * quarter-space so the two images overlap slightly.
-   *
-   * This creates the "almost touching tips" look.
-   */
-  private static readonly PFP_SIZE = 620;
-
-  // ==========================================================
-  // MAIN GENERATOR
-  // ==========================================================
-
-  static async generateQuoteImage(
-    data: QuoteImageData
-  ): Promise<Buffer> {
-    if (!fontLoaded) {
-      throw new Error(
-        '[QuoteImageGenerator] Font not loaded - cannot render image'
-      );
+export async function handleQuoteInteraction(interaction: any): Promise<void> {
+  try {
+    const customId = interaction.customId;
+    
+    if (!customId.startsWith('quote_')) {
+      return;
     }
 
-    const {
-      message1,
-      message2,
-      style,
-    } = data;
+    const parts = customId.split('_');
+    const quoteId = parts[1];
+    const style = parts[2] as 'color' | 'bw';
 
-    const isTwoMessage = !!message2;
+    const quoteData = activeQuotes.get(quoteId);
 
-    const canvas = createCanvas(
-      this.IMAGE_WIDTH,
-      this.IMAGE_HEIGHT
-    );
-
-    const ctx = canvas.getContext('2d');
-
-    // Load avatars
-    const avatar1 = await loadImage(
-      message1.avatarBuffer
-    );
-
-    const avatar2 = message2
-      ? await loadImage(message2.avatarBuffer)
-      : null;
-
-    // Always start with pure black.
-    this.drawBackground(ctx);
-
-    if (isTwoMessage && avatar2) {
-      this.drawTwoMessageLayout(
-        ctx,
-        avatar1,
-        avatar2,
-        message1,
-        message2,
-        style
-      );
-    } else {
-      this.drawSingleMessageLayout(
-        ctx,
-        avatar1,
-        message1,
-        style
-      );
+    if (!quoteData) {
+      await interaction.reply({
+        content: 'This quote has expired.',
+        ephemeral: true,
+      });
+      return;
     }
 
-    return canvas.toBuffer('image/png');
-  }
-
-  // ==========================================================
-  // BACKGROUND
-  // ==========================================================
-
-  private static drawBackground(
-    ctx: SKRSContext2D
-  ): void {
-    ctx.save();
-
-    ctx.fillStyle = '#000000';
-
-    ctx.fillRect(
-      0,
-      0,
-      this.IMAGE_WIDTH,
-      this.IMAGE_HEIGHT
-    );
-
-    ctx.restore();
-  }
-
-  // ==========================================================
-  // SINGLE QUOTE
-  // ==========================================================
-
-  private static drawSingleMessageLayout(
-    ctx: SKRSContext2D,
-    avatar: any,
-    message: QuoteMessageData,
-    style: 'color' | 'bw'
-  ): void {
-    const pfpSize = this.PFP_SIZE;
-
-    /*
-     * ABSOLUTELY NO PADDING.
-     *
-     * The PFP touches:
-     * - top edge
-     * - left edge
-     */
-    const pfpX = 0;
-    const pfpY = 0;
-
-    ctx.save();
-
-    if (style === 'bw') {
-      ctx.filter = 'grayscale(100%)';
-    }
-
-    this.drawCoverImage(
-      ctx,
-      avatar,
-      pfpX,
-      pfpY,
-      pfpSize,
-      pfpSize
-    );
-
-    ctx.restore();
-
-    /*
-     * Fade toward:
-     * - right
-     * - bottom
-     *
-     * The OUTER top/left edges remain completely intact.
-     */
-    this.drawDirectionalFade(
-      ctx,
-      pfpX,
-      pfpY,
-      pfpSize,
-      pfpSize,
-      'right-bottom'
-    );
-
-    // ========================================================
-    // TEXT
-    // ========================================================
-
-    // Center of the RIGHT HALF.
-    const textCenterX =
-      this.IMAGE_WIDTH * 0.75;
-
-    const textCenterY =
-      this.IMAGE_HEIGHT * 0.5;
-
-    /*
-     * Large soft black area behind the text.
-     */
-    this.drawTextGradient(
-      ctx,
-      textCenterX - 300,
-      textCenterY - 170,
-      600,
-      340
-    );
-
-    const quoteFontSize =
-      this.getQuoteFontSize(
-        ctx,
-        message.content,
-        500
-      );
-
-    const quoteLines =
-      this.getQuoteLines(
-        ctx,
-        message.content,
-        500,
-        quoteFontSize
-      );
-
-    const quoteLineHeight =
-      quoteFontSize * 1.25;
-
-    const quoteBlockHeight =
-      quoteLines.length * quoteLineHeight;
-
-    const usernameSpacing = 35;
-
-    const totalHeight =
-      quoteBlockHeight +
-      usernameSpacing +
-      42;
-
-    /*
-     * Vertically center the COMPLETE quote block,
-     * including username.
-     */
-    const quoteStartY =
-      textCenterY -
-      totalHeight / 2;
-
-    this.drawQuoteText(
-      ctx,
-      message.content,
-      textCenterX,
-      quoteStartY,
-      500,
-      'center',
-      quoteFontSize
-    );
-
-    this.drawUsername(
-      ctx,
-      message.username,
-      textCenterX,
-      quoteStartY +
-        quoteBlockHeight +
-        usernameSpacing,
-      true,
-      'center'
-    );
-  }
-
-  // ==========================================================
-  // TWO MESSAGE / REPLY QUOTE
-  // ==========================================================
-
-  private static drawTwoMessageLayout(
-    ctx: SKRSContext2D,
-    avatar1: any,
-    avatar2: any,
-    message1: QuoteMessageData,
-    message2: QuoteMessageData,
-    style: 'color' | 'bw'
-  ): void {
-    const pfpSize = this.PFP_SIZE;
-
-    // ========================================================
-    // TOP-LEFT PFP
-    // ========================================================
-
-    /*
-     * NO SPACE.
-     *
-     * This MUST be exactly 0,0.
-     *
-     * It touches:
-     * - top
-     * - left
-     */
-    const pfp1X = 0;
-    const pfp1Y = 0;
-
-    ctx.save();
-
-    if (style === 'bw') {
-      ctx.filter = 'grayscale(100%)';
-    }
-
-    this.drawCoverImage(
-      ctx,
-      avatar1,
-      pfp1X,
-      pfp1Y,
-      pfpSize,
-      pfpSize
-    );
-
-    ctx.restore();
-
-    /*
-     * TOP-LEFT PFP fades ONLY toward:
-     * - right
-     * - bottom
-     *
-     * Its top-left corner stays fully visible.
-     */
-    this.drawDirectionalFade(
-      ctx,
-      pfp1X,
-      pfp1Y,
-      pfpSize,
-      pfpSize,
-      'right-bottom'
-    );
-
-    // ========================================================
-    // BOTTOM-RIGHT PFP
-    // ========================================================
-
-    /*
-     * NO SPACE.
-     *
-     * Anchor directly to:
-     * - right
-     * - bottom
-     */
-    const pfp2X =
-      this.IMAGE_WIDTH - pfpSize;
-
-    const pfp2Y =
-      this.IMAGE_HEIGHT - pfpSize;
-
-    ctx.save();
-
-    if (style === 'bw') {
-      ctx.filter = 'grayscale(100%)';
-    }
-
-    this.drawCoverImage(
-      ctx,
-      avatar2,
-      pfp2X,
-      pfp2Y,
-      pfpSize,
-      pfpSize
-    );
-
-    ctx.restore();
-
-    /*
-     * BOTTOM-RIGHT PFP fades ONLY toward:
-     * - top
-     * - left
-     *
-     * Its bottom-right corner stays fully visible.
-     */
-    this.drawDirectionalFade(
-      ctx,
-      pfp2X,
-      pfp2Y,
-      pfpSize,
-      pfpSize,
-      'top-left'
-    );
-
-    // ========================================================
-    // TOP-RIGHT TEXT
-    // ========================================================
-
-    /*
-     * The first message belongs here.
-     *
-     * This is the TOP-RIGHT quarter.
-     */
-    const topTextCenterX =
-      this.IMAGE_WIDTH * 0.75;
-
-    const topTextCenterY =
-      this.IMAGE_HEIGHT * 0.25;
-
-    this.drawTextGradient(
-      ctx,
-      topTextCenterX - 290,
-      topTextCenterY - 150,
-      580,
-      300
-    );
-
-    const topFontSize =
-      this.getQuoteFontSize(
-        ctx,
-        message1.content,
-        500
-      );
-
-    const topLines =
-      this.getQuoteLines(
-        ctx,
-        message1.content,
-        500,
-        topFontSize
-      );
-
-    const topLineHeight =
-      topFontSize * 1.25;
-
-    const topQuoteHeight =
-      topLines.length * topLineHeight;
-
-    const topUsernameSpacing = 30;
-
-    const topTotalHeight =
-      topQuoteHeight +
-      topUsernameSpacing +
-      42;
-
-    /*
-     * Center the ENTIRE quote + username block
-     * inside the top-right quarter.
-     */
-    const topQuoteY =
-      topTextCenterY -
-      topTotalHeight / 2;
-
-    this.drawQuoteText(
-      ctx,
-      message1.content,
-      topTextCenterX,
-      topQuoteY,
-      500,
-      'center',
-      topFontSize
-    );
-
-    this.drawUsername(
-      ctx,
-      message1.username,
-      topTextCenterX,
-      topQuoteY +
-        topQuoteHeight +
-        topUsernameSpacing,
-      true,
-      'center'
-    );
-
-    // ========================================================
-    // BOTTOM-LEFT TEXT
-    // ========================================================
-
-    /*
-     * The reply belongs here.
-     *
-     * This is the BOTTOM-LEFT quarter.
-     */
-    const bottomTextCenterX =
-      this.IMAGE_WIDTH * 0.25;
-
-    const bottomTextCenterY =
-      this.IMAGE_HEIGHT * 0.75;
-
-    this.drawTextGradient(
-      ctx,
-      bottomTextCenterX - 290,
-      bottomTextCenterY - 150,
-      580,
-      300
-    );
-
-    const bottomFontSize =
-      this.getQuoteFontSize(
-        ctx,
-        message2.content,
-        500
-      );
-
-    const bottomLines =
-      this.getQuoteLines(
-        ctx,
-        message2.content,
-        500,
-        bottomFontSize
-      );
-
-    const bottomLineHeight =
-      bottomFontSize * 1.25;
-
-    const bottomQuoteHeight =
-      bottomLines.length *
-      bottomLineHeight;
-
-    const bottomUsernameSpacing = 30;
-
-    const bottomTotalHeight =
-      bottomQuoteHeight +
-      bottomUsernameSpacing +
-      42;
-
-    /*
-     * Center the COMPLETE block in the
-     * bottom-left quarter.
-     */
-    const bottomQuoteY =
-      bottomTextCenterY -
-      bottomTotalHeight / 2;
-
-    this.drawQuoteText(
-      ctx,
-      message2.content,
-      bottomTextCenterX,
-      bottomQuoteY,
-      500,
-      'center',
-      bottomFontSize
-    );
-
-    this.drawUsername(
-      ctx,
-      message2.username,
-      bottomTextCenterX,
-      bottomQuoteY +
-        bottomQuoteHeight +
-        bottomUsernameSpacing,
-      true,
-      'center'
-    );
-  }
-
-  // ==========================================================
-  // DIRECTIONAL IMAGE FADE
-  // ==========================================================
-
-  private static drawDirectionalFade(
-    ctx: SKRSContext2D,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    direction:
-      | 'right-bottom'
-      | 'top-left'
-  ): void {
-    ctx.save();
-
-    if (direction === 'right-bottom') {
-      // ------------------------------------------------------
-      // RIGHT FADE
-      // ------------------------------------------------------
-
-      const rightGradient =
-        ctx.createLinearGradient(
-          x + width * 0.48,
-          y,
-          x + width,
-          y
-        );
-
-      rightGradient.addColorStop(
-        0,
-        'rgba(0,0,0,0)'
-      );
-
-      rightGradient.addColorStop(
-        0.55,
-        'rgba(0,0,0,0.35)'
-      );
-
-      rightGradient.addColorStop(
-        1,
-        'rgba(0,0,0,1)'
-      );
-
-      ctx.fillStyle =
-        rightGradient;
-
-      ctx.fillRect(
-        x + width * 0.48,
-        y,
-        width * 0.52,
-        height
-      );
-
-      // ------------------------------------------------------
-      // BOTTOM FADE
-      // ------------------------------------------------------
-
-      const bottomGradient =
-        ctx.createLinearGradient(
-          x,
-          y + height * 0.48,
-          x,
-          y + height
-        );
-
-      bottomGradient.addColorStop(
-        0,
-        'rgba(0,0,0,0)'
-      );
-
-      bottomGradient.addColorStop(
-        0.55,
-        'rgba(0,0,0,0.35)'
-      );
-
-      bottomGradient.addColorStop(
-        1,
-        'rgba(0,0,0,1)'
-      );
-
-      ctx.fillStyle =
-        bottomGradient;
-
-      ctx.fillRect(
-        x,
-        y + height * 0.48,
-        width,
-        height * 0.52
-      );
-
-    } else {
-      // ------------------------------------------------------
-      // TOP FADE
-      // ------------------------------------------------------
-
-      const topGradient =
-        ctx.createLinearGradient(
-          x,
-          y,
-          x,
-          y + height * 0.48
-        );
-
-      topGradient.addColorStop(
-        0,
-        'rgba(0,0,0,1)'
-      );
-
-      topGradient.addColorStop(
-        0.45,
-        'rgba(0,0,0,0.35)'
-      );
-
-      topGradient.addColorStop(
-        1,
-        'rgba(0,0,0,0)'
-      );
-
-      ctx.fillStyle =
-        topGradient;
-
-      ctx.fillRect(
-        x,
-        y,
-        width,
-        height * 0.48
-      );
-
-      // ------------------------------------------------------
-      // LEFT FADE
-      // ------------------------------------------------------
-
-      const leftGradient =
-        ctx.createLinearGradient(
-          x,
-          y,
-          x + width * 0.48,
-          y
-        );
-
-      leftGradient.addColorStop(
-        0,
-        'rgba(0,0,0,1)'
-      );
-
-      leftGradient.addColorStop(
-        0.45,
-        'rgba(0,0,0,0.35)'
-      );
-
-      leftGradient.addColorStop(
-        1,
-        'rgba(0,0,0,0)'
-      );
-
-      ctx.fillStyle =
-        leftGradient;
-
-      ctx.fillRect(
-        x,
-        y,
-        width * 0.48,
-        height
-      );
-    }
-
-    ctx.restore();
-  }
-
-  // ==========================================================
-  // TEXT GRADIENT
-  // ==========================================================
-
-  private static drawTextGradient(
-    ctx: SKRSContext2D,
-    x: number,
-    y: number,
-    width: number,
-    height: number
-  ): void {
-    ctx.save();
-
-    const centerX =
-      x + width / 2;
-
-    const centerY =
-      y + height / 2;
-
-    const radius =
-      Math.max(width, height) * 0.72;
-
-    const gradient =
-      ctx.createRadialGradient(
-        centerX,
-        centerY,
-        0,
-        centerX,
-        centerY,
-        radius
-      );
-
-    gradient.addColorStop(
-      0,
-      'rgba(0,0,0,0.88)'
-    );
-
-    gradient.addColorStop(
-      0.35,
-      'rgba(0,0,0,0.68)'
-    );
-
-    gradient.addColorStop(
-      0.7,
-      'rgba(0,0,0,0.28)'
-    );
-
-    gradient.addColorStop(
-      1,
-      'rgba(0,0,0,0)'
-    );
-
-    ctx.fillStyle =
-      gradient;
-
-    ctx.fillRect(
-      x,
-      y,
-      width,
-      height
-    );
-
-    ctx.restore();
-  }
-
-  // ==========================================================
-  // FONT SIZE
-  // ==========================================================
-
-  private static getQuoteFontSize(
-    ctx: SKRSContext2D,
-    text: string,
-    maxWidth: number
-  ): number {
-    const preferredSize = 58;
-    const minimumSize = 34;
-
-    for (
-      let size = preferredSize;
-      size >= minimumSize;
-      size -= 2
-    ) {
-      ctx.font =
-        `bold ${size}px Roboto`;
-
-      const lines =
-        this.wrapText(
-          ctx,
-          `"${text}"`,
-          maxWidth
-        );
-
-      if (lines.length <= 3) {
-        return size;
-      }
-    }
-
-    return minimumSize;
-  }
-
-  // ==========================================================
-  // GET QUOTE LINES
-  // ==========================================================
-
-  private static getQuoteLines(
-    ctx: SKRSContext2D,
-    text: string,
-    maxWidth: number,
-    fontSize: number = 58
-  ): string[] {
-    ctx.font =
-      `bold ${fontSize}px Roboto`;
-
-    return this.wrapText(
-      ctx,
-      `"${text}"`,
-      maxWidth
-    );
-  }
-
-  // ==========================================================
-  // USERNAME
-  // ==========================================================
-
-  private static drawUsername(
-    ctx: SKRSContext2D,
-    username: string,
-    x: number,
-    y: number,
-    isProminent: boolean = false,
-    align:
-      | 'left'
-      | 'right'
-      | 'center' = 'left'
-  ): void {
-    const fontSize =
-      isProminent
-        ? 36
-        : 32;
-
-    ctx.save();
-
-    ctx.textAlign = align;
-    ctx.textBaseline = 'top';
-
-    ctx.font =
-      `bold ${fontSize}px Roboto`;
-
-    ctx.shadowColor =
-      'rgba(0,0,0,0.95)';
-
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-
-    ctx.fillStyle =
-      '#A0A0A0';
-
-    ctx.fillText(
-      `— ${username}`,
-      x,
-      y
-    );
-
-    ctx.restore();
-  }
-
-  // ==========================================================
-  // QUOTE TEXT
-  // ==========================================================
-
-  private static drawQuoteText(
-    ctx: SKRSContext2D,
-    text: string,
-    x: number,
-    y: number,
-    maxWidth: number,
-    align:
-      | 'left'
-      | 'right'
-      | 'center' = 'left',
-    fontSize: number = 58
-  ): void {
-    const lineHeight =
-      fontSize * 1.25;
-
-    ctx.save();
-
-    ctx.textAlign = align;
-    ctx.textBaseline = 'top';
-
-    ctx.font =
-      `bold ${fontSize}px Roboto`;
-
-    ctx.shadowColor =
-      'rgba(0,0,0,0.95)';
-
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 3;
-
-    const lines =
-      this.wrapText(
-        ctx,
-        `"${text}"`,
-        maxWidth
-      );
-
-    lines.forEach(
-      (line, index) => {
-        ctx.fillStyle =
-          '#FFFFFF';
-
-        ctx.fillText(
-          line,
-          x,
-          y + index * lineHeight
-        );
-      }
-    );
-
-    ctx.restore();
-  }
-
-  // ==========================================================
-  // WORD WRAPPING
-  // ==========================================================
-
-  private static wrapText(
-    ctx: SKRSContext2D,
-    text: string,
-    maxWidth: number
-  ): string[] {
-    if (!text || !text.trim()) {
-      return ['""'];
-    }
-
-    const words =
-      text.trim().split(/\s+/);
-
-    const lines: string[] = [];
-
-    let currentLine =
-      words[0];
-
-    for (
-      let i = 1;
-      i < words.length;
-      i++
-    ) {
-      const testLine =
-        currentLine +
-        ' ' +
-        words[i];
-
-      if (
-        ctx.measureText(testLine)
-          .width <= maxWidth
-      ) {
-        currentLine =
-          testLine;
-      } else {
-        lines.push(
-          currentLine
-        );
-
-        currentLine =
-          words[i];
-      }
-    }
-
-    lines.push(
-      currentLine
-    );
-
-    return lines;
-  }
-
-  // ==========================================================
-  // COVER IMAGE
-  // ==========================================================
-
-  private static drawCoverImage(
-    ctx: SKRSContext2D,
-    image: any,
-    destX: number,
-    destY: number,
-    destWidth: number,
-    destHeight: number
-  ): void {
-    const imgRatio =
-      image.width /
-      image.height;
-
-    const destRatio =
-      destWidth /
-      destHeight;
-
-    let sourceX = 0;
-    let sourceY = 0;
-    let sourceWidth =
-      image.width;
-    let sourceHeight =
-      image.height;
-
-    if (
-      imgRatio > destRatio
-    ) {
-      // Crop left/right.
-      sourceWidth =
-        image.height *
-        destRatio;
-
-      sourceX =
-        (image.width -
-          sourceWidth) /
-        2;
-    } else {
-      // Crop top/bottom.
-      sourceHeight =
-        image.width /
-        destRatio;
-
-      sourceY =
-        (image.height -
-          sourceHeight) /
-        2;
-    }
-
-    ctx.drawImage(
-      image,
-      sourceX,
-      sourceY,
-      sourceWidth,
-      sourceHeight,
-      destX,
-      destY,
-      destWidth,
-      destHeight
-    );
-  }
-
-  // ==========================================================
-  // DOWNLOAD IMAGE
-  // ==========================================================
-
-  static async downloadImage(
-    url: string
-  ): Promise<Buffer> {
-    const response =
-      await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to download image: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const arrayBuffer =
-      await response.arrayBuffer();
-
-    return Buffer.from(
-      arrayBuffer
-    );
+    // Update the style
+    quoteData.currentStyle = style;
+
+    // Regenerate the image
+    const imageBuffer = await QuoteImageGenerator.generateQuoteImage({
+      message1: quoteData.message1,
+      message2: quoteData.message2,
+      style: quoteData.currentStyle,
+    });
+
+    // Create attachment
+    const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
+
+    // Create buttons
+    const colorButton = new ButtonBuilder()
+      .setCustomId(`quote_${quoteId}_color`)
+      .setLabel('🎨 Color')
+      .setStyle(ButtonStyle.Primary);
+
+    const bwButton = new ButtonBuilder()
+      .setCustomId(`quote_${quoteId}_bw`)
+      .setLabel('🖤 B&W')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(colorButton, bwButton);
+
+    // Update the message
+    await interaction.update({
+      files: [attachment],
+      components: [row],
+    });
+
+  } catch (error) {
+    console.error('[Quote Interaction] Error:', error);
+    await interaction.reply({
+      content: 'An error occurred while updating the quote.',
+      ephemeral: true,
+    });
   }
 }
