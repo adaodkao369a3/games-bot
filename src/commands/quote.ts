@@ -10,7 +10,9 @@ interface QuoteData {
   messageId: string;
   channelId: string;
   message1: QuoteMessageData;
+  message1Url: string; // URL to original message
   message2?: QuoteMessageData;
+  message2Url?: string; // URL to second message (if two-message quote)
   currentStyle: 'color' | 'bw';
 }
 
@@ -349,7 +351,9 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
         messageId: message.id,
         channelId: message.channel.id,
         message1: message1Data,
+        message1Url: messageB.url,
         message2: message2Data,
+        message2Url: messageA.url,
         currentStyle: 'color',
       };
 
@@ -364,6 +368,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
         messageId: message.id,
         channelId: message.channel.id,
         message1: message1Data,
+        message1Url: quotedMessage.url,
         currentStyle: 'color',
       };
 
@@ -386,10 +391,19 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       mentions += ` and <@${quoteData.message2.userId}>`;
     }
 
+    // Build description with message links
+    let description = `Quoting ${mentions}`;
+    if (quoteData.message2Url) {
+      description += `\n[Jump to original message](${quoteData.message1Url})`;
+      description += ` | [Jump to reply](${quoteData.message2Url})`;
+    } else {
+      description += `\n[Jump to message](${quoteData.message1Url})`;
+    }
+
     // Create embed with image
     const embed = new EmbedBuilder()
       .setTitle('Quote')
-      .setDescription(`Quoting ${mentions}`)
+      .setDescription(description)
       .setImage('attachment://quote.png')
       .setColor('#0099ff')
       .setTimestamp();
