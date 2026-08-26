@@ -140,7 +140,7 @@ export interface QuoteImageData {
 
 export class QuoteImageGenerator {
   private static readonly IMAGE_WIDTH = 1200;
-  private static readonly IMAGE_HEIGHT = 800;
+  private static readonly IMAGE_HEIGHT = 630;
 
   /*
    * PFP size for two-message quotes.
@@ -434,7 +434,7 @@ export class QuoteImageGenerator {
     }
     
     const dividerHeight = 20;
-    const usernameSpacing = 20;
+    const usernameSpacing = 40;
     const usernameHeight = 42;
     const totalHeight = contentHeight + dividerHeight + usernameSpacing + usernameHeight;
     
@@ -466,7 +466,7 @@ export class QuoteImageGenerator {
         quoteFontSize
       );
       
-      currentY += textHeight + 20;
+      currentY += textHeight + 40;
     }
     
     // Draw media as large primary content
@@ -488,7 +488,7 @@ export class QuoteImageGenerator {
         ctx,
         textRegionCenterX,
         currentY + usernameSpacing,
-        80
+        120
       );
     }
     
@@ -1039,8 +1039,8 @@ export class QuoteImageGenerator {
     text: string,
     maxWidth: number
   ): number {
-    const preferredSize = 58;
-    const minimumSize = 34;
+    const preferredSize = 68;
+    const minimumSize = 44;
 
     for (
       let size = preferredSize;
@@ -1144,7 +1144,7 @@ export class QuoteImageGenerator {
   ): void {
     ctx.save();
     
-    ctx.strokeStyle = 'rgba(160, 160, 160, 0.5)';
+    ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 1;
     
     ctx.beginPath();
