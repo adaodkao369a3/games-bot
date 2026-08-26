@@ -1,4 +1,4 @@
-import { AttachmentBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
+import { AttachmentBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, EmbedBuilder } from 'discord.js';
 import { QuoteImageGenerator, QuoteMessageData } from '../utils/quote-image-generator.js';
 
 // ============================================================
@@ -79,11 +79,13 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
         channelId: message.channel.id,
         message1: {
           username: messageB.author.displayName || messageB.author.username,
+          userId: messageB.author.id,
           content: messageB.content,
           avatarBuffer: avatarBBuffer,
         },
         message2: {
           username: messageA.author.displayName || messageA.author.username,
+          userId: messageA.author.id,
           content: messageA.content,
           avatarBuffer: avatarABuffer,
         },
@@ -103,6 +105,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
         channelId: message.channel.id,
         message1: {
           username: quotedMessage.author.displayName || quotedMessage.author.username,
+          userId: quotedMessage.author.id,
           content: quotedMessage.content,
           avatarBuffer,
         },
@@ -122,6 +125,20 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
     // Create attachment
     const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
 
+    // Build user mentions string
+    let mentions = `<@${quoteData.message1.userId}>`;
+    if (quoteData.message2) {
+      mentions += ` and <@${quoteData.message2.userId}>`;
+    }
+
+    // Create embed with image
+    const embed = new EmbedBuilder()
+      .setTitle('Quote')
+      .setDescription(`Quoting ${mentions}`)
+      .setImage('attachment://quote.png')
+      .setColor('#0099ff')
+      .setTimestamp();
+
     // Create buttons
     const colorButton = new ButtonBuilder()
       .setCustomId(`quote_${quoteId}_color`)
@@ -136,11 +153,27 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
     const row = new ActionRowBuilder<ButtonBuilder>()
       .addComponents(colorButton, bwButton);
 
-    // Send the message
-    await message.channel.send({
+    // Send the message to the original channel first
+    const originalMessage = await message.channel.send({
+      embeds: [embed],
       files: [attachment],
       components: [row],
     });
+
+    // Redirect to directors cut channel
+    const directorsCutChannelId = '1526869451834654821';
+    try {
+      const directorsCutChannel = await message.guild.channels.fetch(directorsCutChannelId);
+      if (directorsCutChannel && directorsCutChannel.isTextBased()) {
+        await directorsCutChannel.send({
+          embeds: [embed],
+          files: [attachment],
+          components: [row],
+        });
+      }
+    } catch (error) {
+      console.error('[Quote Command] Error redirecting to directors cut channel:', error);
+    }
 
   } catch (error) {
     console.error('[Quote Command] Error:', error);
@@ -189,6 +222,20 @@ export async function handleQuoteInteraction(interaction: any): Promise<void> {
     // Create attachment
     const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
 
+    // Build user mentions string
+    let mentions = `<@${quoteData.message1.userId}>`;
+    if (quoteData.message2) {
+      mentions += ` and <@${quoteData.message2.userId}>`;
+    }
+
+    // Create embed with image
+    const embed = new EmbedBuilder()
+      .setTitle('Quote')
+      .setDescription(`Quoting ${mentions}`)
+      .setImage('attachment://quote.png')
+      .setColor('#0099ff')
+      .setTimestamp();
+
     // Create buttons
     const colorButton = new ButtonBuilder()
       .setCustomId(`quote_${quoteId}_color`)
@@ -205,6 +252,7 @@ export async function handleQuoteInteraction(interaction: any): Promise<void> {
 
     // Update the message
     await interaction.update({
+      embeds: [embed],
       files: [attachment],
       components: [row],
     });

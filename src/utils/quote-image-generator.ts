@@ -61,6 +61,7 @@ try {
 
 export interface QuoteMessageData {
   username: string;
+  userId: string;
   content: string;
   avatarBuffer: Buffer;
 }
