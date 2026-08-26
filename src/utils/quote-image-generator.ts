@@ -398,6 +398,7 @@ export class QuoteImageGenerator {
     // Right half region: x = 50% → 100%, y = 0% → 100%
     const textRegionX = this.IMAGE_WIDTH * 0.5;
     const textRegionWidth = this.IMAGE_WIDTH * 0.5;
+    const textRegionHeight = this.IMAGE_HEIGHT;
     const textRegionCenterX = textRegionX + textRegionWidth / 2;
     const textRegionCenterY = this.IMAGE_HEIGHT * 0.5;
 
@@ -410,13 +411,23 @@ export class QuoteImageGenerator {
     // Only render text if there's actual text or emoji content
     const shouldRenderText = message.hasText;
     
+    // Layout constants
+    const dividerHeight = 20;
+    const usernameSpacing = 40;
+    const usernameHeight = 42;
+    const postTextSpacing = 40;
+    
     // Calculate content height based on what we have
     let contentHeight = 0;
     let textHeight = 0;
     let mediaHeight = 0;
     
     if (shouldRenderText) {
-      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, textRegionWidth - 100);
+      // Calculate available height for quote (reserve space for divider, username, and spacing)
+      const reservedHeight = dividerHeight + usernameSpacing + usernameHeight + postTextSpacing;
+      const availableQuoteHeight = textRegionHeight - reservedHeight;
+      
+      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, textRegionWidth - 100, availableQuoteHeight);
       const quoteLines = this.getQuoteLines(ctx, textContent, textRegionWidth - 100, quoteFontSize);
       const quoteLineHeight = quoteFontSize * 1.25;
       textHeight = quoteLines.length * quoteLineHeight;
@@ -433,9 +444,6 @@ export class QuoteImageGenerator {
       contentHeight += mediaHeight;
     }
     
-    const dividerHeight = 20;
-    const usernameSpacing = 40;
-    const usernameHeight = 42;
     const totalHeight = contentHeight + dividerHeight + usernameSpacing + usernameHeight;
     
     // Vertically center the complete content block within the right region
@@ -452,7 +460,10 @@ export class QuoteImageGenerator {
         textHeight + 40
       );
       
-      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, textRegionWidth - 100);
+      // Recalculate with height constraint (same as above)
+      const reservedHeight = dividerHeight + usernameSpacing + usernameHeight + postTextSpacing;
+      const availableQuoteHeight = textRegionHeight - reservedHeight;
+      const quoteFontSize = this.getQuoteFontSize(ctx, textContent, textRegionWidth - 100, availableQuoteHeight);
       const quoteLines = this.getQuoteLines(ctx, textContent, textRegionWidth - 100, quoteFontSize);
       const quoteLineHeight = quoteFontSize * 1.25;
       
@@ -1037,10 +1048,11 @@ export class QuoteImageGenerator {
   private static getQuoteFontSize(
     ctx: SKRSContext2D,
     text: string,
-    maxWidth: number
+    maxWidth: number,
+    maxHeight: number = 400
   ): number {
     const preferredSize = 68;
-    const minimumSize = 44;
+    const minimumSize = 34;
 
     for (
       let size = preferredSize;
@@ -1057,7 +1069,11 @@ export class QuoteImageGenerator {
           maxWidth
         );
 
-      if (lines.length <= 3) {
+      const lineHeight = size * 1.25;
+      const totalHeight = lines.length * lineHeight;
+
+      // Check if text fits within both width and height constraints
+      if (totalHeight <= maxHeight) {
         return size;
       }
     }
