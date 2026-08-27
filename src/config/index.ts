@@ -9,6 +9,9 @@ export const config = {
     guildId: process.env.DISCORD_GUILD_ID || '',
   },
   prefix: process.env.PREFIX || ',',
+  database: {
+    url: process.env.DATABASE_URL || '',
+  },
 };
 
 export function validateConfig(): void {
@@ -16,6 +19,10 @@ export function validateConfig(): void {
 
   if (!config.discord.botToken) {
     errors.push('DISCORD_BOT_TOKEN is required');
+  }
+
+  if (!config.database.url) {
+    errors.push('DATABASE_URL is required');
   }
 
   if (errors.length > 0) {

@@ -19,6 +19,7 @@ import { handlePissCompCommand, handlePissCompInteraction } from '../commands/pi
 import { handleSmashMaxCommand, handleSmashMaxInteraction } from '../commands/smashmax.js';
 import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } from '../commands/trial.js';
 import { handleQuoteCommand } from '../commands/quote.js';
+import { handleGambleCommand } from '../commands/gamble.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -156,6 +157,11 @@ export class DiscordClient {
 
       if (command === 'quote') {
         await handleQuoteCommand(message, args);
+        return;
+      }
+
+      if (command === 'gamble') {
+        await handleGambleCommand(message, args);
         return;
       }
     }
