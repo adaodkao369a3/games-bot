@@ -173,12 +173,14 @@ export class QuoteImageGenerator {
 
   // Fixed visual regions. Content is allowed to resize only INSIDE
   // its own quote box; the PFP, divider bar, and username never move.
+  // Margins are kept tight (~35-40px) so the quote box claims almost all
+  // of its available half instead of floating in a sea of padding.
   private static readonly SINGLE_PFP = { x: 0, y: 0, width: 600, height: 630 };
   private static readonly SINGLE_NO_MEDIA = {
-    quoteBox: { x: 660, y: 70, width: 480, height: 355 },
-    barY: 500,
-    usernameY: 520,
-    barWidth: 120,
+    quoteBox: { x: 636, y: 36, width: 528, height: 490 },
+    barY: 546,
+    usernameY: 566,
+    barWidth: 140,
   };
   // When the quoted message includes media, the entire right half is
   // handed over to the image/gif/sticker - no quote box, no divider bar,
@@ -186,8 +188,8 @@ export class QuoteImageGenerator {
   // message also has text) is overlaid directly on the media instead of
   // taking its own box, and the author name/handle move onto the PFP.
   private static readonly SINGLE_WITH_MEDIA = {
-    mediaBox: { x: 620, y: 30, width: 560, height: 570 },
-    captionHeight: 150,
+    mediaBox: { x: 610, y: 20, width: 580, height: 590 },
+    captionHeight: 160,
   };
 
   // Each half of a two-message quote is 600x315. The PFP is exactly
@@ -195,30 +197,30 @@ export class QuoteImageGenerator {
   // outer corner so it does not leave the unwanted gap underneath.
   private static readonly DOUBLE_PFP = { width: 300, height: 315 };
   private static readonly DOUBLE_TOP_NO_MEDIA = {
-    quoteBox: { x: 660, y: 20, width: 480, height: 175 },
-    barY: 235,
-    usernameY: 252,
-    barWidth: 90,
+    quoteBox: { x: 630, y: 20, width: 540, height: 225 },
+    barY: 260,
+    usernameY: 276,
+    barWidth: 100,
   };
   private static readonly DOUBLE_TOP_WITH_MEDIA = {
-    mediaBox: { x: 660, y: 12, width: 480, height: 78 },
-    quoteBox: { x: 660, y: 100, width: 480, height: 92 },
-    barY: 235,
-    usernameY: 252,
-    barWidth: 90,
+    mediaBox: { x: 630, y: 15, width: 540, height: 85 },
+    quoteBox: { x: 630, y: 110, width: 540, height: 135 },
+    barY: 260,
+    usernameY: 276,
+    barWidth: 100,
   };
   private static readonly DOUBLE_BOTTOM_NO_MEDIA = {
-    quoteBox: { x: 60, y: 335, width: 480, height: 175 },
-    barY: 550,
-    usernameY: 567,
-    barWidth: 90,
+    quoteBox: { x: 30, y: 335, width: 540, height: 225 },
+    barY: 575,
+    usernameY: 591,
+    barWidth: 100,
   };
   private static readonly DOUBLE_BOTTOM_WITH_MEDIA = {
-    mediaBox: { x: 60, y: 327, width: 480, height: 78 },
-    quoteBox: { x: 60, y: 415, width: 480, height: 92 },
-    barY: 550,
-    usernameY: 567,
-    barWidth: 90,
+    mediaBox: { x: 30, y: 330, width: 540, height: 85 },
+    quoteBox: { x: 30, y: 425, width: 540, height: 135 },
+    barY: 575,
+    usernameY: 591,
+    barWidth: 100,
   };
 
   // ==========================================================
@@ -302,11 +304,15 @@ export class QuoteImageGenerator {
     ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
 
     if (gradient !== 'classic') {
-      // Wash a soft tint of the preset color across the whole canvas so the
-      // background reads as part of the theme instead of staying flat
-      // black outside the small vignette/text areas. Kept subtle so it
-      // never fights with text or media contrast.
+      // Solid tint across the WHOLE canvas first - behind the PFPs, in the
+      // gaps between boxes in the two-message layout, everywhere - so
+      // there's no leftover black dead space no matter which gradient is
+      // picked. A radial highlight is layered on top for a bit of depth.
       const [r, g, b] = GRADIENT_PRESETS[gradient].color;
+
+      ctx.fillStyle = `rgba(${r},${g},${b},0.45)`;
+      ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
+
       const centerX = this.IMAGE_WIDTH / 2;
       const centerY = this.IMAGE_HEIGHT / 2;
       const radius = Math.max(this.IMAGE_WIDTH, this.IMAGE_HEIGHT) * 0.75;
@@ -316,9 +322,8 @@ export class QuoteImageGenerator {
         centerX, centerY, radius
       );
 
-      wash.addColorStop(0, `rgba(${r},${g},${b},0.35)`);
-      wash.addColorStop(0.6, `rgba(${r},${g},${b},0.15)`);
-      wash.addColorStop(1, 'rgba(0,0,0,0)');
+      wash.addColorStop(0, `rgba(${r},${g},${b},0.3)`);
+      wash.addColorStop(1, `rgba(${r},${g},${b},0)`);
 
       ctx.fillStyle = wash;
       ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
@@ -712,7 +717,7 @@ export class QuoteImageGenerator {
         ctx,
         message.textParts,
         layout.quoteBox,
-        { preferredSize: 44, minimumSize: 16 }
+        { preferredSize: 50, minimumSize: 16 }
       );
 
       this.drawTextGradient(
