@@ -29,6 +29,13 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     return;
   }
 
+  // Validate maximum wager limit
+  const MAX_WAGER = 10000;
+  if (wager > MAX_WAGER) {
+    await message.reply(`Maximum wager is ${MAX_WAGER.toLocaleString()} residuals. Please try a smaller amount.`);
+    return;
+  }
+
   // Get user's current balance
   const residualInfo = await getResidualsInfo(userId);
   if (!residualInfo) {
@@ -71,10 +78,14 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     );
 
     if (!deductionResult) {
+      console.error(`[GAMBLE] Failed to deduct wager for user ${userId}. Amount: ${wager}`);
       activeGambles.delete(userId);
       await initialMessage.edit('Failed to process your wager. Please try again.');
       return;
     }
+
+    // Store the balance after deduction for potential refund
+    const balanceAfterDeduction = deductionResult;
 
     // Wait for suspense (2-3 seconds)
     await new Promise(resolve => setTimeout(resolve, 2500));
@@ -100,8 +111,27 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       );
 
       if (!awardResult) {
+        console.error(`[GAMBLE] Failed to award winnings for user ${userId}. Wager: ${wager}, Payout: ${payout}. Attempting refund.`);
+        
+        // Refund the wager if payout fails
+        const refundResult = await awardResiduals(
+          userId,
+          wager,
+          'gamble_refund',
+          {
+            reason: 'Refund after payout failure',
+            description: `Refunded wager: ${wager} residuals`
+          }
+        );
+
+        if (!refundResult) {
+          console.error(`[GAMBLE] CRITICAL: Failed to refund wager for user ${userId} after payout failure. Amount: ${wager}`);
+          await initialMessage.edit('Failed to process your winnings. Please contact support immediately - your wager may be affected.');
+        } else {
+          await initialMessage.edit('Failed to process your winnings. Your wager has been refunded. Please try again.');
+        }
+        
         activeGambles.delete(userId);
-        await initialMessage.edit('Failed to process your winnings. Please contact support.');
         return;
       }
 
@@ -131,6 +161,27 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     await initialMessage.edit({ embeds: [resultEmbed] });
 
   } catch (error) {
+    console.error(`[GAMBLE] Unexpected error for user ${userId}. Wager: ${wager}. Error:`, error);
+    
+    // Attempt to refund the wager on any unexpected error
+    try {
+      const refundResult = await awardResiduals(
+        userId,
+        wager,
+        'gamble_error_refund',
+        {
+          reason: 'Refund after unexpected error',
+          description: `Refunded wager due to error: ${wager} residuals`
+        }
+      );
+
+      if (!refundResult) {
+        console.error(`[GAMBLE] CRITICAL: Failed to refund wager for user ${userId} after unexpected error. Amount: ${wager}`);
+      }
+    } catch (refundError) {
+      console.error(`[GAMBLE] CRITICAL: Exception during refund attempt for user ${userId}:`, refundError);
+    }
+
     await ErrorHandler.handleMessageError(message, error, 'gamble command');
   } finally {
     // Remove user from active gambles
