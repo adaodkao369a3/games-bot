@@ -36,11 +36,11 @@ const activeQuotes = new Map<string, QuoteData>();
 // GRADIENT + EFFECT DROPDOWNS
 // ============================================================
 
-function buildStyleRow(
+function buildStyleRows(
   quoteId: string,
   selectedGradient: GradientPresetId,
   selectedEffect: EffectPresetId
-): ActionRowBuilder<StringSelectMenuBuilder> {
+): ActionRowBuilder<StringSelectMenuBuilder>[] {
   const gradientMenu = new StringSelectMenuBuilder()
     .setCustomId(`quote_gradient_${quoteId}`)
     .setPlaceholder('🎨 Choose a gradient')
@@ -69,12 +69,12 @@ function buildStyleRow(
       )
     );
 
-  // Discord allows multiple select menus in one action row, so the two
-  // controls appear side-by-side directly beneath the generated quote.
-  return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-    gradientMenu,
-    effectMenu
-  );
+  // Discord string select menus each consume the full action-row width.
+  // They cannot be placed side-by-side in the same row, so use two rows.
+  return [
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(gradientMenu),
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(effectMenu),
+  ];
 }
 
 // ============================================================
@@ -139,7 +139,7 @@ export async function handleQuoteInteraction(interaction: StringSelectMenuIntera
     });
 
     const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
-    const styleRow = buildStyleRow(
+    const styleRows = buildStyleRows(
       quoteId,
       quoteData.currentGradient,
       quoteData.currentEffect
@@ -147,7 +147,7 @@ export async function handleQuoteInteraction(interaction: StringSelectMenuIntera
 
     await interaction.editReply({
       files: [attachment],
-      components: [styleRow],
+      components: styleRows,
     });
   } catch (error) {
     console.error('[Quote Command] Error applying gradient:', error);
@@ -605,7 +605,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
 
     // Gradient picker dropdown - lets the requester restyle the image
     // in place without re-running the command.
-    const styleRow = buildStyleRow(
+    const styleRows = buildStyleRows(
       quoteId,
       quoteData.currentGradient,
       quoteData.currentEffect
@@ -615,7 +615,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
     // the gradient dropdown, no embed wrapper.
     const originalMessage = await message.channel.send({
       files: [attachment],
-      components: [styleRow],
+      components: styleRows,
     });
 
     // Redirect to directors cut channel
@@ -625,7 +625,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       if (directorsCutChannel && directorsCutChannel.isTextBased()) {
         await directorsCutChannel.send({
           files: [new AttachmentBuilder(imageBuffer, { name: 'quote.png' })],
-          components: [styleRow],
+          components: styleRows,
         });
       }
     } catch (error) {
