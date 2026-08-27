@@ -435,7 +435,23 @@ export class QuoteImageGenerator {
 
     const containScale = Math.min(maxWidth / image.width, maxHeight / image.height);
     const coverScale = Math.max(maxWidth / image.width, maxHeight / image.height);
-    const scale = containScale + (coverScale - containScale) * fillAmount;
+    let scale = containScale + (coverScale - containScale) * fillAmount;
+
+    // Cap how much of the source image the "cover" blend is allowed to
+    // crop away. When the box's aspect ratio is very different from the
+    // image's own (e.g. a wide 1200x630 quote card getting embedded into a
+    // squarer box), blending 80% toward cover would slice off a big chunk
+    // of the image - it visibly "runs out of frame". If the crop implied
+    // by the current scale would exceed that budget, fall back toward
+    // "contain" instead so the whole image stays visible.
+    const MAX_CROP_FRACTION = 0.2;
+    const srcWidthAtScale = Math.min(image.width, maxWidth / scale);
+    const srcHeightAtScale = Math.min(image.height, maxHeight / scale);
+    const cropFractionW = 1 - srcWidthAtScale / image.width;
+    const cropFractionH = 1 - srcHeightAtScale / image.height;
+    if (Math.max(cropFractionW, cropFractionH) > MAX_CROP_FRACTION) {
+      scale = containScale;
+    }
 
     // Source crop needed so the scaled result never exceeds the box.
     const srcWidth = Math.min(image.width, maxWidth / scale);

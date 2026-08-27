@@ -369,9 +369,30 @@ async function processEmojis(textParts: QuoteTextPart[]): Promise<QuoteTextPart[
 }
 
 // Main extraction function
-async function extractQuoteMessageData(message: any): Promise<QuoteMessageData> {
-  const avatarBuffer = await downloadImage(message.author.displayAvatarURL({ size: 256 }));
-  
+async function extractQuoteMessageData(message: any, guild: any): Promise<QuoteMessageData> {
+  // Resolve the GuildMember so we can read their server nickname and their
+  // guild-specific (or highest quality global) avatar. message.member is
+  // often already populated for the invoking message, but messages fetched
+  // via fetchReference frequently come back without it, so fall back to a
+  // member fetch in that case.
+  let member = message.member ?? null;
+  if (!member && guild) {
+    try {
+      member = await guild.members.fetch(message.author.id);
+    } catch (error) {
+      console.error('[Quote Command] Error fetching guild member:', error);
+      member = null;
+    }
+  }
+
+  // Full-quality avatar: prefer the member's guild-specific avatar (falls
+  // back to the account's global avatar automatically), fetched at 1024px
+  // instead of a small thumbnail size.
+  const avatarURL = member
+    ? member.displayAvatarURL({ size: 1024, extension: 'png' })
+    : message.author.displayAvatarURL({ size: 1024, extension: 'png' });
+  const avatarBuffer = await downloadImage(avatarURL);
+
   // Extract text parts
   const rawTextParts = extractTextParts(message.content);
   const textParts = await processEmojis(rawTextParts);
@@ -385,7 +406,10 @@ async function extractQuoteMessageData(message: any): Promise<QuoteMessageData> 
   const hasText = hasTextContent || hasEmojiContent;
   
   return {
-    username: message.author.displayName || message.author.username,
+    // Server nickname first - that's the name people actually recognize
+    // this person by in this server. Falls back to their global display
+    // name, then their raw username, only if no nickname is set.
+    username: member?.nickname || message.author.globalName || message.author.username,
     handle: message.author.username,
     userId: message.author.id,
     avatarBuffer,
@@ -480,8 +504,8 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       }
 
       // Build quote data for both messages
-      const message1Data = await extractQuoteMessageData(messageB);
-      const message2Data = await extractQuoteMessageData(messageA);
+      const message1Data = await extractQuoteMessageData(messageB, message.guild);
+      const message2Data = await extractQuoteMessageData(messageA, message.guild);
 
       quoteData = {
         messageId: message.id,
@@ -500,7 +524,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       // Single message quote: just the replied-to message (Message A)
       const quotedMessage = messageA;
 
-      const message1Data = await extractQuoteMessageData(quotedMessage);
+      const message1Data = await extractQuoteMessageData(quotedMessage, message.guild);
 
       quoteData = {
         messageId: message.id,
