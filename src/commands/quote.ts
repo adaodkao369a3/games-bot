@@ -7,6 +7,9 @@ import {
   GRADIENT_PRESETS,
   GradientPresetId,
   DEFAULT_GRADIENT,
+  EFFECT_PRESETS,
+  EffectPresetId,
+  DEFAULT_EFFECT,
 } from '../utils/quote-image-generator.js';
 import { loadImage } from '@napi-rs/canvas';
 
@@ -23,31 +26,55 @@ interface QuoteData {
   message2Url?: string; // URL to second message (if two-message quote)
   currentStyle: 'color' | 'bw';
   currentGradient: GradientPresetId;
+  currentEffect: EffectPresetId;
   ownerId: string; // only the person who requested the quote may change its gradient
 }
 
 const activeQuotes = new Map<string, QuoteData>();
 
 // ============================================================
-// GRADIENT DROPDOWN
+// GRADIENT + EFFECT DROPDOWNS
 // ============================================================
 
-function buildGradientRow(quoteId: string, selected: GradientPresetId): ActionRowBuilder<StringSelectMenuBuilder> {
-  const menu = new StringSelectMenuBuilder()
+function buildStyleRow(
+  quoteId: string,
+  selectedGradient: GradientPresetId,
+  selectedEffect: EffectPresetId
+): ActionRowBuilder<StringSelectMenuBuilder> {
+  const gradientMenu = new StringSelectMenuBuilder()
     .setCustomId(`quote_gradient_${quoteId}`)
-    .setPlaceholder('🎨 Choose a gradient style')
+    .setPlaceholder('🎨 Choose a gradient')
     .addOptions(
       (Object.entries(GRADIENT_PRESETS) as [GradientPresetId, typeof GRADIENT_PRESETS[GradientPresetId]][]).map(
         ([id, preset]) => ({
           label: preset.label,
           description: preset.description,
           value: id,
-          default: id === selected,
+          default: id === selectedGradient,
         })
       )
     );
 
-  return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
+  const effectMenu = new StringSelectMenuBuilder()
+    .setCustomId(`quote_effect_${quoteId}`)
+    .setPlaceholder('✨ Choose an effect')
+    .addOptions(
+      (Object.entries(EFFECT_PRESETS) as [EffectPresetId, typeof EFFECT_PRESETS[EffectPresetId]][]).map(
+        ([id, preset]) => ({
+          label: preset.label,
+          description: preset.description,
+          value: id,
+          default: id === selectedEffect,
+        })
+      )
+    );
+
+  // Discord allows multiple select menus in one action row, so the two
+  // controls appear side-by-side directly beneath the generated quote.
+  return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    gradientMenu,
+    effectMenu
+  );
 }
 
 // ============================================================
@@ -55,7 +82,15 @@ function buildGradientRow(quoteId: string, selected: GradientPresetId): ActionRo
 // ============================================================
 
 export async function handleQuoteInteraction(interaction: StringSelectMenuInteraction): Promise<void> {
-  const quoteId = interaction.customId.replace('quote_gradient_', '');
+  const isGradientInteraction = interaction.customId.startsWith('quote_gradient_');
+  const isEffectInteraction = interaction.customId.startsWith('quote_effect_');
+
+  if (!isGradientInteraction && !isEffectInteraction) {
+    return;
+  }
+
+  const prefix = isGradientInteraction ? 'quote_gradient_' : 'quote_effect_';
+  const quoteId = interaction.customId.replace(prefix, '');
   const quoteData = activeQuotes.get(quoteId);
 
   if (!quoteData) {
@@ -74,13 +109,23 @@ export async function handleQuoteInteraction(interaction: StringSelectMenuIntera
     return;
   }
 
-  const selectedGradient = interaction.values[0] as GradientPresetId;
-  if (!(selectedGradient in GRADIENT_PRESETS)) {
-    await interaction.reply({ content: 'Unknown gradient style.', ephemeral: true });
-    return;
-  }
+  const selectedValue = interaction.values[0];
 
-  quoteData.currentGradient = selectedGradient;
+  if (isGradientInteraction) {
+    const selectedGradient = selectedValue as GradientPresetId;
+    if (!(selectedGradient in GRADIENT_PRESETS)) {
+      await interaction.reply({ content: 'Unknown gradient style.', ephemeral: true });
+      return;
+    }
+    quoteData.currentGradient = selectedGradient;
+  } else {
+    const selectedEffect = selectedValue as EffectPresetId;
+    if (!(selectedEffect in EFFECT_PRESETS)) {
+      await interaction.reply({ content: 'Unknown effect.', ephemeral: true });
+      return;
+    }
+    quoteData.currentEffect = selectedEffect;
+  }
 
   try {
     await interaction.deferUpdate();
@@ -90,14 +135,19 @@ export async function handleQuoteInteraction(interaction: StringSelectMenuIntera
       message2: quoteData.message2,
       style: quoteData.currentStyle,
       gradient: quoteData.currentGradient,
+      effect: quoteData.currentEffect,
     });
 
     const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
-    const gradientRow = buildGradientRow(quoteId, quoteData.currentGradient);
+    const styleRow = buildStyleRow(
+      quoteId,
+      quoteData.currentGradient,
+      quoteData.currentEffect
+    );
 
     await interaction.editReply({
       files: [attachment],
-      components: [gradientRow],
+      components: [styleRow],
     });
   } catch (error) {
     console.error('[Quote Command] Error applying gradient:', error);
@@ -516,6 +566,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
         message2Url: messageA.url,
         currentStyle: 'color',
         currentGradient: DEFAULT_GRADIENT,
+        currentEffect: DEFAULT_EFFECT,
         ownerId: message.author.id,
       };
 
@@ -533,6 +584,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
         message1Url: quotedMessage.url,
         currentStyle: 'color',
         currentGradient: DEFAULT_GRADIENT,
+        currentEffect: DEFAULT_EFFECT,
         ownerId: message.author.id,
       };
 
@@ -545,6 +597,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       message2: quoteData.message2,
       style: quoteData.currentStyle,
       gradient: quoteData.currentGradient,
+      effect: quoteData.currentEffect,
     });
 
     // Create attachment
@@ -552,13 +605,17 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
 
     // Gradient picker dropdown - lets the requester restyle the image
     // in place without re-running the command.
-    const gradientRow = buildGradientRow(quoteId, quoteData.currentGradient);
+    const styleRow = buildStyleRow(
+      quoteId,
+      quoteData.currentGradient,
+      quoteData.currentEffect
+    );
 
     // Send the message to the original channel first - just the image and
     // the gradient dropdown, no embed wrapper.
     const originalMessage = await message.channel.send({
       files: [attachment],
-      components: [gradientRow],
+      components: [styleRow],
     });
 
     // Redirect to directors cut channel
@@ -568,7 +625,7 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       if (directorsCutChannel && directorsCutChannel.isTextBased()) {
         await directorsCutChannel.send({
           files: [new AttachmentBuilder(imageBuffer, { name: 'quote.png' })],
-          components: [gradientRow],
+          components: [styleRow],
         });
       }
     } catch (error) {

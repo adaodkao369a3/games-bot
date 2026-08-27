@@ -17,11 +17,11 @@ const PROJECT_ROOT = cwd();
 // FONT LOADING
 // ============================================================
 
-const fontPath = join(
+const butlerFontPath = join(
   PROJECT_ROOT,
   'assets',
   'fonts',
-  'Roboto-Bold.ttf'
+  'Butler-Free-Bd.otf'
 );
 
 // Emoji font path (Noto Color Emoji or similar)
@@ -36,30 +36,30 @@ let fontLoaded = false;
 let emojiFontLoaded = false;
 
 try {
-  if (existsSync(fontPath)) {
+  if (existsSync(butlerFontPath)) {
     const success = GlobalFonts.registerFromPath(
-      fontPath,
-      'Roboto'
+      butlerFontPath,
+      'Butler'
     );
 
     if (success) {
       fontLoaded = true;
       console.log(
-        '[QuoteImageGenerator] Font loaded: assets/fonts/Roboto-Bold.ttf'
+        '[QuoteImageGenerator] Font loaded: assets/fonts/Butler-Free-Bd.otf'
       );
     } else {
       console.error(
-        '[QuoteImageGenerator] Font registration failed'
+        '[QuoteImageGenerator] Butler font registration failed'
       );
     }
   } else {
     console.error(
-      '[QuoteImageGenerator] Font file not found: assets/fonts/Roboto-Bold.ttf'
+      '[QuoteImageGenerator] Butler font file not found: assets/fonts/Butler-Free-Bd.otf'
     );
   }
 } catch (error) {
   console.error(
-    '[QuoteImageGenerator] Failed to load font:',
+    '[QuoteImageGenerator] Failed to load Butler font:',
     error
   );
 }
@@ -134,6 +134,7 @@ export interface QuoteImageData {
   message2?: QuoteMessageData;
   style: 'color' | 'bw';
   gradient?: GradientPresetId;
+  effect?: EffectPresetId;
 }
 
 // ============================================================
@@ -162,6 +163,30 @@ export const GRADIENT_PRESETS = {
 export type GradientPresetId = keyof typeof GRADIENT_PRESETS;
 
 export const DEFAULT_GRADIENT: GradientPresetId = 'classic';
+
+export const EFFECT_PRESETS = {
+  none: {
+    label: 'None',
+    description: 'No overlay effect',
+  },
+  blackFog: {
+    label: 'Black Fog',
+    description: 'Soft black fog and smoke overlay',
+  },
+} as const;
+
+export type EffectPresetId = keyof typeof EFFECT_PRESETS;
+
+export const DEFAULT_EFFECT: EffectPresetId = 'none';
+
+const EFFECT_ASSET_PATHS: Partial<Record<EffectPresetId, string>> = {
+  blackFog: join(
+    PROJECT_ROOT,
+    'assets',
+    'effects',
+    'vecteezy_black-fog-smoke-overlay_75582803.png'
+  ),
+};
 
 // ============================================================
 // GENERATOR
@@ -254,6 +279,7 @@ export class QuoteImageGenerator {
       message2,
       style,
       gradient = DEFAULT_GRADIENT,
+      effect = DEFAULT_EFFECT,
     } = data;
 
     const isTwoMessage = !!message2;
@@ -298,6 +324,11 @@ export class QuoteImageGenerator {
       );
     }
 
+    // Effects are deliberately applied last so the selected PNG overlays
+    // the complete finished quote card, including the avatar, text, and
+    // gradient wash.
+    await this.drawEffect(ctx, effect);
+
     return canvas.toBuffer('image/png');
   }
 
@@ -311,37 +342,72 @@ export class QuoteImageGenerator {
   ): void {
     ctx.save();
 
-    // Start with black either way so any transparent edges always land on
-    // black, not whatever was previously in the canvas.
-    ctx.fillStyle = '#000000';
+    // One continuous base color across the entire canvas. This is important:
+    // when an avatar is alpha-masked, this exact color shows through instead
+    // of exposing a different-colored/black region on the right side.
+    const BASE_BLUE = '#0a3d62';
+    ctx.fillStyle = BASE_BLUE;
     ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
 
-    if (gradient !== 'classic') {
-      // Solid tint across the WHOLE canvas first - behind the PFPs, in the
-      // gaps between boxes in the two-message layout, everywhere - so
-      // there's no leftover black dead space no matter which gradient is
-      // picked. A radial highlight is layered on top for a bit of depth.
-      const [r, g, b] = GRADIENT_PRESETS[gradient].color;
+    const [r, g, b] = GRADIENT_PRESETS[gradient].color;
 
-      ctx.fillStyle = `rgba(${r},${g},${b},0.45)`;
+    // Keep the gradient tint as a translucent wash over the same base blue.
+    // "Classic" simply leaves the unified blue untouched.
+    if (gradient !== 'classic') {
+      ctx.fillStyle = `rgba(${r},${g},${b},0.35)`;
       ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
 
-      const centerX = this.IMAGE_WIDTH / 2;
-      const centerY = this.IMAGE_HEIGHT / 2;
-      const radius = Math.max(this.IMAGE_WIDTH, this.IMAGE_HEIGHT) * 0.75;
-
       const wash = ctx.createRadialGradient(
-        centerX, centerY, 0,
-        centerX, centerY, radius
+        this.IMAGE_WIDTH / 2,
+        this.IMAGE_HEIGHT / 2,
+        0,
+        this.IMAGE_WIDTH / 2,
+        this.IMAGE_HEIGHT / 2,
+        Math.max(this.IMAGE_WIDTH, this.IMAGE_HEIGHT) * 0.75
       );
 
-      wash.addColorStop(0, `rgba(${r},${g},${b},0.3)`);
+      wash.addColorStop(0, `rgba(${r},${g},${b},0.24)`);
       wash.addColorStop(1, `rgba(${r},${g},${b},0)`);
 
       ctx.fillStyle = wash;
       ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
     }
 
+    ctx.restore();
+  }
+
+  // ==========================================================
+  // EFFECT OVERLAY
+  // ==========================================================
+
+  private static async drawEffect(
+    ctx: SKRSContext2D,
+    effect: EffectPresetId
+  ): Promise<void> {
+    if (effect === 'none') {
+      return;
+    }
+
+    const effectPath = EFFECT_ASSET_PATHS[effect];
+    if (!effectPath || !existsSync(effectPath)) {
+      console.warn(
+        `[QuoteImageGenerator] Effect asset not found for "${effect}": ${effectPath ?? 'unknown'}`
+      );
+      return;
+    }
+
+    const effectImage = await loadImage(effectPath);
+
+    ctx.save();
+    ctx.globalAlpha = 0.42;
+    this.drawCoverImage(
+      ctx,
+      effectImage,
+      0,
+      0,
+      this.IMAGE_WIDTH,
+      this.IMAGE_HEIGHT
+    );
     ctx.restore();
   }
 
@@ -506,11 +572,16 @@ export class QuoteImageGenerator {
   ): Promise<void> {
     // LEFT HALF: permanently reserved for the PFP.
     const pfp = this.SINGLE_PFP;
-    ctx.save();
-    if (style === 'bw') ctx.filter = 'grayscale(100%)';
-    this.drawCoverImage(ctx, avatar, pfp.x, pfp.y, pfp.width, pfp.height);
-    ctx.restore();
-    this.drawDirectionalFade(ctx, pfp.x, pfp.y, pfp.width, pfp.height, 'right-bottom', gradient);
+    await this.drawMaskedAvatar(
+      ctx,
+      avatar,
+      pfp.x,
+      pfp.y,
+      pfp.width,
+      pfp.height,
+      style,
+      'right'
+    );
 
     const hasMedia = !!message.media?.length;
     const centerX = 900;
@@ -649,11 +720,11 @@ export class QuoteImageGenerator {
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
 
-    ctx.font = 'bold 34px Roboto';
+    ctx.font = 'bold 34px Butler';
     ctx.fillStyle = '#FFFFFF';
     ctx.fillText(name, pfpX + paddingX, nameY);
 
-    ctx.font = 'bold 24px Roboto';
+    ctx.font = 'bold 24px Butler';
     ctx.fillStyle = '#A0A0A0';
     ctx.fillText(`@${handle}`, pfpX + paddingX, handleY);
 
@@ -676,20 +747,30 @@ export class QuoteImageGenerator {
     const pfp = this.DOUBLE_PFP;
 
     // TOP-LEFT PFP: 50% of the top half, full height, pinned to top-left.
-    ctx.save();
-    if (style === 'bw') ctx.filter = 'grayscale(100%)';
-    this.drawCoverImage(ctx, avatar1, 0, 0, pfp.width, pfp.height);
-    ctx.restore();
-    this.drawDirectionalFade(ctx, 0, 0, pfp.width, pfp.height, 'right-bottom', gradient);
+    await this.drawMaskedAvatar(
+      ctx,
+      avatar1,
+      0,
+      0,
+      pfp.width,
+      pfp.height,
+      style,
+      'right'
+    );
 
     // BOTTOM-RIGHT PFP: 50% of the bottom half, full height, pinned to bottom-right.
     const pfp2X = this.IMAGE_WIDTH - pfp.width;
     const pfp2Y = this.IMAGE_HEIGHT - pfp.height;
-    ctx.save();
-    if (style === 'bw') ctx.filter = 'grayscale(100%)';
-    this.drawCoverImage(ctx, avatar2, pfp2X, pfp2Y, pfp.width, pfp.height);
-    ctx.restore();
-    this.drawDirectionalFade(ctx, pfp2X, pfp2Y, pfp.width, pfp.height, 'top-left', gradient);
+    await this.drawMaskedAvatar(
+      ctx,
+      avatar2,
+      pfp2X,
+      pfp2Y,
+      pfp.width,
+      pfp.height,
+      style,
+      'left'
+    );
 
     // Center each text region on its OWN quote box (not a fixed constant) -
     // the box width/position now varies to hug the avatar and fill the
@@ -764,128 +845,59 @@ export class QuoteImageGenerator {
   // DIRECTIONAL IMAGE FADE
   // ==========================================================
 
-  private static drawDirectionalFade(
+  private static async drawMaskedAvatar(
     ctx: SKRSContext2D,
+    image: any,
     x: number,
     y: number,
     width: number,
     height: number,
-    direction:
-      | 'right-bottom'
-      | 'top-left',
-    gradient: GradientPresetId = DEFAULT_GRADIENT
-  ): void {
-    ctx.save();
-
-    const [r, g, b] = GRADIENT_PRESETS[gradient].color;
-    const rgb = (a: number) => `rgba(${r},${g},${b},${a})`;
-
-    if (direction === 'right-bottom') {
-      // ------------------------------------------------------
-      // COMBINED FADE: Right + Bottom with radial component
-      // ------------------------------------------------------
-      
-      // Start fade at 45% of the image
-      const fadeStart = 0.45;
-      
-      // Create radial gradient from corner for smooth diagonal fade
-      const centerX = x + width * 0.3;
-      const centerY = y + height * 0.3;
-      const radius = Math.max(width, height) * 0.8;
-      
-      const radialGradient = ctx.createRadialGradient(
-        centerX, centerY, 0,
-        centerX, centerY, radius
-      );
-      
-      radialGradient.addColorStop(0, rgb(0));
-      radialGradient.addColorStop(0.4, rgb(0.2));
-      radialGradient.addColorStop(0.7, rgb(0.6));
-      radialGradient.addColorStop(1, rgb(1));
-      
-      ctx.fillStyle = radialGradient;
-      ctx.fillRect(x, y, width, height);
-      
-      // Add stronger linear gradient on right edge
-      const rightGradient = ctx.createLinearGradient(
-        x + width * fadeStart, y,
-        x + width, y
-      );
-      
-      rightGradient.addColorStop(0, rgb(0));
-      rightGradient.addColorStop(0.5, rgb(0.5));
-      rightGradient.addColorStop(1, rgb(1));
-      
-      ctx.fillStyle = rightGradient;
-      ctx.fillRect(x + width * fadeStart, y, width * (1 - fadeStart), height);
-      
-      // Add stronger linear gradient on bottom edge
-      const bottomGradient = ctx.createLinearGradient(
-        x, y + height * fadeStart,
-        x, y + height
-      );
-      
-      bottomGradient.addColorStop(0, rgb(0));
-      bottomGradient.addColorStop(0.5, rgb(0.5));
-      bottomGradient.addColorStop(1, rgb(1));
-      
-      ctx.fillStyle = bottomGradient;
-      ctx.fillRect(x, y + height * fadeStart, width, height * (1 - fadeStart));
-
-    } else {
-      // ------------------------------------------------------
-      // COMBINED FADE: Top + Left with radial component
-      // ------------------------------------------------------
-      
-      // Start fade at 45% of the image
-      const fadeStart = 0.45;
-      
-      // Create radial gradient from corner for smooth diagonal fade
-      const centerX = x + width * 0.7;
-      const centerY = y + height * 0.7;
-      const radius = Math.max(width, height) * 0.8;
-      
-      const radialGradient = ctx.createRadialGradient(
-        centerX, centerY, 0,
-        centerX, centerY, radius
-      );
-      
-      radialGradient.addColorStop(0, rgb(0));
-      radialGradient.addColorStop(0.4, rgb(0.2));
-      radialGradient.addColorStop(0.7, rgb(0.6));
-      radialGradient.addColorStop(1, rgb(1));
-      
-      ctx.fillStyle = radialGradient;
-      ctx.fillRect(x, y, width, height);
-      
-      // Add stronger linear gradient on top edge
-      const topGradient = ctx.createLinearGradient(
-        x, y,
-        x, y + height * fadeStart
-      );
-      
-      topGradient.addColorStop(0, rgb(1));
-      topGradient.addColorStop(0.5, rgb(0.5));
-      topGradient.addColorStop(1, rgb(0));
-      
-      ctx.fillStyle = topGradient;
-      ctx.fillRect(x, y, width, height * fadeStart);
-      
-      // Add stronger linear gradient on left edge
-      const leftGradient = ctx.createLinearGradient(
-        x, y,
-        x + width * fadeStart, y
-      );
-      
-      leftGradient.addColorStop(0, rgb(1));
-      leftGradient.addColorStop(0.5, rgb(0.5));
-      leftGradient.addColorStop(1, rgb(0));
-      
-      ctx.fillStyle = leftGradient;
-      ctx.fillRect(x, y, width * fadeStart, height);
+    style: 'color' | 'bw',
+    fadeEdge: 'left' | 'right'
+  ): Promise<void> {
+    if (width <= 0 || height <= 0) {
+      return;
     }
 
-    ctx.restore();
+    // Render the cropped avatar onto an off-screen canvas first. The alpha
+    // mask is then applied to that image only, so destination-in can never
+    // erase the unified background beneath it.
+    const offCanvas = createCanvas(width, height);
+    const offCtx = offCanvas.getContext('2d');
+
+    if (style === 'bw') {
+      offCtx.filter = 'grayscale(100%)';
+    }
+
+    this.drawCoverImage(
+      offCtx,
+      image,
+      0,
+      0,
+      width,
+      height
+    );
+
+    offCtx.filter = 'none';
+    offCtx.globalCompositeOperation = 'destination-in';
+
+    const fadeStart = width * 0.5;
+    const maskGradient = fadeEdge === 'right'
+      ? offCtx.createLinearGradient(fadeStart, 0, width, 0)
+      : offCtx.createLinearGradient(0, 0, width - fadeStart, 0);
+
+    if (fadeEdge === 'right') {
+      maskGradient.addColorStop(0, 'rgba(0,0,0,1)');
+      maskGradient.addColorStop(1, 'rgba(0,0,0,0)');
+    } else {
+      maskGradient.addColorStop(0, 'rgba(0,0,0,0)');
+      maskGradient.addColorStop(1, 'rgba(0,0,0,1)');
+    }
+
+    offCtx.fillStyle = maskGradient;
+    offCtx.fillRect(0, 0, width, height);
+
+    ctx.drawImage(offCanvas, x, y, width, height);
   }
 
   // ==========================================================
@@ -977,7 +989,7 @@ export class QuoteImageGenerator {
 
     for (let size = options.preferredSize; size >= options.minimumSize; size -= 2) {
       const emojiSize = size * 1.05;
-      ctx.font = `bold ${size}px Roboto`;
+      ctx.font = `bold ${size}px Butler`;
       const lines = this.buildLinesWithEmojis(ctx, textParts, box.width, size, emojiSize);
       const lineHeight = size * lineHeightRatio;
       const blockHeight = lines.length * lineHeight;
@@ -994,7 +1006,7 @@ export class QuoteImageGenerator {
     // The wrapper splits overlong words, so the minimum size should normally fit.
     const size = options.minimumSize;
     const emojiSize = size * 1.05;
-    ctx.font = `bold ${size}px Roboto`;
+    ctx.font = `bold ${size}px Butler`;
     const lines = this.buildLinesWithEmojis(ctx, textParts, box.width, size, emojiSize);
     return { lines, fontSize: size, blockHeight: lines.length * size * lineHeightRatio };
   }
@@ -1019,7 +1031,7 @@ export class QuoteImageGenerator {
     maxWidth: number,
     fontSize: number = 58
   ): string[] {
-    ctx.font = `bold ${fontSize}px Roboto`;
+    ctx.font = `bold ${fontSize}px Butler`;
     return this.wrapText(ctx, text, maxWidth);
   }
 
@@ -1050,7 +1062,7 @@ export class QuoteImageGenerator {
     ctx.textBaseline = 'top';
 
     ctx.font =
-      `bold ${fontSize}px Roboto`;
+      `bold ${fontSize}px Butler`;
 
     ctx.shadowColor =
       'rgba(0,0,0,0.95)';
@@ -1112,7 +1124,7 @@ export class QuoteImageGenerator {
     ctx.save();
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.font = `bold ${fontSize}px Roboto`;
+    ctx.font = `bold ${fontSize}px Butler`;
     ctx.shadowColor = 'rgba(0,0,0,0.95)';
     ctx.shadowBlur = 10;
     ctx.shadowOffsetX = 2;
@@ -1147,7 +1159,7 @@ export class QuoteImageGenerator {
           // failure, unrecognized codepoint, etc). Render the raw glyph
           // with the bundled emoji font instead of silently dropping it.
           ctx.save();
-          ctx.font = `${fontSize}px NotoColorEmoji, Roboto`;
+          ctx.font = `${fontSize}px NotoColorEmoji, Butler`;
           ctx.fillText(part.value, currentX, lineY);
           const fallbackWidth = ctx.measureText(part.value).width || emojiSize;
           ctx.restore();
@@ -1289,7 +1301,7 @@ export class QuoteImageGenerator {
     ctx.textBaseline = 'top';
 
     ctx.font =
-      `bold ${fontSize}px Roboto`;
+      `bold ${fontSize}px Butler`;
 
     ctx.shadowColor =
       'rgba(0,0,0,0.95)';
