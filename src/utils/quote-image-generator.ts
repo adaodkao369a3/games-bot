@@ -875,30 +875,32 @@ export class QuoteImageGenerator {
   ): void {
     ctx.save();
 
-    const centerX =
-      x + width / 2;
-
-    const centerY =
-      y + height / 2;
-
-    const radius =
-      Math.max(width, height) * 0.85;
-
     const [r, g, b] = GRADIENT_PRESETS[gradient].color;
 
-    const radialGradient =
-      ctx.createRadialGradient(
-        centerX,
-        centerY,
-        0,
-        centerX,
-        centerY,
-        radius
-      );
+    // Solid color base first, so the WHOLE box - corners included - reads
+    // as the chosen gradient's color. Without this, the radial highlight
+    // below fades all the way to transparent at the box edges/corners,
+    // which lets the near-black canvas underneath show through and makes
+    // every gradient look like a black box instead of its own color.
+    ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
+    ctx.fillRect(x, y, width, height);
 
-    radialGradient.addColorStop(0, `rgba(${r},${g},${b},0.75)`);
-    radialGradient.addColorStop(0.4, `rgba(${r},${g},${b},0.5)`);
-    radialGradient.addColorStop(0.7, `rgba(${r},${g},${b},0.2)`);
+    // Soft radial highlight on top for a bit of depth in the center.
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const radius = Math.max(width, height) * 0.85;
+
+    const radialGradient = ctx.createRadialGradient(
+      centerX,
+      centerY,
+      0,
+      centerX,
+      centerY,
+      radius
+    );
+
+    radialGradient.addColorStop(0, `rgba(${r},${g},${b},0.4)`);
+    radialGradient.addColorStop(0.5, `rgba(${r},${g},${b},0.2)`);
     radialGradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
 
     ctx.fillStyle =
