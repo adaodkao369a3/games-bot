@@ -173,11 +173,14 @@ export class QuoteImageGenerator {
 
   // Fixed visual regions. Content is allowed to resize only INSIDE
   // its own quote box; the PFP, divider bar, and username never move.
-  // Margins are kept tight (~35-40px) so the quote box claims almost all
-  // of its available half instead of floating in a sea of padding.
+  // Margins are kept tight and, critically, EQUAL on both sides of the
+  // box's own half so the box reads as centered fill rather than
+  // arbitrarily offset padding.
   private static readonly SINGLE_PFP = { x: 0, y: 0, width: 600, height: 630 };
+  // Right half spans x=600..1200 (600px wide). A 24px margin on both
+  // sides keeps the box symmetric while claiming as much width as possible.
   private static readonly SINGLE_NO_MEDIA = {
-    quoteBox: { x: 636, y: 36, width: 528, height: 490 },
+    quoteBox: { x: 624, y: 36, width: 552, height: 490 },
     barY: 546,
     usernameY: 566,
     barWidth: 140,
@@ -195,29 +198,39 @@ export class QuoteImageGenerator {
   // Each half of a two-message quote is 600x315. The PFP is exactly
   // half of its half: 300px wide, full 315px height, pinned to the
   // outer corner so it does not leave the unwanted gap underneath.
+  // The quote box on the OTHER side of that same half must start right
+  // where the PFP ends (plus a small breathing-room gap) and run all the
+  // way to the outer edge - otherwise a dead strip of bare background
+  // opens up between the avatar card and the text box, which is exactly
+  // what makes the box look like it's floating, detached, in its own
+  // little island. GAP is that breathing room; it's small and identical
+  // on both the PFP side and the outer-edge side.
   private static readonly DOUBLE_PFP = { width: 300, height: 315 };
+  private static readonly DOUBLE_GAP = 24;
   private static readonly DOUBLE_TOP_NO_MEDIA = {
-    quoteBox: { x: 630, y: 20, width: 540, height: 225 },
+    // Avatar1 occupies x:0-300, so the box starts right after it.
+    quoteBox: { x: 300 + 24, y: 20, width: 1200 - 24 - (300 + 24), height: 225 },
     barY: 260,
     usernameY: 276,
     barWidth: 100,
   };
   private static readonly DOUBLE_TOP_WITH_MEDIA = {
-    mediaBox: { x: 630, y: 15, width: 540, height: 85 },
-    quoteBox: { x: 630, y: 110, width: 540, height: 135 },
+    mediaBox: { x: 300 + 24, y: 15, width: 1200 - 24 - (300 + 24), height: 85 },
+    quoteBox: { x: 300 + 24, y: 110, width: 1200 - 24 - (300 + 24), height: 135 },
     barY: 260,
     usernameY: 276,
     barWidth: 100,
   };
   private static readonly DOUBLE_BOTTOM_NO_MEDIA = {
-    quoteBox: { x: 30, y: 335, width: 540, height: 225 },
+    // Avatar2 occupies x:900-1200, so the box ends right before it.
+    quoteBox: { x: 30, y: 335, width: 900 - 24 - 30, height: 225 },
     barY: 575,
     usernameY: 591,
     barWidth: 100,
   };
   private static readonly DOUBLE_BOTTOM_WITH_MEDIA = {
-    mediaBox: { x: 30, y: 330, width: 540, height: 85 },
-    quoteBox: { x: 30, y: 425, width: 540, height: 135 },
+    mediaBox: { x: 30, y: 330, width: 900 - 24 - 30, height: 85 },
+    quoteBox: { x: 30, y: 425, width: 900 - 24 - 30, height: 135 },
     barY: 575,
     usernameY: 591,
     barWidth: 100,
@@ -678,15 +691,24 @@ export class QuoteImageGenerator {
     ctx.restore();
     this.drawDirectionalFade(ctx, pfp2X, pfp2Y, pfp.width, pfp.height, 'top-left', gradient);
 
+    // Center each text region on its OWN quote box (not a fixed constant) -
+    // the box width/position now varies to hug the avatar and fill the
+    // rest of its half, so the horizontal center moves with it.
+    const topLayout = message1.media?.length ? this.DOUBLE_TOP_WITH_MEDIA : this.DOUBLE_TOP_NO_MEDIA;
+    const topCenterX = topLayout.quoteBox.x + topLayout.quoteBox.width / 2;
+
     await this.drawDoubleTextRegion(
-      ctx, message1, 900,
-      message1.media?.length ? this.DOUBLE_TOP_WITH_MEDIA : this.DOUBLE_TOP_NO_MEDIA,
+      ctx, message1, topCenterX,
+      topLayout,
       gradient
     );
 
+    const bottomLayout = message2.media?.length ? this.DOUBLE_BOTTOM_WITH_MEDIA : this.DOUBLE_BOTTOM_NO_MEDIA;
+    const bottomCenterX = bottomLayout.quoteBox.x + bottomLayout.quoteBox.width / 2;
+
     await this.drawDoubleTextRegion(
-      ctx, message2, 300,
-      message2.media?.length ? this.DOUBLE_BOTTOM_WITH_MEDIA : this.DOUBLE_BOTTOM_NO_MEDIA,
+      ctx, message2, bottomCenterX,
+      bottomLayout,
       gradient
     );
   }
@@ -870,6 +892,13 @@ export class QuoteImageGenerator {
   // TEXT GRADIENT
   // ==========================================================
 
+  // Feather radius for the text panel's edges. Blurring the fill instead
+  // of hard-cutting it at [x, y, width, height] is what makes the panel
+  // dissolve into the surrounding background wash instead of reading as
+  // a floating card with a visible seam/border - "seamless" comes from
+  // the edge literally being soft, not from color-matching alone.
+  private static readonly PANEL_FEATHER = 34;
+
   private static drawTextGradient(
     ctx: SKRSContext2D,
     x: number,
@@ -881,6 +910,13 @@ export class QuoteImageGenerator {
     ctx.save();
 
     const [r, g, b] = GRADIENT_PRESETS[gradient].color;
+    const feather = this.PANEL_FEATHER;
+
+    // Inset the actual fill so that after blurring, the flat/opaque part
+    // of the panel still roughly matches the intended box footprint,
+    // with the blur radius spreading softly beyond it into the
+    // background rather than eating into the box's usable interior.
+    ctx.filter = `blur(${feather}px)`;
 
     // Solid color base first, so the WHOLE box - corners included - reads
     // as the chosen gradient's color. Without this, the radial highlight
@@ -888,7 +924,12 @@ export class QuoteImageGenerator {
     // which lets the near-black canvas underneath show through and makes
     // every gradient look like a black box instead of its own color.
     ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
-    ctx.fillRect(x, y, width, height);
+    ctx.fillRect(
+      x + feather,
+      y + feather,
+      Math.max(0, width - feather * 2),
+      Math.max(0, height - feather * 2)
+    );
 
     // Soft radial highlight on top for a bit of depth in the center.
     const centerX = x + width / 2;
@@ -912,12 +953,13 @@ export class QuoteImageGenerator {
       radialGradient;
 
     ctx.fillRect(
-      x,
-      y,
-      width,
-      height
+      x + feather,
+      y + feather,
+      Math.max(0, width - feather * 2),
+      Math.max(0, height - feather * 2)
     );
 
+    ctx.filter = 'none';
     ctx.restore();
   }
 
