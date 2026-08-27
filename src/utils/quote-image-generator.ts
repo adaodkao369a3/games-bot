@@ -115,6 +115,7 @@ export interface QuoteTextPart {
 
 export interface QuoteMessageData {
   username: string;
+  handle: string; // raw @handle, shown alongside the display name
   userId: string;
   avatarBuffer: Buffer;
   
@@ -179,12 +180,14 @@ export class QuoteImageGenerator {
     usernameY: 520,
     barWidth: 120,
   };
+  // When the quoted message includes media, the entire right half is
+  // handed over to the image/gif/sticker - no quote box, no divider bar,
+  // no username row competing for space on that side. A caption (if the
+  // message also has text) is overlaid directly on the media instead of
+  // taking its own box, and the author name/handle move onto the PFP.
   private static readonly SINGLE_WITH_MEDIA = {
-    mediaBox: { x: 660, y: 55, width: 480, height: 175 },
-    quoteBox: { x: 660, y: 250, width: 480, height: 185 },
-    barY: 500,
-    usernameY: 520,
-    barWidth: 120,
+    mediaBox: { x: 620, y: 30, width: 560, height: 570 },
+    captionHeight: 150,
   };
 
   // Each half of a two-message quote is 600x315. The PFP is exactly
@@ -256,8 +259,9 @@ export class QuoteImageGenerator {
       ? await loadImage(message2.avatarBuffer)
       : null;
 
-    // Always start with pure black.
-    this.drawBackground(ctx);
+    // Base backdrop reflects the chosen gradient's mood instead of always
+    // being flat black - only "classic" stays pure black.
+    this.drawBackground(ctx, gradient);
 
     if (isTwoMessage && avatar2) {
       await this.drawTwoMessageLayout(
@@ -287,18 +291,38 @@ export class QuoteImageGenerator {
   // ==========================================================
 
   private static drawBackground(
-    ctx: SKRSContext2D
+    ctx: SKRSContext2D,
+    gradient: GradientPresetId = DEFAULT_GRADIENT
   ): void {
     ctx.save();
 
+    // Start with black either way so any transparent edges always land on
+    // black, not whatever was previously in the canvas.
     ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
 
-    ctx.fillRect(
-      0,
-      0,
-      this.IMAGE_WIDTH,
-      this.IMAGE_HEIGHT
-    );
+    if (gradient !== 'classic') {
+      // Wash a soft tint of the preset color across the whole canvas so the
+      // background reads as part of the theme instead of staying flat
+      // black outside the small vignette/text areas. Kept subtle so it
+      // never fights with text or media contrast.
+      const [r, g, b] = GRADIENT_PRESETS[gradient].color;
+      const centerX = this.IMAGE_WIDTH / 2;
+      const centerY = this.IMAGE_HEIGHT / 2;
+      const radius = Math.max(this.IMAGE_WIDTH, this.IMAGE_HEIGHT) * 0.75;
+
+      const wash = ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, radius
+      );
+
+      wash.addColorStop(0, `rgba(${r},${g},${b},0.35)`);
+      wash.addColorStop(0.6, `rgba(${r},${g},${b},0.15)`);
+      wash.addColorStop(1, 'rgba(0,0,0,0)');
+
+      ctx.fillStyle = wash;
+      ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
+    }
 
     ctx.restore();
   }
@@ -325,9 +349,13 @@ export class QuoteImageGenerator {
     if (isSingle) {
       // Single image: fill ~80% of the way from "contain" to "cover" so it
       // reads as big and prominent, while never spilling outside its box.
+      // Stickers are always shown fully "contain" instead - they're small
+      // graphics (often with transparent padding baked in) where cropping
+      // any edge cuts off part of the actual artwork.
       const item = media[0];
       const image = await this.loadImageFromBuffer(item.buffer);
-      this.drawBoxFitImage(ctx, image, x, y, maxWidth, maxHeight);
+      const fillAmount = item.type === 'sticker' ? 0 : this.IMAGE_FILL_AMOUNT;
+      this.drawBoxFitImage(ctx, image, x, y, maxWidth, maxHeight, fillAmount);
     } else {
       // Multiple images: create a grid
       const cols = Math.ceil(Math.sqrt(mediaCount));
@@ -342,13 +370,15 @@ export class QuoteImageGenerator {
         const cellY = y + row * cellHeight;
 
         const image = await this.loadImageFromBuffer(item.buffer);
+        const fillAmount = item.type === 'sticker' ? 0 : this.IMAGE_FILL_AMOUNT;
         this.drawBoxFitImage(
           ctx,
           image,
           cellX + 4,
           cellY + 4,
           cellWidth - 8, // Padding
-          cellHeight - 8
+          cellHeight - 8,
+          fillAmount
         );
       }
     }
@@ -448,18 +478,14 @@ export class QuoteImageGenerator {
     ctx.restore();
     this.drawDirectionalFade(ctx, pfp.x, pfp.y, pfp.width, pfp.height, 'right-bottom', gradient);
 
-    // RIGHT HALF: permanently reserved for quote/media + fixed author area.
     const hasMedia = !!message.media?.length;
     const centerX = 900;
 
-    // Keep the two layout types separate so TypeScript can correctly
-    // narrow mediaBox. The quote box, bar, and username remain fixed
-    // regardless of quote length.
-    const quoteLayout = hasMedia
-      ? this.SINGLE_WITH_MEDIA
-      : this.SINGLE_NO_MEDIA;
-
     if (hasMedia) {
+      // RIGHT HALF: handed entirely to the media - no quote box splitting
+      // the space. Caption text (if any) overlays the bottom of the image
+      // instead of taking its own row, and the author name/handle sit on
+      // the PFP instead of the right side.
       const mediaLayout = this.SINGLE_WITH_MEDIA;
       await this.drawLargeMedia(
         ctx,
@@ -469,55 +495,135 @@ export class QuoteImageGenerator {
         mediaLayout.mediaBox.width,
         mediaLayout.mediaBox.height
       );
-    }
 
-    if (message.hasText) {
-      const fit = this.fitQuoteInBox(
+      if (message.hasText) {
+        const captionBox = {
+          x: mediaLayout.mediaBox.x,
+          y: mediaLayout.mediaBox.y + mediaLayout.mediaBox.height - mediaLayout.captionHeight,
+          width: mediaLayout.mediaBox.width,
+          height: mediaLayout.captionHeight,
+        };
+
+        const fit = this.fitQuoteInBox(
+          ctx,
+          message.textParts,
+          captionBox,
+          { preferredSize: 36, minimumSize: 18 }
+        );
+
+        this.drawTextGradient(ctx, captionBox.x, captionBox.y, captionBox.width, captionBox.height, gradient);
+
+        const startY = captionBox.y + (captionBox.height - fit.blockHeight) / 2;
+
+        await this.drawInlineTextWithEmojis(
+          ctx,
+          fit.lines,
+          captionBox.x + captionBox.width / 2,
+          startY,
+          fit.fontSize,
+          'center'
+        );
+      }
+
+      // Author name + handle live on the PFP itself, near the bottom but
+      // clear of the very edge so they don't feel cramped against it.
+      this.drawAvatarNameOverlay(ctx, message.username, message.handle, pfp.x, pfp.y, pfp.width, pfp.height);
+    } else {
+      // RIGHT HALF: permanently reserved for quote + fixed author area.
+      const quoteLayout = this.SINGLE_NO_MEDIA;
+
+      if (message.hasText) {
+        const fit = this.fitQuoteInBox(
+          ctx,
+          message.textParts,
+          quoteLayout.quoteBox,
+          { preferredSize: 64, minimumSize: 20 }
+        );
+
+        this.drawTextGradient(
+          ctx,
+          quoteLayout.quoteBox.x,
+          quoteLayout.quoteBox.y,
+          quoteLayout.quoteBox.width,
+          quoteLayout.quoteBox.height,
+          gradient
+        );
+
+        const startY =
+          quoteLayout.quoteBox.y +
+          (quoteLayout.quoteBox.height - fit.blockHeight) / 2;
+
+        await this.drawInlineTextWithEmojis(
+          ctx,
+          fit.lines,
+          centerX,
+          startY,
+          fit.fontSize,
+          'center'
+        );
+      }
+
+      // FIXED: this area never follows quote length.
+      this.drawDividerBar(
         ctx,
-        message.textParts,
-        quoteLayout.quoteBox,
-        { preferredSize: hasMedia ? 46 : 64, minimumSize: 20 }
-      );
-
-      this.drawTextGradient(
-        ctx,
-        quoteLayout.quoteBox.x,
-        quoteLayout.quoteBox.y,
-        quoteLayout.quoteBox.width,
-        quoteLayout.quoteBox.height,
-        gradient
-      );
-
-      const startY =
-        quoteLayout.quoteBox.y +
-        (quoteLayout.quoteBox.height - fit.blockHeight) / 2;
-
-      await this.drawInlineTextWithEmojis(
-        ctx,
-        fit.lines,
         centerX,
-        startY,
-        fit.fontSize,
+        quoteLayout.barY,
+        quoteLayout.barWidth
+      );
+
+      this.drawUsername(
+        ctx,
+        message.username,
+        centerX,
+        quoteLayout.usernameY,
+        true,
         'center'
       );
     }
+  }
 
-    // FIXED: this area never follows quote length.
-    this.drawDividerBar(
-      ctx,
-      centerX,
-      quoteLayout.barY,
-      quoteLayout.barWidth
-    );
+  // ==========================================================
+  // AUTHOR NAME OVERLAY ON PFP (used when media takes the whole
+  // opposite half, so the author's name/handle move onto the avatar)
+  // ==========================================================
 
-    this.drawUsername(
-      ctx,
-      message.username,
-      centerX,
-      quoteLayout.usernameY,
-      true,
-      'center'
-    );
+  private static drawAvatarNameOverlay(
+    ctx: SKRSContext2D,
+    name: string,
+    handle: string,
+    pfpX: number,
+    pfpY: number,
+    pfpWidth: number,
+    pfpHeight: number
+  ): void {
+    const paddingX = 40;
+    // Kept clear of the very bottom edge rather than flush against it.
+    const paddingBottom = 56;
+    const barWidth = 90;
+
+    const handleY = pfpY + pfpHeight - paddingBottom;
+    const barY = handleY - 14;
+    const nameY = barY - 34;
+
+    this.drawDividerBar(ctx, pfpX + paddingX + barWidth / 2, barY, barWidth);
+
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.shadowColor = 'rgba(0,0,0,0.95)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+
+    ctx.font = 'bold 34px Roboto';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(name, pfpX + paddingX, nameY);
+
+    ctx.font = 'bold 24px Roboto';
+    ctx.fillStyle = '#A0A0A0';
+    ctx.fillText(`@${handle}`, pfpX + paddingX, handleY);
+
+    ctx.restore();
   }
 
   // ==========================================================

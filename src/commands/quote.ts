@@ -1,4 +1,4 @@
-import { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuInteraction } from 'discord.js';
+import { AttachmentBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuInteraction } from 'discord.js';
 import {
   QuoteImageGenerator,
   QuoteMessageData,
@@ -50,30 +50,6 @@ function buildGradientRow(quoteId: string, selected: GradientPresetId): ActionRo
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
 }
 
-function buildQuoteEmbed(quoteData: QuoteData): EmbedBuilder {
-  // Build user mentions string
-  let mentions = `<@${quoteData.message1.userId}>`;
-  if (quoteData.message2) {
-    mentions += ` and <@${quoteData.message2.userId}>`;
-  }
-
-  // Build description with message links
-  let description = `Quoting ${mentions}`;
-  if (quoteData.message2Url) {
-    description += `\n[Jump to original message](${quoteData.message1Url})`;
-    description += ` | [Jump to reply](${quoteData.message2Url})`;
-  } else {
-    description += `\n[Jump to message](${quoteData.message1Url})`;
-  }
-
-  return new EmbedBuilder()
-    .setTitle('Quote')
-    .setDescription(description)
-    .setImage('attachment://quote.png')
-    .setColor('#0099ff')
-    .setTimestamp();
-}
-
 // ============================================================
 // GRADIENT SELECT MENU INTERACTION
 // ============================================================
@@ -117,11 +93,9 @@ export async function handleQuoteInteraction(interaction: StringSelectMenuIntera
     });
 
     const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
-    const embed = buildQuoteEmbed(quoteData);
     const gradientRow = buildGradientRow(quoteId, quoteData.currentGradient);
 
     await interaction.editReply({
-      embeds: [embed],
       files: [attachment],
       components: [gradientRow],
     });
@@ -412,6 +386,7 @@ async function extractQuoteMessageData(message: any): Promise<QuoteMessageData> 
   
   return {
     username: message.author.displayName || message.author.username,
+    handle: message.author.username,
     userId: message.author.id,
     avatarBuffer,
     textParts,
@@ -551,16 +526,13 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
     // Create attachment
     const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
 
-    // Create embed with image
-    const embed = buildQuoteEmbed(quoteData);
-
     // Gradient picker dropdown - lets the requester restyle the image
     // in place without re-running the command.
     const gradientRow = buildGradientRow(quoteId, quoteData.currentGradient);
 
-    // Send the message to the original channel first
+    // Send the message to the original channel first - just the image and
+    // the gradient dropdown, no embed wrapper.
     const originalMessage = await message.channel.send({
-      embeds: [embed],
       files: [attachment],
       components: [gradientRow],
     });
@@ -571,7 +543,6 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       const directorsCutChannel = await message.guild.channels.fetch(directorsCutChannelId);
       if (directorsCutChannel && directorsCutChannel.isTextBased()) {
         await directorsCutChannel.send({
-          embeds: [embed],
           files: [new AttachmentBuilder(imageBuffer, { name: 'quote.png' })],
           components: [gradientRow],
         });
