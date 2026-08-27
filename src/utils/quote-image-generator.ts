@@ -132,7 +132,35 @@ export interface QuoteImageData {
   message1: QuoteMessageData;
   message2?: QuoteMessageData;
   style: 'color' | 'bw';
+  gradient?: GradientPresetId;
 }
+
+// ============================================================
+// GRADIENT PRESETS
+// ============================================================
+// Each preset defines the tint used for the PFP fade and the
+// backing gradient behind quote text. "classic" reproduces the
+// original pure-black fade exactly (default, unchanged look).
+
+export interface GradientPreset {
+  label: string;
+  description: string;
+  color: [number, number, number]; // RGB tint used for fades/glow
+}
+
+export const GRADIENT_PRESETS = {
+  classic: { label: 'Classic', description: 'The original black fade', color: [0, 0, 0] },
+  sunset: { label: 'Sunset', description: 'Warm orange & pink glow', color: [255, 94, 58] },
+  ocean: { label: 'Ocean', description: 'Deep blue & teal', color: [0, 90, 140] },
+  purple: { label: 'Purple Haze', description: 'Rich violet glow', color: [110, 30, 160] },
+  fire: { label: 'Fire', description: 'Hot red & amber', color: [200, 30, 10] },
+  midnight: { label: 'Midnight', description: 'Deep indigo night', color: [15, 15, 60] },
+  neon: { label: 'Neon', description: 'Electric pink & cyan', color: [255, 0, 170] },
+} as const satisfies Record<string, GradientPreset>;
+
+export type GradientPresetId = keyof typeof GRADIENT_PRESETS;
+
+export const DEFAULT_GRADIENT: GradientPresetId = 'classic';
 
 // ============================================================
 // GENERATOR
@@ -207,6 +235,7 @@ export class QuoteImageGenerator {
       message1,
       message2,
       style,
+      gradient = DEFAULT_GRADIENT,
     } = data;
 
     const isTwoMessage = !!message2;
@@ -237,14 +266,16 @@ export class QuoteImageGenerator {
         avatar2,
         message1,
         message2,
-        style
+        style,
+        gradient
       );
     } else {
       await this.drawSingleMessageLayout(
         ctx,
         avatar1,
         message1,
-        style
+        style,
+        gradient
       );
     }
 
@@ -292,24 +323,11 @@ export class QuoteImageGenerator {
     const isSingle = mediaCount === 1;
 
     if (isSingle) {
-      // Single image: fit within bounds with object-fit: contain behavior
+      // Single image: fill ~80% of the way from "contain" to "cover" so it
+      // reads as big and prominent, while never spilling outside its box.
       const item = media[0];
-      const scaled = this.fitWithinBounds(
-        item.width,
-        item.height,
-        maxWidth,
-        maxHeight
-      );
-
       const image = await this.loadImageFromBuffer(item.buffer);
-      this.drawCoverImage(
-        ctx,
-        image,
-        x + (maxWidth - scaled.width) / 2,
-        y + (maxHeight - scaled.height) / 2,
-        scaled.width,
-        scaled.height
-      );
+      this.drawBoxFitImage(ctx, image, x, y, maxWidth, maxHeight);
     } else {
       // Multiple images: create a grid
       const cols = Math.ceil(Math.sqrt(mediaCount));
@@ -323,21 +341,14 @@ export class QuoteImageGenerator {
         const cellX = x + col * cellWidth;
         const cellY = y + row * cellHeight;
 
-        const scaled = this.fitWithinBounds(
-          item.width,
-          item.height,
-          cellWidth - 8, // Padding
-          cellHeight - 8
-        );
-
         const image = await this.loadImageFromBuffer(item.buffer);
-        this.drawCoverImage(
+        this.drawBoxFitImage(
           ctx,
           image,
-          cellX + (cellWidth - scaled.width) / 2,
-          cellY + (cellHeight - scaled.height) / 2,
-          scaled.width,
-          scaled.height
+          cellX + 4,
+          cellY + 4,
+          cellWidth - 8, // Padding
+          cellHeight - 8
         );
       }
     }
@@ -369,6 +380,56 @@ export class QuoteImageGenerator {
   }
 
   // ==========================================================
+  // BOX-FIT IMAGE (bigger images without spilling into other areas)
+  // ==========================================================
+  // Plain "contain" fit (the old behavior) can leave large empty gaps when
+  // an image's aspect ratio doesn't match its box, making it look small.
+  // This blends 80% of the way from "contain" (fully visible, may
+  // letterbox) to "cover" (fills the box completely, may crop) so images
+  // read as big and intentional. It never draws outside [x, y, maxWidth,
+  // maxHeight] - the box next to it is never touched.
+  private static readonly IMAGE_FILL_AMOUNT = 0.8;
+
+  private static drawBoxFitImage(
+    ctx: SKRSContext2D,
+    image: any,
+    x: number,
+    y: number,
+    maxWidth: number,
+    maxHeight: number,
+    fillAmount: number = this.IMAGE_FILL_AMOUNT
+  ): void {
+    if (maxWidth <= 0 || maxHeight <= 0 || !image.width || !image.height) {
+      return;
+    }
+
+    const containScale = Math.min(maxWidth / image.width, maxHeight / image.height);
+    const coverScale = Math.max(maxWidth / image.width, maxHeight / image.height);
+    const scale = containScale + (coverScale - containScale) * fillAmount;
+
+    // Source crop needed so the scaled result never exceeds the box.
+    const srcWidth = Math.min(image.width, maxWidth / scale);
+    const srcHeight = Math.min(image.height, maxHeight / scale);
+    const srcX = (image.width - srcWidth) / 2;
+    const srcY = (image.height - srcHeight) / 2;
+
+    const destWidth = srcWidth * scale;
+    const destHeight = srcHeight * scale;
+
+    ctx.drawImage(
+      image,
+      srcX,
+      srcY,
+      srcWidth,
+      srcHeight,
+      x + (maxWidth - destWidth) / 2,
+      y + (maxHeight - destHeight) / 2,
+      destWidth,
+      destHeight
+    );
+  }
+
+  // ==========================================================
   // SINGLE MESSAGE QUOTE
   // ==========================================================
 
@@ -376,7 +437,8 @@ export class QuoteImageGenerator {
     ctx: SKRSContext2D,
     avatar: any,
     message: QuoteMessageData,
-    style: 'color' | 'bw'
+    style: 'color' | 'bw',
+    gradient: GradientPresetId = DEFAULT_GRADIENT
   ): Promise<void> {
     // LEFT HALF: permanently reserved for the PFP.
     const pfp = this.SINGLE_PFP;
@@ -384,7 +446,7 @@ export class QuoteImageGenerator {
     if (style === 'bw') ctx.filter = 'grayscale(100%)';
     this.drawCoverImage(ctx, avatar, pfp.x, pfp.y, pfp.width, pfp.height);
     ctx.restore();
-    this.drawDirectionalFade(ctx, pfp.x, pfp.y, pfp.width, pfp.height, 'right-bottom');
+    this.drawDirectionalFade(ctx, pfp.x, pfp.y, pfp.width, pfp.height, 'right-bottom', gradient);
 
     // RIGHT HALF: permanently reserved for quote/media + fixed author area.
     const hasMedia = !!message.media?.length;
@@ -422,7 +484,8 @@ export class QuoteImageGenerator {
         quoteLayout.quoteBox.x,
         quoteLayout.quoteBox.y,
         quoteLayout.quoteBox.width,
-        quoteLayout.quoteBox.height
+        quoteLayout.quoteBox.height,
+        gradient
       );
 
       const startY =
@@ -467,7 +530,8 @@ export class QuoteImageGenerator {
     avatar2: any,
     message1: QuoteMessageData,
     message2: QuoteMessageData,
-    style: 'color' | 'bw'
+    style: 'color' | 'bw',
+    gradient: GradientPresetId = DEFAULT_GRADIENT
   ): Promise<void> {
     const pfp = this.DOUBLE_PFP;
 
@@ -476,7 +540,7 @@ export class QuoteImageGenerator {
     if (style === 'bw') ctx.filter = 'grayscale(100%)';
     this.drawCoverImage(ctx, avatar1, 0, 0, pfp.width, pfp.height);
     ctx.restore();
-    this.drawDirectionalFade(ctx, 0, 0, pfp.width, pfp.height, 'right-bottom');
+    this.drawDirectionalFade(ctx, 0, 0, pfp.width, pfp.height, 'right-bottom', gradient);
 
     // BOTTOM-RIGHT PFP: 50% of the bottom half, full height, pinned to bottom-right.
     const pfp2X = this.IMAGE_WIDTH - pfp.width;
@@ -485,16 +549,18 @@ export class QuoteImageGenerator {
     if (style === 'bw') ctx.filter = 'grayscale(100%)';
     this.drawCoverImage(ctx, avatar2, pfp2X, pfp2Y, pfp.width, pfp.height);
     ctx.restore();
-    this.drawDirectionalFade(ctx, pfp2X, pfp2Y, pfp.width, pfp.height, 'top-left');
+    this.drawDirectionalFade(ctx, pfp2X, pfp2Y, pfp.width, pfp.height, 'top-left', gradient);
 
     await this.drawDoubleTextRegion(
       ctx, message1, 900,
-      message1.media?.length ? this.DOUBLE_TOP_WITH_MEDIA : this.DOUBLE_TOP_NO_MEDIA
+      message1.media?.length ? this.DOUBLE_TOP_WITH_MEDIA : this.DOUBLE_TOP_NO_MEDIA,
+      gradient
     );
 
     await this.drawDoubleTextRegion(
       ctx, message2, 300,
-      message2.media?.length ? this.DOUBLE_BOTTOM_WITH_MEDIA : this.DOUBLE_BOTTOM_NO_MEDIA
+      message2.media?.length ? this.DOUBLE_BOTTOM_WITH_MEDIA : this.DOUBLE_BOTTOM_NO_MEDIA,
+      gradient
     );
   }
 
@@ -508,7 +574,8 @@ export class QuoteImageGenerator {
       usernameY: number;
       barWidth: number;
       mediaBox?: { x: number; y: number; width: number; height: number };
-    }
+    },
+    gradient: GradientPresetId = DEFAULT_GRADIENT
   ): Promise<void> {
     if (layout.mediaBox) {
       await this.drawLargeMedia(
@@ -529,7 +596,8 @@ export class QuoteImageGenerator {
       this.drawTextGradient(
         ctx,
         layout.quoteBox.x, layout.quoteBox.y,
-        layout.quoteBox.width, layout.quoteBox.height
+        layout.quoteBox.width, layout.quoteBox.height,
+        gradient
       );
 
       const startY = layout.quoteBox.y + (layout.quoteBox.height - fit.blockHeight) / 2;
@@ -555,9 +623,13 @@ export class QuoteImageGenerator {
     height: number,
     direction:
       | 'right-bottom'
-      | 'top-left'
+      | 'top-left',
+    gradient: GradientPresetId = DEFAULT_GRADIENT
   ): void {
     ctx.save();
+
+    const [r, g, b] = GRADIENT_PRESETS[gradient].color;
+    const rgb = (a: number) => `rgba(${r},${g},${b},${a})`;
 
     if (direction === 'right-bottom') {
       // ------------------------------------------------------
@@ -577,10 +649,10 @@ export class QuoteImageGenerator {
         centerX, centerY, radius
       );
       
-      radialGradient.addColorStop(0, 'rgba(0,0,0,0)');
-      radialGradient.addColorStop(0.4, 'rgba(0,0,0,0.2)');
-      radialGradient.addColorStop(0.7, 'rgba(0,0,0,0.6)');
-      radialGradient.addColorStop(1, 'rgba(0,0,0,1)');
+      radialGradient.addColorStop(0, rgb(0));
+      radialGradient.addColorStop(0.4, rgb(0.2));
+      radialGradient.addColorStop(0.7, rgb(0.6));
+      radialGradient.addColorStop(1, rgb(1));
       
       ctx.fillStyle = radialGradient;
       ctx.fillRect(x, y, width, height);
@@ -591,9 +663,9 @@ export class QuoteImageGenerator {
         x + width, y
       );
       
-      rightGradient.addColorStop(0, 'rgba(0,0,0,0)');
-      rightGradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
-      rightGradient.addColorStop(1, 'rgba(0,0,0,1)');
+      rightGradient.addColorStop(0, rgb(0));
+      rightGradient.addColorStop(0.5, rgb(0.5));
+      rightGradient.addColorStop(1, rgb(1));
       
       ctx.fillStyle = rightGradient;
       ctx.fillRect(x + width * fadeStart, y, width * (1 - fadeStart), height);
@@ -604,9 +676,9 @@ export class QuoteImageGenerator {
         x, y + height
       );
       
-      bottomGradient.addColorStop(0, 'rgba(0,0,0,0)');
-      bottomGradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
-      bottomGradient.addColorStop(1, 'rgba(0,0,0,1)');
+      bottomGradient.addColorStop(0, rgb(0));
+      bottomGradient.addColorStop(0.5, rgb(0.5));
+      bottomGradient.addColorStop(1, rgb(1));
       
       ctx.fillStyle = bottomGradient;
       ctx.fillRect(x, y + height * fadeStart, width, height * (1 - fadeStart));
@@ -629,10 +701,10 @@ export class QuoteImageGenerator {
         centerX, centerY, radius
       );
       
-      radialGradient.addColorStop(0, 'rgba(0,0,0,0)');
-      radialGradient.addColorStop(0.4, 'rgba(0,0,0,0.2)');
-      radialGradient.addColorStop(0.7, 'rgba(0,0,0,0.6)');
-      radialGradient.addColorStop(1, 'rgba(0,0,0,1)');
+      radialGradient.addColorStop(0, rgb(0));
+      radialGradient.addColorStop(0.4, rgb(0.2));
+      radialGradient.addColorStop(0.7, rgb(0.6));
+      radialGradient.addColorStop(1, rgb(1));
       
       ctx.fillStyle = radialGradient;
       ctx.fillRect(x, y, width, height);
@@ -643,9 +715,9 @@ export class QuoteImageGenerator {
         x, y + height * fadeStart
       );
       
-      topGradient.addColorStop(0, 'rgba(0,0,0,1)');
-      topGradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
-      topGradient.addColorStop(1, 'rgba(0,0,0,0)');
+      topGradient.addColorStop(0, rgb(1));
+      topGradient.addColorStop(0.5, rgb(0.5));
+      topGradient.addColorStop(1, rgb(0));
       
       ctx.fillStyle = topGradient;
       ctx.fillRect(x, y, width, height * fadeStart);
@@ -656,9 +728,9 @@ export class QuoteImageGenerator {
         x + width * fadeStart, y
       );
       
-      leftGradient.addColorStop(0, 'rgba(0,0,0,1)');
-      leftGradient.addColorStop(0.5, 'rgba(0,0,0,0.5)');
-      leftGradient.addColorStop(1, 'rgba(0,0,0,0)');
+      leftGradient.addColorStop(0, rgb(1));
+      leftGradient.addColorStop(0.5, rgb(0.5));
+      leftGradient.addColorStop(1, rgb(0));
       
       ctx.fillStyle = leftGradient;
       ctx.fillRect(x, y, width * fadeStart, height);
@@ -676,7 +748,8 @@ export class QuoteImageGenerator {
     x: number,
     y: number,
     width: number,
-    height: number
+    height: number,
+    gradient: GradientPresetId = DEFAULT_GRADIENT
   ): void {
     ctx.save();
 
@@ -689,7 +762,9 @@ export class QuoteImageGenerator {
     const radius =
       Math.max(width, height) * 0.85;
 
-    const gradient =
+    const [r, g, b] = GRADIENT_PRESETS[gradient].color;
+
+    const radialGradient =
       ctx.createRadialGradient(
         centerX,
         centerY,
@@ -699,28 +774,13 @@ export class QuoteImageGenerator {
         radius
       );
 
-    gradient.addColorStop(
-      0,
-      'rgba(0,0,0,0.75)'
-    );
-
-    gradient.addColorStop(
-      0.4,
-      'rgba(0,0,0,0.5)'
-    );
-
-    gradient.addColorStop(
-      0.7,
-      'rgba(0,0,0,0.2)'
-    );
-
-    gradient.addColorStop(
-      1,
-      'rgba(0,0,0,0)'
-    );
+    radialGradient.addColorStop(0, `rgba(${r},${g},${b},0.75)`);
+    radialGradient.addColorStop(0.4, `rgba(${r},${g},${b},0.5)`);
+    radialGradient.addColorStop(0.7, `rgba(${r},${g},${b},0.2)`);
+    radialGradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
 
     ctx.fillStyle =
-      gradient;
+      radialGradient;
 
     ctx.fillRect(
       x,
@@ -807,10 +867,11 @@ export class QuoteImageGenerator {
       | 'right'
       | 'center' = 'left'
   ): void {
+    // 20% smaller than the original 36 / 32px sizes.
     const fontSize =
       isProminent
-        ? 36
-        : 32;
+        ? 29
+        : 26;
 
     ctx.save();
 
@@ -910,6 +971,16 @@ export class QuoteImageGenerator {
             scaled.height
           );
           currentX += scaled.width;
+        } else if (part.value) {
+          // Fallback: we couldn't fetch an image for this emoji (network
+          // failure, unrecognized codepoint, etc). Render the raw glyph
+          // with the bundled emoji font instead of silently dropping it.
+          ctx.save();
+          ctx.font = `${fontSize}px NotoColorEmoji, Roboto`;
+          ctx.fillText(part.value, currentX, lineY);
+          const fallbackWidth = ctx.measureText(part.value).width || emojiSize;
+          ctx.restore();
+          currentX += fallbackWidth;
         }
       }
     }

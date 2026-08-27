@@ -1,5 +1,13 @@
-import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
-import { QuoteImageGenerator, QuoteMessageData, QuoteMedia, QuoteTextPart } from '../utils/quote-image-generator.js';
+import { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuInteraction } from 'discord.js';
+import {
+  QuoteImageGenerator,
+  QuoteMessageData,
+  QuoteMedia,
+  QuoteTextPart,
+  GRADIENT_PRESETS,
+  GradientPresetId,
+  DEFAULT_GRADIENT,
+} from '../utils/quote-image-generator.js';
 import { loadImage } from '@napi-rs/canvas';
 
 // ============================================================
@@ -14,9 +22,118 @@ interface QuoteData {
   message2?: QuoteMessageData;
   message2Url?: string; // URL to second message (if two-message quote)
   currentStyle: 'color' | 'bw';
+  currentGradient: GradientPresetId;
+  ownerId: string; // only the person who requested the quote may change its gradient
 }
 
 const activeQuotes = new Map<string, QuoteData>();
+
+// ============================================================
+// GRADIENT DROPDOWN
+// ============================================================
+
+function buildGradientRow(quoteId: string, selected: GradientPresetId): ActionRowBuilder<StringSelectMenuBuilder> {
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId(`quote_gradient_${quoteId}`)
+    .setPlaceholder('🎨 Choose a gradient style')
+    .addOptions(
+      (Object.entries(GRADIENT_PRESETS) as [GradientPresetId, typeof GRADIENT_PRESETS[GradientPresetId]][]).map(
+        ([id, preset]) => ({
+          label: preset.label,
+          description: preset.description,
+          value: id,
+          default: id === selected,
+        })
+      )
+    );
+
+  return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
+}
+
+function buildQuoteEmbed(quoteData: QuoteData): EmbedBuilder {
+  // Build user mentions string
+  let mentions = `<@${quoteData.message1.userId}>`;
+  if (quoteData.message2) {
+    mentions += ` and <@${quoteData.message2.userId}>`;
+  }
+
+  // Build description with message links
+  let description = `Quoting ${mentions}`;
+  if (quoteData.message2Url) {
+    description += `\n[Jump to original message](${quoteData.message1Url})`;
+    description += ` | [Jump to reply](${quoteData.message2Url})`;
+  } else {
+    description += `\n[Jump to message](${quoteData.message1Url})`;
+  }
+
+  return new EmbedBuilder()
+    .setTitle('Quote')
+    .setDescription(description)
+    .setImage('attachment://quote.png')
+    .setColor('#0099ff')
+    .setTimestamp();
+}
+
+// ============================================================
+// GRADIENT SELECT MENU INTERACTION
+// ============================================================
+
+export async function handleQuoteInteraction(interaction: StringSelectMenuInteraction): Promise<void> {
+  const quoteId = interaction.customId.replace('quote_gradient_', '');
+  const quoteData = activeQuotes.get(quoteId);
+
+  if (!quoteData) {
+    await interaction.reply({
+      content: 'This quote has expired and can no longer be restyled. Run `,quote` again to make a new one.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (interaction.user.id !== quoteData.ownerId) {
+    await interaction.reply({
+      content: 'Only the person who created this quote can change its gradient.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const selectedGradient = interaction.values[0] as GradientPresetId;
+  if (!(selectedGradient in GRADIENT_PRESETS)) {
+    await interaction.reply({ content: 'Unknown gradient style.', ephemeral: true });
+    return;
+  }
+
+  quoteData.currentGradient = selectedGradient;
+
+  try {
+    await interaction.deferUpdate();
+
+    const imageBuffer = await QuoteImageGenerator.generateQuoteImage({
+      message1: quoteData.message1,
+      message2: quoteData.message2,
+      style: quoteData.currentStyle,
+      gradient: quoteData.currentGradient,
+    });
+
+    const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
+    const embed = buildQuoteEmbed(quoteData);
+    const gradientRow = buildGradientRow(quoteId, quoteData.currentGradient);
+
+    await interaction.editReply({
+      embeds: [embed],
+      files: [attachment],
+      components: [gradientRow],
+    });
+  } catch (error) {
+    console.error('[Quote Command] Error applying gradient:', error);
+    try {
+      await interaction.followUp({ content: 'Failed to apply that gradient. Please try again.', ephemeral: true });
+    } catch {
+      // Interaction may have already expired; nothing more we can do.
+    }
+  }
+}
 
 // ============================================================
 // MESSAGE CONTENT EXTRACTION
@@ -37,6 +154,46 @@ async function getImageDimensions(buffer: Buffer): Promise<{ width: number; heig
 }
 
 const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
+
+// Twemoji asset filenames drop the VARIATION SELECTOR-16 (U+FE0F) codepoint,
+// so it has to be stripped before building the lookup URL or the request
+// 404s and the emoji silently fails to render.
+function toTwemojiCodepoint(value: string): string {
+  return Array.from(value)
+    .map(char => char.codePointAt(0)!)
+    .filter(cp => cp !== 0xFE0F)
+    .map(cp => cp.toString(16))
+    .join('-');
+}
+
+// Twitter's original twemoji repo is no longer actively maintained;
+// jdecked/twemoji is the community fork that keeps shipping new emoji, so
+// it's tried first with the legacy repo as a fallback for older codepoints.
+async function downloadTwemoji(value: string): Promise<Buffer> {
+  const codepoint = toTwemojiCodepoint(value);
+
+  if (!codepoint) {
+    throw new Error(`No renderable codepoint for emoji: ${JSON.stringify(value)}`);
+  }
+
+  const sources = [
+    `https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/72x72/${codepoint}.png`,
+    `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/${codepoint}.png`,
+  ];
+
+  let lastError: unknown;
+  for (const url of sources) {
+    try {
+      return await downloadImage(url);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Failed to download Twemoji for codepoint ${codepoint}`);
+}
 
 // Extract text parts from message content, handling custom emojis and Unicode emojis
 function extractTextParts(content: string): QuoteTextPart[] {
@@ -99,8 +256,17 @@ function extractUnicodeEmojis(text: string): QuoteTextPart[] {
   for (const { segment } of segmenter.segment(text)) {
     // Extended pictographic catches normal emoji as well as many emoji
     // sequences that do not carry Emoji_Presentation on every code point.
+    // We also catch two cases that would otherwise slip through and get
+    // rendered (or silently dropped) as plain text:
+    //  - Text-presentation symbols explicitly forced into emoji style with
+    //    a variation selector, e.g. "✔️", "™️", "☺️" (U+FE0F).
+    //  - Keycap sequences, e.g. "1️⃣", "#️⃣", "*️⃣".
+    const hasEmojiVariationSelector = /\p{Emoji}\uFE0F/u.test(segment);
+    const isKeycapSequence = /[0-9#*]\uFE0F?\u20E3/u.test(segment);
     const isEmoji = /\p{Extended_Pictographic}/u.test(segment) ||
-      /\p{Emoji_Presentation}/u.test(segment);
+      /\p{Emoji_Presentation}/u.test(segment) ||
+      hasEmojiVariationSelector ||
+      isKeycapSequence;
 
     if (isEmoji) {
       flushText();
@@ -204,12 +370,9 @@ async function processEmojis(textParts: QuoteTextPart[]): Promise<QuoteTextPart[
       }
     } else if (part.type === 'unicodeEmoji') {
       try {
-        // Download Twemoji for Unicode emoji
-        const codepoint = Array.from(part.value).map(char => char.codePointAt(0)!.toString(16)).join('-');
-        const url = `https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/${codepoint}.png`;
-        const buffer = await downloadImage(url);
+        const buffer = await downloadTwemoji(part.value);
         const dimensions = await getImageDimensions(buffer);
-        
+
         processedParts.push({
           type: 'unicodeEmoji',
           value: '', // Empty value since we'll render the image
@@ -218,8 +381,9 @@ async function processEmojis(textParts: QuoteTextPart[]): Promise<QuoteTextPart[
           height: dimensions.height,
         });
       } catch (error) {
-        console.error('[Quote Command] Error downloading Twemoji:', error);
-        // Fallback to text representation
+        console.error('[Quote Command] Error downloading Twemoji for', JSON.stringify(part.value), ':', error);
+        // Fallback to text representation - the renderer will draw the raw
+        // glyph with the bundled emoji font instead of dropping it entirely.
         processedParts.push(part);
       }
     } else {
@@ -352,6 +516,8 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
         message2: message2Data,
         message2Url: messageA.url,
         currentStyle: 'color',
+        currentGradient: DEFAULT_GRADIENT,
+        ownerId: message.author.id,
       };
 
       activeQuotes.set(quoteId, quoteData);
@@ -367,6 +533,8 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
         message1: message1Data,
         message1Url: quotedMessage.url,
         currentStyle: 'color',
+        currentGradient: DEFAULT_GRADIENT,
+        ownerId: message.author.id,
       };
 
       activeQuotes.set(quoteId, quoteData);
@@ -377,38 +545,24 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       message1: quoteData.message1,
       message2: quoteData.message2,
       style: quoteData.currentStyle,
+      gradient: quoteData.currentGradient,
     });
 
     // Create attachment
     const attachment = new AttachmentBuilder(imageBuffer, { name: 'quote.png' });
 
-    // Build user mentions string
-    let mentions = `<@${quoteData.message1.userId}>`;
-    if (quoteData.message2) {
-      mentions += ` and <@${quoteData.message2.userId}>`;
-    }
-
-    // Build description with message links
-    let description = `Quoting ${mentions}`;
-    if (quoteData.message2Url) {
-      description += `\n[Jump to original message](${quoteData.message1Url})`;
-      description += ` | [Jump to reply](${quoteData.message2Url})`;
-    } else {
-      description += `\n[Jump to message](${quoteData.message1Url})`;
-    }
-
     // Create embed with image
-    const embed = new EmbedBuilder()
-      .setTitle('Quote')
-      .setDescription(description)
-      .setImage('attachment://quote.png')
-      .setColor('#0099ff')
-      .setTimestamp();
+    const embed = buildQuoteEmbed(quoteData);
+
+    // Gradient picker dropdown - lets the requester restyle the image
+    // in place without re-running the command.
+    const gradientRow = buildGradientRow(quoteId, quoteData.currentGradient);
 
     // Send the message to the original channel first
     const originalMessage = await message.channel.send({
       embeds: [embed],
       files: [attachment],
+      components: [gradientRow],
     });
 
     // Redirect to directors cut channel
@@ -418,7 +572,8 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       if (directorsCutChannel && directorsCutChannel.isTextBased()) {
         await directorsCutChannel.send({
           embeds: [embed],
-          files: [attachment],
+          files: [new AttachmentBuilder(imageBuffer, { name: 'quote.png' })],
+          components: [gradientRow],
         });
       }
     } catch (error) {
