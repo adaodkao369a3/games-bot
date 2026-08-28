@@ -103,38 +103,42 @@ function createCurveMask() {
   } = LAYOUT;
 
   const mask = createCanvas(W, H);
-  const pixels = mask.getContext('2d').createImageData(W, H);
+  const maskCtx = mask.getContext('2d');
+  const pixels = maskCtx.createImageData(W, H);
   const data = pixels.data;
 
-  // This is a transparency mask for the colour veil ABOVE the PFP.
-  // The curve itself is never stroked or blurred. It only describes the
-  // point where the colour veil has 0% opacity.
+  // The curve is NOT a boundary that gets blurred. It is the centre of a
+  // continuous alpha transition on the colour veil that sits ABOVE the PFP.
   //
-  // Shape: top starts at ~80% of the PFP, the middle is pushed to the RIGHT
-  // without becoming a full circle, and the bottom finishes at ~90% of the PFP.
+  // Shape requested by the design:
+  //   - starts around 80% of the PFP at the top
+  //   - bends toward the right through the middle
+  //   - is comparatively straight around the centre
+  //   - finishes around 90% of the PFP at the bottom
+  // There is deliberately no stroke and no canvas blur anywhere in this mask.
   const boundaryX = (y: number) => {
     const t = Math.max(0, Math.min(1, y / H));
 
-    // A single cubic interpolation between the two PFP-side endpoints.
-    // The smooth middle bulge shifts the centre right without moving either
-    // endpoint, so the lower/upper ends stay where they are independently.
-    const cubic = t * t * t;
-    const centreBulge = 4 * t * (1 - t);
+    // Two cubic halves let the top and bottom have different shapes. The
+    // centre is held at a right-shifted position instead of making a circle.
+    const centreX = (CURVE_TOP_X + CURVE_BOTTOM_X) / 2 + CURVE_CENTER_SHIFT_X;
 
-    return CURVE_TOP_X
-      + (CURVE_BOTTOM_X - CURVE_TOP_X) * cubic
-      + CURVE_CENTER_SHIFT_X * centreBulge;
+    if (t < 0.5) {
+      const u = t / 0.5;
+      const smooth = u * u * (3 - 2 * u);
+      return CURVE_TOP_X + (centreX - CURVE_TOP_X) * smooth;
+    }
+
+    const u = (t - 0.5) / 0.5;
+    const smooth = u * u * (3 - 2 * u);
+    return centreX + (CURVE_BOTTOM_X - centreX) * smooth;
   };
 
   const pfpWidth = H;
 
-  // The colour remains fully opaque on the text side until 30% of the PFP
-  // width AFTER the PFP ends. From that point, opacity falls continuously
-  // LEFTWARD all the way to the curved boundary.
-  //
-  // 630px PFP + (630 * 0.30) = 819px. This is deliberately NOT a short
-  // feather. The entire region between the curve and 819px participates in
-  // the fade, so the PFP blends naturally into the text panel.
+  // Full opacity is reached 30% of the PFP width after the PFP ends.
+  // For a 630px PFP this is x=819. The fade is NOT a small feather at the
+  // curve: every pixel between the curve and x=819 participates in it.
   const fullyOpaqueX = pfpWidth * (1 + CURVE_FADE_START_AFTER_PFP);
 
   for (let y = 0; y < H; y++) {
@@ -142,16 +146,13 @@ function createCurveMask() {
     const fadeWidth = Math.max(1, fullyOpaqueX - edge);
 
     for (let x = 0; x < W; x++) {
-      // 0 at the curve, 1 at the fully-opaque point. The same calculation is
-      // used for every row, but each row has its own curved edge position.
+      // The curve is alpha 0. Opacity rises continuously toward the text side.
       const u = Math.max(0, Math.min(1, (x - edge) / fadeWidth));
 
-      // Smoothstep gives a genuinely soft continuous fade with no line at the
-      // curve and no abrupt opacity jump anywhere in the transition.
-      // Bias the fade slightly toward the colour side so the PFP does not
-      // stay too dark while the transition is still continuous.
-      const eased = Math.pow(u, 0.72);
-      const smooth = eased * eased * (3 - 2 * eased);
+      // A gentler power keeps substantially more colour over the PFP while
+      // remaining completely continuous. There is no hard line at the edge.
+      const biased = Math.pow(u, 0.45);
+      const smooth = biased * biased * (3 - 2 * biased);
       const alpha = Math.round(smooth * 255);
 
       const i = (y * W + x) * 4;
@@ -162,7 +163,7 @@ function createCurveMask() {
     }
   }
 
-  mask.getContext('2d').putImageData(pixels, 0, 0);
+  maskCtx.putImageData(pixels, 0, 0);
   return mask;
 }
 

@@ -13,7 +13,7 @@ export const LAYOUT = {
 
   // ← CHANGE: pushes ONLY the middle of the curve to the RIGHT.
   // 0 = no centre shift; 20–40 = increasingly rightward centre.
-  CURVE_CENTER_SHIFT_X: 35,
+  CURVE_CENTER_SHIFT_X: 45,
 
   // ← CHANGE: controls the FULL fade distance from PFP toward the text.
   // This is intentionally large so the colour is fading throughout the

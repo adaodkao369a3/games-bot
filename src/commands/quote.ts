@@ -5,8 +5,8 @@ import {
   ActionRowBuilder,
   ComponentType,
 } from 'discord.js';
-import { renderQuoteCard } from '../quote/renderer';
-import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS } from '../quote/config';
+import { renderQuoteCard } from '../quote/renderer.js';
+import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS } from '../quote/config.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
 const THEME_NAMES: PresetName[] = ['classic', 'sunset', 'ocean', 'purple'];
