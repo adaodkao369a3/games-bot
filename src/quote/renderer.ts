@@ -2,7 +2,7 @@ import { createCanvas, loadImage, Image, SKRSContext2D, GlobalFonts } from '@nap
 import { join } from 'path';
 import { cwd } from 'process';
 import { existsSync } from 'fs';
-import { LAYOUT, GRADIENT_PRESETS, PresetName, FONT_FALLBACK } from './config';
+import { LAYOUT, GRADIENT_PRESETS, PresetName, FONT_FALLBACK } from './config.js';
 
 const PROJECT_ROOT = cwd();
 
