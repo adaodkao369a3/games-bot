@@ -1,36 +1,41 @@
 export const LAYOUT = {
-  // Discord avatars are always square, so contain-scaling one to the full
-  // card height (H) always makes its drawn width equal H. Hardcoding W as
-  // double H keeps the canvas exactly two equal-width blocks: the avatar
-  // fills the left half, and the text zone gets the same width on the right.
+  // 1260x630 card: the PFP owns exactly the left 50% (630px) and the
+  // quote/content owns the right 50% (630px).
   H: 630,
   W: 630 * 2,
-  // Fade geometry is now derived dynamically from the avatar's real right
-  // edge (see renderer.ts) rather than a fixed BOUNDARY_X, so the curve
-  // always hugs whatever gets drawn. These two constants control how the
-  // curve sits relative to that computed edge:
-  FADE_SOFTEN: 30,    // px BEFORE the real edge where the fade starts (softens the seam)
-  FADE_SWEEP: 160,    // px AFTER the real edge the curve continues into the text zone
-  CIRCLE_R: 630 * 1.15, // controls curve tightness
-  STOPS: 8,
-  // Quote text should be compact and "settled in its own place" rather than
-  // spanning/dominating the whole canvas.
+
+  // Left edge of the full-width colour layer. The colour layer is ABOVE the
+  // PFP, so this curve intentionally overlaps the PFP near the top/bottom and
+  // meets the 50% boundary around the vertical centre.
+  // Curve endpoints are positions INSIDE the 630px PFP.
+  CURVE_TOP_X: 504, // ← CHANGE: top starts at ~80% of the PFP width
+  CURVE_BOTTOM_X: 567, // ← CHANGE: bottom ends at ~90% of the PFP width
+
+  // ← CHANGE: pushes ONLY the middle of the curve to the RIGHT.
+  // 0 = no centre shift; 20–40 = increasingly rightward centre.
+  CURVE_CENTER_SHIFT_X: 35,
+
+  // ← CHANGE: controls the FULL fade distance from PFP toward the text.
+  // This is intentionally large so the colour is fading throughout the
+  // transition, not just at the final edge.
+  CURVE_FADE_START_AFTER_PFP: 0.30, // ← CHANGE: 0.30 = start the fade 30% of the PFP width past the PFP edge
+
+  // Quote stays in the right half. The existing quote sizing is retained.
+  TEXT_X: 700,
   MAX_FONT_SIZE: 54,
   MAX_TEXT_BLOCK_WIDTH: 620,
 } as const;
 
 export const FONT_FALLBACK = 'Butler, Georgia, serif';
 
-// How long the theme-select dropdown stays active on a rendered quote card
-// before it's disabled/removed (5 minutes).
 export const THEME_SELECT_EXPIRY_MS = 5 * 60 * 1000;
 
 export type PresetName = 'classic' | 'sunset' | 'ocean' | 'purple';
 
 export interface GradientPreset {
   type: 'solid' | 'linear';
-  colors: [number, number, number][]; // RGB, ordered light→dark or start→end
-  label: string; // display label for the theme select menu
+  colors: [number, number, number][];
+  label: string;
 }
 
 export const GRADIENT_PRESETS: Record<PresetName, GradientPreset> = {
