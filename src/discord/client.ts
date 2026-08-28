@@ -21,6 +21,7 @@ import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } fr
 import { handleQuoteCommand, handleQuoteInteraction } from '../commands/quote.js';
 import { handleGambleCommand } from '../commands/gamble.js';
 import { handleWalletCommand } from '../commands/wallet.js';
+import { handleRedirectOnCommand, handleRedirectOffCommand } from '../commands/redirect.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -169,6 +170,17 @@ export class DiscordClient {
       if (command === 'wal') {
         await handleWalletCommand(message);
         return;
+      }
+
+      if (command === 'redirect') {
+        const subcommand = args[0]?.toLowerCase();
+        if (subcommand === 'on') {
+          await handleRedirectOnCommand(message);
+          return;
+        } else if (subcommand === 'off') {
+          await handleRedirectOffCommand(message);
+          return;
+        }
       }
     }
 

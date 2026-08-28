@@ -24,7 +24,6 @@ const butlerFontPath = join(
   'Butler-Free-Bd.otf'
 );
 
-// Emoji font path (Noto Color Emoji or similar)
 const emojiFontPath = join(
   PROJECT_ROOT,
   'assets',
@@ -102,30 +101,24 @@ export interface QuoteMedia {
   buffer: Buffer;
   width: number;
   height: number;
-  url: string; // For deduplication
+  url: string;
 }
 
 export interface QuoteTextPart {
   type: 'text' | 'unicodeEmoji' | 'customEmoji';
   value: string;
-  buffer?: Buffer; // For emoji images
+  buffer?: Buffer;
   width?: number;
   height?: number;
 }
 
 export interface QuoteMessageData {
   username: string;
-  handle: string; // raw @handle, shown alongside the display name
+  handle: string;
   userId: string;
   avatarBuffer: Buffer;
-  
-  // Text content broken into parts (text, unicode emojis, custom emojis)
   textParts: QuoteTextPart[];
-  
-  // Media attachments (images, gifs, stickers)
   media: QuoteMedia[];
-  
-  // Whether the message has actual text content
   hasText: boolean;
 }
 
@@ -140,24 +133,55 @@ export interface QuoteImageData {
 // ============================================================
 // GRADIENT PRESETS
 // ============================================================
-// Each preset defines the tint used for the PFP fade and the
-// backing gradient behind quote text. "classic" reproduces the
-// original pure-black fade exactly (default, unchanged look).
 
 export interface GradientPreset {
   label: string;
   description: string;
-  color: [number, number, number]; // RGB tint used for fades/glow
+  color: [number, number, number];
 }
 
 export const GRADIENT_PRESETS = {
-  classic: { label: 'Classic', description: 'The original black fade', color: [0, 0, 0] },
-  sunset: { label: 'Sunset', description: 'Warm orange & pink glow', color: [255, 94, 58] },
-  ocean: { label: 'Ocean', description: 'Deep blue & teal', color: [0, 90, 140] },
-  purple: { label: 'Purple Haze', description: 'Rich violet glow', color: [110, 30, 160] },
-  fire: { label: 'Fire', description: 'Hot red & amber', color: [200, 30, 10] },
-  midnight: { label: 'Midnight', description: 'Deep indigo night', color: [15, 15, 60] },
-  neon: { label: 'Neon', description: 'Electric pink & cyan', color: [255, 0, 170] },
+  classic: {
+    label: 'Classic',
+    description: 'The original black fade',
+    color: [0, 0, 0],
+  },
+
+  sunset: {
+    label: 'Sunset',
+    description: 'Warm orange & pink glow',
+    color: [255, 94, 58],
+  },
+
+  ocean: {
+    label: 'Ocean',
+    description: 'Deep blue & teal',
+    color: [0, 90, 140],
+  },
+
+  purple: {
+    label: 'Purple Haze',
+    description: 'Rich violet glow',
+    color: [110, 30, 160],
+  },
+
+  fire: {
+    label: 'Fire',
+    description: 'Hot red & amber',
+    color: [200, 30, 10],
+  },
+
+  midnight: {
+    label: 'Midnight',
+    description: 'Deep indigo night',
+    color: [15, 15, 60],
+  },
+
+  neon: {
+    label: 'Neon',
+    description: 'Electric pink & cyan',
+    color: [255, 0, 170],
+  },
 } as const satisfies Record<string, GradientPreset>;
 
 export type GradientPresetId = keyof typeof GRADIENT_PRESETS;
@@ -169,6 +193,7 @@ export const EFFECT_PRESETS = {
     label: 'None',
     description: 'No overlay effect',
   },
+
   blackFog: {
     label: 'Black Fog',
     description: 'Soft black fog and smoke overlay',
@@ -196,66 +221,131 @@ export class QuoteImageGenerator {
   private static readonly IMAGE_WIDTH = 1200;
   private static readonly IMAGE_HEIGHT = 630;
 
-  // Fixed visual regions. Content is allowed to resize only INSIDE
-  // its own quote box; the PFP, divider bar, and username never move.
-  // Margins are kept tight and, critically, EQUAL on both sides of the
-  // box's own half so the box reads as centered fill rather than
-  // arbitrarily offset padding.
-  private static readonly SINGLE_PFP = { x: 0, y: 0, width: 600, height: 630 };
-  // Right half spans x=600..1200 (600px wide). A 24px margin on both
-  // sides keeps the box symmetric while claiming as much width as possible.
+  /*
+   * SINGLE-MESSAGE QUARTER-CIRCLE
+   *
+   * IMPORTANT: The 50/50 layout is preserved.
+   *
+   * The canvas is 1200px wide, split evenly:
+   * - Left 0-600px: PFP region
+   * - Right 600-1200px: Text region
+   *
+   * The ONLY background element is a quarter-circle gradient that serves as
+   * the transition between PFP and text. The circle's center is positioned
+   * toward the right side so only one quarter is visible across the PFP→text
+   * boundary.
+   *
+   * The quarter-circle overlaps the PFP by ~10-20% (60-120px) at its deepest
+   * point, creating a smooth circular arc transition without changing the
+   * actual layout geometry.
+   *
+   * QUARTER_CIRCLE_RADIUS: Size of the circle (controls curve depth)
+   * QUARTER_CIRCLE_CENTER_X: Center position (controls overlap amount)
+   * QUARTER_CIRCLE_CENTER_Y: Vertical center of the circle
+   */
+  private static readonly QUARTER_CIRCLE_RADIUS = 450;
+  private static readonly QUARTER_CIRCLE_CENTER_X = 600 + 90; // 690 - overlaps PFP by 90px (15%)
+  private static readonly QUARTER_CIRCLE_CENTER_Y = 315; // Vertical center of 630px canvas
+
+  private static readonly SINGLE_PFP = {
+    x: 0,
+    y: 0,
+    width: 600,  // Pure 50/50 split - curve is visual only
+    height: 630,
+  };
+
   private static readonly SINGLE_NO_MEDIA = {
-    quoteBox: { x: 624, y: 36, width: 552, height: 490 },
+    quoteBox: {
+      x: 610,
+      y: 36,
+      width: 552,
+      height: 490,
+    },
+
     barY: 546,
     usernameY: 566,
     barWidth: 140,
   };
-  // When the quoted message includes media, the entire right half is
-  // handed over to the image/gif/sticker - no quote box, no divider bar,
-  // no username row competing for space on that side. A caption (if the
-  // message also has text) is overlaid directly on the media instead of
-  // taking its own box, and the author name/handle move onto the PFP.
+
   private static readonly SINGLE_WITH_MEDIA = {
-    mediaBox: { x: 610, y: 20, width: 580, height: 590 },
+    mediaBox: {
+      x: 610,
+      y: 20,
+      width: 580,
+      height: 590,
+    },
+
     captionHeight: 160,
   };
 
-  // Each half of a two-message quote is 600x315. The PFP is exactly
-  // half of its half: 300px wide, full 315px height, pinned to the
-  // outer corner so it does not leave the unwanted gap underneath.
-  // The quote box on the OTHER side of that same half must start right
-  // where the PFP ends (plus a small breathing-room gap) and run all the
-  // way to the outer edge - otherwise a dead strip of bare background
-  // opens up between the avatar card and the text box, which is exactly
-  // what makes the box look like it's floating, detached, in its own
-  // little island. GAP is that breathing room; it's small and identical
-  // on both the PFP side and the outer-edge side.
-  private static readonly DOUBLE_PFP = { width: 300, height: 315 };
+  private static readonly DOUBLE_PFP = {
+    width: 300,
+    height: 315,
+  };
+
   private static readonly DOUBLE_GAP = 24;
+
   private static readonly DOUBLE_TOP_NO_MEDIA = {
-    // Avatar1 occupies x:0-300, so the box starts right after it.
-    quoteBox: { x: 300 + 24, y: 20, width: 1200 - 24 - (300 + 24), height: 225 },
+    quoteBox: {
+      x: 300 + 24,
+      y: 20,
+      width: 1200 - 24 - (300 + 24),
+      height: 225,
+    },
+
     barY: 260,
     usernameY: 276,
     barWidth: 100,
   };
+
   private static readonly DOUBLE_TOP_WITH_MEDIA = {
-    mediaBox: { x: 300 + 24, y: 15, width: 1200 - 24 - (300 + 24), height: 85 },
-    quoteBox: { x: 300 + 24, y: 110, width: 1200 - 24 - (300 + 24), height: 135 },
+    mediaBox: {
+      x: 300 + 24,
+      y: 15,
+      width: 1200 - 24 - (300 + 24),
+      height: 85,
+    },
+
+    quoteBox: {
+      x: 300 + 24,
+      y: 110,
+      width: 1200 - 24 - (300 + 24),
+      height: 135,
+    },
+
     barY: 260,
     usernameY: 276,
     barWidth: 100,
   };
+
   private static readonly DOUBLE_BOTTOM_NO_MEDIA = {
-    // Avatar2 occupies x:900-1200, so the box ends right before it.
-    quoteBox: { x: 30, y: 335, width: 900 - 24 - 30, height: 225 },
+    quoteBox: {
+      x: 30,
+      y: 335,
+      width: 900 - 24 - 30,
+      height: 225,
+    },
+
     barY: 575,
     usernameY: 591,
     barWidth: 100,
   };
+
   private static readonly DOUBLE_BOTTOM_WITH_MEDIA = {
-    mediaBox: { x: 30, y: 330, width: 900 - 24 - 30, height: 85 },
-    quoteBox: { x: 30, y: 425, width: 900 - 24 - 30, height: 135 },
+    mediaBox: {
+      x: 30,
+      y: 330,
+      width: 900 - 24 - 30,
+      height: 85,
+    },
+
+    quoteBox: {
+      x: 30,
+      y: 425,
+      width: 900 - 24 - 30,
+      height: 135,
+    },
+
     barY: 575,
     usernameY: 591,
     barWidth: 100,
@@ -291,7 +381,6 @@ export class QuoteImageGenerator {
 
     const ctx = canvas.getContext('2d');
 
-    // Load avatars
     const avatar1 = await loadImage(
       message1.avatarBuffer
     );
@@ -300,9 +389,11 @@ export class QuoteImageGenerator {
       ? await loadImage(message2.avatarBuffer)
       : null;
 
-    // Base backdrop reflects the chosen gradient's mood instead of always
-    // being flat black - only "classic" stays pure black.
-    this.drawBackground(ctx, gradient);
+    this.drawBackground(
+      ctx,
+      gradient,
+      isTwoMessage
+    );
 
     if (isTwoMessage && avatar2) {
       await this.drawTwoMessageLayout(
@@ -324,10 +415,10 @@ export class QuoteImageGenerator {
       );
     }
 
-    // Effects are deliberately applied last so the selected PNG overlays
-    // the complete finished quote card, including the avatar, text, and
-    // gradient wash.
-    await this.drawEffect(ctx, effect);
+    await this.drawEffect(
+      ctx,
+      effect
+    );
 
     return canvas.toBuffer('image/png');
   }
@@ -338,40 +429,97 @@ export class QuoteImageGenerator {
 
   private static drawBackground(
     ctx: SKRSContext2D,
-    gradient: GradientPresetId = DEFAULT_GRADIENT
+    gradient: GradientPresetId = DEFAULT_GRADIENT,
+    isTwoMessage: boolean = false
   ): void {
     ctx.save();
 
-    // One continuous base color across the entire canvas. This is important:
-    // when an avatar is alpha-masked, this exact color shows through instead
-    // of exposing a different-colored/black region on the right side.
-    const BASE_BLUE = '#0a3d62';
-    ctx.fillStyle = BASE_BLUE;
+    // Always start with a completely black background.
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
 
-    const [r, g, b] = GRADIENT_PRESETS[gradient].color;
+    if (isTwoMessage) {
+      // Double-message layout:
+      // Use the SAME preset color as the avatar fades and text panels so the
+      // whole canvas reads as one consistent gradient instead of a black
+      // backdrop with colored patches only behind the text.
+      const [r, g, b] = GRADIENT_PRESETS[gradient].color;
 
-    // Keep the gradient tint as a translucent wash over the same base blue.
-    // "Classic" simply leaves the unified blue untouched.
-    if (gradient !== 'classic') {
-      ctx.fillStyle = `rgba(${r},${g},${b},0.35)`;
-      ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
-
-      const wash = ctx.createRadialGradient(
-        this.IMAGE_WIDTH / 2,
-        this.IMAGE_HEIGHT / 2,
+      const fadeGradient = ctx.createLinearGradient(
         0,
-        this.IMAGE_WIDTH / 2,
-        this.IMAGE_HEIGHT / 2,
-        Math.max(this.IMAGE_WIDTH, this.IMAGE_HEIGHT) * 0.75
+        0,
+        this.IMAGE_WIDTH,
+        0
       );
 
-      wash.addColorStop(0, `rgba(${r},${g},${b},0.24)`);
-      wash.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      fadeGradient.addColorStop(0, `rgba(${r},${g},${b},0)`);
+      fadeGradient.addColorStop(0.55, `rgba(${r},${g},${b},0.3)`);
+      fadeGradient.addColorStop(1, `rgba(${r},${g},${b},0.8)`);
 
-      ctx.fillStyle = wash;
+      ctx.fillStyle = fadeGradient;
       ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
     }
+
+    ctx.restore();
+  }
+
+  // ==========================================================
+  // QUARTER-CIRCLE GRADIENT
+  // ==========================================================
+
+  /**
+   * Draws a quarter-circle gradient as the ONLY background transition.
+   *
+   * The circle's center is positioned toward the right side so only one
+   * quarter is visible across the PFP→text boundary. The gradient is
+   * contained entirely within this quarter-circle.
+   *
+   * This is the single unified approach for ALL gradient presets - only the
+   * colors change based on the preset.
+   */
+  private static drawQuarterCircleGradient(
+    ctx: SKRSContext2D,
+    gradient: GradientPresetId = DEFAULT_GRADIENT
+  ): void {
+    const [r, g, b] = GRADIENT_PRESETS[gradient].color;
+
+    const centerX = this.QUARTER_CIRCLE_CENTER_X;
+    const centerY = this.QUARTER_CIRCLE_CENTER_Y;
+    const radius = this.QUARTER_CIRCLE_RADIUS;
+
+    ctx.save();
+
+    // Create a radial gradient from the circle center outward
+    const radialGradient = ctx.createRadialGradient(
+      centerX,
+      centerY,
+      0,
+      centerX,
+      centerY,
+      radius
+    );
+
+    // Smooth multi-stop gradient: 100% → 90% → 75% → 60% → 45% → 30% → 15% → 0%
+    radialGradient.addColorStop(0, `rgba(${r},${g},${b},1.0)`);
+    radialGradient.addColorStop(0.15, `rgba(${r},${g},${b},0.9)`);
+    radialGradient.addColorStop(0.3, `rgba(${r},${g},${b},0.75)`);
+    radialGradient.addColorStop(0.45, `rgba(${r},${g},${b},0.6)`);
+    radialGradient.addColorStop(0.6, `rgba(${r},${g},${b},0.45)`);
+    radialGradient.addColorStop(0.75, `rgba(${r},${g},${b},0.3)`);
+    radialGradient.addColorStop(0.9, `rgba(${r},${g},${b},0.15)`);
+    radialGradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
+
+    // Clip to the quarter-circle region (the arc that spans from top to bottom)
+    ctx.beginPath();
+    ctx.moveTo(centerX, 0);
+    ctx.arc(centerX, centerY, radius, -Math.PI / 2, Math.PI / 2, false);
+    ctx.lineTo(centerX, this.IMAGE_HEIGHT);
+    ctx.closePath();
+    ctx.clip();
+
+    // Fill the clipped region with the radial gradient
+    ctx.fillStyle = radialGradient;
+    ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
 
     ctx.restore();
   }
@@ -389,17 +537,24 @@ export class QuoteImageGenerator {
     }
 
     const effectPath = EFFECT_ASSET_PATHS[effect];
+
     if (!effectPath || !existsSync(effectPath)) {
       console.warn(
-        `[QuoteImageGenerator] Effect asset not found for "${effect}": ${effectPath ?? 'unknown'}`
+        `[QuoteImageGenerator] Effect asset not found for "${effect}": ${effectPath ?? 'unknown'
+        }`
       );
+
       return;
     }
 
-    const effectImage = await loadImage(effectPath);
+    const effectImage = await loadImage(
+      effectPath
+    );
 
     ctx.save();
+
     ctx.globalAlpha = 0.42;
+
     this.drawCoverImage(
       ctx,
       effectImage,
@@ -408,6 +563,7 @@ export class QuoteImageGenerator {
       this.IMAGE_WIDTH,
       this.IMAGE_HEIGHT
     );
+
     ctx.restore();
   }
 
@@ -431,36 +587,73 @@ export class QuoteImageGenerator {
     const isSingle = mediaCount === 1;
 
     if (isSingle) {
-      // Single image: fill ~80% of the way from "contain" to "cover" so it
-      // reads as big and prominent, while never spilling outside its box.
-      // Stickers are always shown fully "contain" instead - they're small
-      // graphics (often with transparent padding baked in) where cropping
-      // any edge cuts off part of the actual artwork.
       const item = media[0];
-      const image = await this.loadImageFromBuffer(item.buffer);
-      const fillAmount = item.type === 'sticker' ? 0 : this.IMAGE_FILL_AMOUNT;
-      this.drawBoxFitImage(ctx, image, x, y, maxWidth, maxHeight, fillAmount);
+
+      const image =
+        await this.loadImageFromBuffer(
+          item.buffer
+        );
+
+      const fillAmount =
+        item.type === 'sticker'
+          ? 0
+          : this.IMAGE_FILL_AMOUNT;
+
+      this.drawBoxFitImage(
+        ctx,
+        image,
+        x,
+        y,
+        maxWidth,
+        maxHeight,
+        fillAmount
+      );
     } else {
-      // Multiple images: create a grid
-      const cols = Math.ceil(Math.sqrt(mediaCount));
-      const rows = Math.ceil(mediaCount / cols);
-      const cellWidth = maxWidth / cols;
-      const cellHeight = maxHeight / rows;
+      const cols = Math.ceil(
+        Math.sqrt(mediaCount)
+      );
 
-      for (const [index, item] of media.entries()) {
+      const rows = Math.ceil(
+        mediaCount / cols
+      );
+
+      const cellWidth =
+        maxWidth / cols;
+
+      const cellHeight =
+        maxHeight / rows;
+
+      for (
+        const [index, item]
+        of media.entries()
+      ) {
         const col = index % cols;
-        const row = Math.floor(index / cols);
-        const cellX = x + col * cellWidth;
-        const cellY = y + row * cellHeight;
+        const row = Math.floor(
+          index / cols
+        );
 
-        const image = await this.loadImageFromBuffer(item.buffer);
-        const fillAmount = item.type === 'sticker' ? 0 : this.IMAGE_FILL_AMOUNT;
+        const cellX =
+          x + col * cellWidth;
+
+        const cellY =
+          y + row * cellHeight;
+
+        const image =
+          await this.loadImageFromBuffer(
+            item.buffer
+          );
+
+        const fillAmount =
+          item.type === 'sticker'
+            ? 0
+            : this.IMAGE_FILL_AMOUNT;
+
         this.drawBoxFitImage(
           ctx,
           image,
           cellX + 4,
           cellY + 4,
-          cellWidth - 8, // Padding
+          cellWidth - 8,
           cellHeight - 8,
           fillAmount
         );
@@ -469,11 +662,7 @@ export class QuoteImageGenerator {
   }
 
   // ==========================================================
-  // CUSTOM EMOJI RENDERING (REMOVED - will be handled in text parts)
-  // ==========================================================
-
-  // ==========================================================
-  // EMBEDDED MEDIA RENDERING (REMOVED - will be handled with new media system)
+  // IMAGE HELPERS
   // ==========================================================
 
   private static fitWithinBounds(
@@ -481,27 +670,27 @@ export class QuoteImageGenerator {
     height: number,
     maxWidth: number,
     maxHeight: number
-  ): { width: number; height: number } {
-    const ratio = Math.min(maxWidth / width, maxHeight / height);
+  ): {
+    width: number;
+    height: number;
+  } {
+    const ratio = Math.min(
+      maxWidth / width,
+      maxHeight / height
+    );
+
     return {
       width: width * ratio,
       height: height * ratio,
     };
   }
 
-  private static async loadImageFromBuffer(buffer: Buffer): Promise<any> {
+  private static async loadImageFromBuffer(
+    buffer: Buffer
+  ): Promise<any> {
     return await loadImage(buffer);
   }
 
-  // ==========================================================
-  // BOX-FIT IMAGE (bigger images without spilling into other areas)
-  // ==========================================================
-  // Plain "contain" fit (the old behavior) can leave large empty gaps when
-  // an image's aspect ratio doesn't match its box, making it look small.
-  // This blends 80% of the way from "contain" (fully visible, may
-  // letterbox) to "cover" (fills the box completely, may crop) so images
-  // read as big and intentional. It never draws outside [x, y, maxWidth,
-  // maxHeight] - the box next to it is never touched.
   private static readonly IMAGE_FILL_AMOUNT = 0.8;
 
   private static drawBoxFitImage(
@@ -513,38 +702,86 @@ export class QuoteImageGenerator {
     maxHeight: number,
     fillAmount: number = this.IMAGE_FILL_AMOUNT
   ): void {
-    if (maxWidth <= 0 || maxHeight <= 0 || !image.width || !image.height) {
+    if (
+      maxWidth <= 0 ||
+      maxHeight <= 0 ||
+      !image.width ||
+      !image.height
+    ) {
       return;
     }
 
-    const containScale = Math.min(maxWidth / image.width, maxHeight / image.height);
-    const coverScale = Math.max(maxWidth / image.width, maxHeight / image.height);
-    let scale = containScale + (coverScale - containScale) * fillAmount;
+    const containScale = Math.min(
+      maxWidth / image.width,
+      maxHeight / image.height
+    );
 
-    // Cap how much of the source image the "cover" blend is allowed to
-    // crop away. When the box's aspect ratio is very different from the
-    // image's own (e.g. a wide 1200x630 quote card getting embedded into a
-    // squarer box), blending 80% toward cover would slice off a big chunk
-    // of the image - it visibly "runs out of frame". If the crop implied
-    // by the current scale would exceed that budget, fall back toward
-    // "contain" instead so the whole image stays visible.
+    const coverScale = Math.max(
+      maxWidth / image.width,
+      maxHeight / image.height
+    );
+
+    let scale =
+      containScale +
+      (coverScale - containScale) *
+      fillAmount;
+
     const MAX_CROP_FRACTION = 0.2;
-    const srcWidthAtScale = Math.min(image.width, maxWidth / scale);
-    const srcHeightAtScale = Math.min(image.height, maxHeight / scale);
-    const cropFractionW = 1 - srcWidthAtScale / image.width;
-    const cropFractionH = 1 - srcHeightAtScale / image.height;
-    if (Math.max(cropFractionW, cropFractionH) > MAX_CROP_FRACTION) {
+
+    const srcWidthAtScale =
+      Math.min(
+        image.width,
+        maxWidth / scale
+      );
+
+    const srcHeightAtScale =
+      Math.min(
+        image.height,
+        maxHeight / scale
+      );
+
+    const cropFractionW =
+      1 -
+      srcWidthAtScale /
+      image.width;
+
+    const cropFractionH =
+      1 -
+      srcHeightAtScale /
+      image.height;
+
+    if (
+      Math.max(
+        cropFractionW,
+        cropFractionH
+      ) > MAX_CROP_FRACTION
+    ) {
       scale = containScale;
     }
 
-    // Source crop needed so the scaled result never exceeds the box.
-    const srcWidth = Math.min(image.width, maxWidth / scale);
-    const srcHeight = Math.min(image.height, maxHeight / scale);
-    const srcX = (image.width - srcWidth) / 2;
-    const srcY = (image.height - srcHeight) / 2;
+    const srcWidth =
+      Math.min(
+        image.width,
+        maxWidth / scale
+      );
 
-    const destWidth = srcWidth * scale;
-    const destHeight = srcHeight * scale;
+    const srcHeight =
+      Math.min(
+        image.height,
+        maxHeight / scale
+      );
+
+    const srcX =
+      (image.width - srcWidth) / 2;
+
+    const srcY =
+      (image.height - srcHeight) / 2;
+
+    const destWidth =
+      srcWidth * scale;
+
+    const destHeight =
+      srcHeight * scale;
 
     ctx.drawImage(
       image,
@@ -552,8 +789,10 @@ export class QuoteImageGenerator {
       srcY,
       srcWidth,
       srcHeight,
-      x + (maxWidth - destWidth) / 2,
-      y + (maxHeight - destHeight) / 2,
+      x +
+      (maxWidth - destWidth) / 2,
+      y +
+      (maxHeight - destHeight) / 2,
       destWidth,
       destHeight
     );
@@ -570,8 +809,9 @@ export class QuoteImageGenerator {
     style: 'color' | 'bw',
     gradient: GradientPresetId = DEFAULT_GRADIENT
   ): Promise<void> {
-    // LEFT HALF: permanently reserved for the PFP.
     const pfp = this.SINGLE_PFP;
+
+    // Draw the PFP normally with a simple linear fade (no complex curve)
     await this.drawMaskedAvatar(
       ctx,
       avatar,
@@ -580,18 +820,22 @@ export class QuoteImageGenerator {
       pfp.width,
       pfp.height,
       style,
-      'right'
+      'right',
+      false // No curved transition - quarter-circle handles it
     );
 
-    const hasMedia = !!message.media?.length;
+    // Draw the quarter-circle gradient as the ONLY background transition
+    this.drawQuarterCircleGradient(ctx, gradient);
+
+    const hasMedia =
+      !!message.media?.length;
+
     const centerX = 900;
 
     if (hasMedia) {
-      // RIGHT HALF: handed entirely to the media - no quote box splitting
-      // the space. Caption text (if any) overlays the bottom of the image
-      // instead of taking its own row, and the author name/handle sit on
-      // the PFP instead of the right side.
-      const mediaLayout = this.SINGLE_WITH_MEDIA;
+      const mediaLayout =
+        this.SINGLE_WITH_MEDIA;
+
       await this.drawLargeMedia(
         ctx,
         message.media,
@@ -604,46 +848,78 @@ export class QuoteImageGenerator {
       if (message.hasText) {
         const captionBox = {
           x: mediaLayout.mediaBox.x,
-          y: mediaLayout.mediaBox.y + mediaLayout.mediaBox.height - mediaLayout.captionHeight,
-          width: mediaLayout.mediaBox.width,
-          height: mediaLayout.captionHeight,
+          y:
+            mediaLayout.mediaBox.y +
+            mediaLayout.mediaBox.height -
+            mediaLayout.captionHeight,
+          width:
+            mediaLayout.mediaBox.width,
+          height:
+            mediaLayout.captionHeight,
         };
 
-        const fit = this.fitQuoteInBox(
+        const fit =
+          this.fitQuoteInBox(
+            ctx,
+            message.textParts,
+            captionBox,
+            {
+              preferredSize: 36,
+              minimumSize: 18,
+            }
+          );
+
+        this.drawTextGradient(
           ctx,
-          message.textParts,
-          captionBox,
-          { preferredSize: 36, minimumSize: 18 }
+          captionBox.x,
+          captionBox.y,
+          captionBox.width,
+          captionBox.height,
+          gradient,
+          'none'
         );
 
-        this.drawTextGradient(ctx, captionBox.x, captionBox.y, captionBox.width, captionBox.height, gradient);
-
-        const startY = captionBox.y + (captionBox.height - fit.blockHeight) / 2;
+        const startY =
+          captionBox.y +
+          (captionBox.height -
+            fit.blockHeight) /
+          2;
 
         await this.drawInlineTextWithEmojis(
           ctx,
           fit.lines,
-          captionBox.x + captionBox.width / 2,
+          captionBox.x +
+          captionBox.width / 2,
           startY,
           fit.fontSize,
           'center'
         );
       }
 
-      // Author name + handle live on the PFP itself, near the bottom but
-      // clear of the very edge so they don't feel cramped against it.
-      this.drawAvatarNameOverlay(ctx, message.username, message.handle, pfp.x, pfp.y, pfp.width, pfp.height);
+      this.drawAvatarNameOverlay(
+        ctx,
+        message.username,
+        message.handle,
+        pfp.x,
+        pfp.y,
+        pfp.width,
+        pfp.height
+      );
     } else {
-      // RIGHT HALF: permanently reserved for quote + fixed author area.
-      const quoteLayout = this.SINGLE_NO_MEDIA;
+      const quoteLayout =
+        this.SINGLE_NO_MEDIA;
 
       if (message.hasText) {
-        const fit = this.fitQuoteInBox(
-          ctx,
-          message.textParts,
-          quoteLayout.quoteBox,
-          { preferredSize: 64, minimumSize: 20 }
-        );
+        const fit =
+          this.fitQuoteInBox(
+            ctx,
+            message.textParts,
+            quoteLayout.quoteBox,
+            {
+              preferredSize: 64,
+              minimumSize: 20,
+            }
+          );
 
         this.drawTextGradient(
           ctx,
@@ -651,12 +927,15 @@ export class QuoteImageGenerator {
           quoteLayout.quoteBox.y,
           quoteLayout.quoteBox.width,
           quoteLayout.quoteBox.height,
-          gradient
+          gradient,
+          'none'
         );
 
         const startY =
           quoteLayout.quoteBox.y +
-          (quoteLayout.quoteBox.height - fit.blockHeight) / 2;
+          (quoteLayout.quoteBox.height -
+            fit.blockHeight) /
+          2;
 
         await this.drawInlineTextWithEmojis(
           ctx,
@@ -668,7 +947,6 @@ export class QuoteImageGenerator {
         );
       }
 
-      // FIXED: this area never follows quote length.
       this.drawDividerBar(
         ctx,
         centerX,
@@ -688,8 +966,7 @@ export class QuoteImageGenerator {
   }
 
   // ==========================================================
-  // AUTHOR NAME OVERLAY ON PFP (used when media takes the whole
-  // opposite half, so the author's name/handle move onto the avatar)
+  // AUTHOR NAME OVERLAY
   // ==========================================================
 
   private static drawAvatarNameOverlay(
@@ -702,31 +979,64 @@ export class QuoteImageGenerator {
     pfpHeight: number
   ): void {
     const paddingX = 40;
-    // Kept clear of the very bottom edge rather than flush against it.
     const paddingBottom = 56;
     const barWidth = 90;
 
-    const handleY = pfpY + pfpHeight - paddingBottom;
-    const barY = handleY - 14;
-    const nameY = barY - 34;
+    const handleY =
+      pfpY +
+      pfpHeight -
+      paddingBottom;
 
-    this.drawDividerBar(ctx, pfpX + paddingX + barWidth / 2, barY, barWidth);
+    const barY =
+      handleY - 14;
+
+    const nameY =
+      barY - 34;
+
+    this.drawDividerBar(
+      ctx,
+      pfpX +
+      paddingX +
+      barWidth / 2,
+      barY,
+      barWidth
+    );
 
     ctx.save();
+
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.shadowColor = 'rgba(0,0,0,0.95)';
+
+    ctx.shadowColor =
+      'rgba(0,0,0,0.95)';
+
     ctx.shadowBlur = 8;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
 
-    ctx.font = 'bold 34px Butler';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(name, pfpX + paddingX, nameY);
+    ctx.font =
+      'bold 34px Butler';
 
-    ctx.font = 'bold 24px Butler';
-    ctx.fillStyle = '#A0A0A0';
-    ctx.fillText(`@${handle}`, pfpX + paddingX, handleY);
+    ctx.fillStyle =
+      '#FFFFFF';
+
+    ctx.fillText(
+      name,
+      pfpX + paddingX,
+      nameY
+    );
+
+    ctx.font =
+      'bold 24px Butler';
+
+    ctx.fillStyle =
+      '#A0A0A0';
+
+    ctx.fillText(
+      `@${handle}`,
+      pfpX + paddingX,
+      handleY
+    );
 
     ctx.restore();
   }
@@ -746,7 +1056,6 @@ export class QuoteImageGenerator {
   ): Promise<void> {
     const pfp = this.DOUBLE_PFP;
 
-    // TOP-LEFT PFP: 50% of the top half, full height, pinned to top-left.
     await this.drawMaskedAvatar(
       ctx,
       avatar1,
@@ -755,12 +1064,18 @@ export class QuoteImageGenerator {
       pfp.width,
       pfp.height,
       style,
-      'right'
+      'right',
+      false
     );
 
-    // BOTTOM-RIGHT PFP: 50% of the bottom half, full height, pinned to bottom-right.
-    const pfp2X = this.IMAGE_WIDTH - pfp.width;
-    const pfp2Y = this.IMAGE_HEIGHT - pfp.height;
+    const pfp2X =
+      this.IMAGE_WIDTH -
+      pfp.width;
+
+    const pfp2Y =
+      this.IMAGE_HEIGHT -
+      pfp.height;
+
     await this.drawMaskedAvatar(
       ctx,
       avatar2,
@@ -769,28 +1084,44 @@ export class QuoteImageGenerator {
       pfp.width,
       pfp.height,
       style,
+      'left',
+      false
+    );
+
+    const topLayout =
+      message1.media?.length
+        ? this.DOUBLE_TOP_WITH_MEDIA
+        : this.DOUBLE_TOP_NO_MEDIA;
+
+    const topCenterX =
+      topLayout.quoteBox.x +
+      topLayout.quoteBox.width / 2;
+
+    await this.drawDoubleTextRegion(
+      ctx,
+      message1,
+      topCenterX,
+      topLayout,
+      gradient,
       'left'
     );
 
-    // Center each text region on its OWN quote box (not a fixed constant) -
-    // the box width/position now varies to hug the avatar and fill the
-    // rest of its half, so the horizontal center moves with it.
-    const topLayout = message1.media?.length ? this.DOUBLE_TOP_WITH_MEDIA : this.DOUBLE_TOP_NO_MEDIA;
-    const topCenterX = topLayout.quoteBox.x + topLayout.quoteBox.width / 2;
+    const bottomLayout =
+      message2.media?.length
+        ? this.DOUBLE_BOTTOM_WITH_MEDIA
+        : this.DOUBLE_BOTTOM_NO_MEDIA;
+
+    const bottomCenterX =
+      bottomLayout.quoteBox.x +
+      bottomLayout.quoteBox.width / 2;
 
     await this.drawDoubleTextRegion(
-      ctx, message1, topCenterX,
-      topLayout,
-      gradient
-    );
-
-    const bottomLayout = message2.media?.length ? this.DOUBLE_BOTTOM_WITH_MEDIA : this.DOUBLE_BOTTOM_NO_MEDIA;
-    const bottomCenterX = bottomLayout.quoteBox.x + bottomLayout.quoteBox.width / 2;
-
-    await this.drawDoubleTextRegion(
-      ctx, message2, bottomCenterX,
+      ctx,
+      message2,
+      bottomCenterX,
       bottomLayout,
-      gradient
+      gradient,
+      'right'
     );
   }
 
@@ -799,50 +1130,98 @@ export class QuoteImageGenerator {
     message: QuoteMessageData,
     centerX: number,
     layout: {
-      quoteBox: { x: number; y: number; width: number; height: number };
+      quoteBox: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+
       barY: number;
       usernameY: number;
       barWidth: number;
-      mediaBox?: { x: number; y: number; width: number; height: number };
+
+      mediaBox?: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
     },
-    gradient: GradientPresetId = DEFAULT_GRADIENT
+    gradient: GradientPresetId = DEFAULT_GRADIENT,
+    pfpEdge:
+      | 'left'
+      | 'right'
+      | 'none' = 'none'
   ): Promise<void> {
     if (layout.mediaBox) {
       await this.drawLargeMedia(
-        ctx, message.media,
-        layout.mediaBox.x, layout.mediaBox.y,
-        layout.mediaBox.width, layout.mediaBox.height
+        ctx,
+        message.media,
+        layout.mediaBox.x,
+        layout.mediaBox.y,
+        layout.mediaBox.width,
+        layout.mediaBox.height
       );
     }
 
     if (message.hasText) {
-      const fit = this.fitQuoteInBox(
-        ctx,
-        message.textParts,
-        layout.quoteBox,
-        { preferredSize: 50, minimumSize: 16 }
-      );
+      const fit =
+        this.fitQuoteInBox(
+          ctx,
+          message.textParts,
+          layout.quoteBox,
+          {
+            preferredSize: 50,
+            minimumSize: 16,
+          }
+        );
 
       this.drawTextGradient(
         ctx,
-        layout.quoteBox.x, layout.quoteBox.y,
-        layout.quoteBox.width, layout.quoteBox.height,
-        gradient
+        layout.quoteBox.x,
+        layout.quoteBox.y,
+        layout.quoteBox.width,
+        layout.quoteBox.height,
+        gradient,
+        'none'
       );
 
-      const startY = layout.quoteBox.y + (layout.quoteBox.height - fit.blockHeight) / 2;
+      const startY =
+        layout.quoteBox.y +
+        (layout.quoteBox.height -
+          fit.blockHeight) /
+        2;
+
       await this.drawInlineTextWithEmojis(
-        ctx, fit.lines, centerX, startY, fit.fontSize, 'center'
+        ctx,
+        fit.lines,
+        centerX,
+        startY,
+        fit.fontSize,
+        'center'
       );
     }
 
-    // FIXED author area. It is never pushed up/down by text length.
-    this.drawDividerBar(ctx, centerX, layout.barY, layout.barWidth);
-    this.drawUsername(ctx, message.username, centerX, layout.usernameY, true, 'center');
+    this.drawDividerBar(
+      ctx,
+      centerX,
+      layout.barY,
+      layout.barWidth
+    );
+
+    this.drawUsername(
+      ctx,
+      message.username,
+      centerX,
+      layout.usernameY,
+      true,
+      'center'
+    );
   }
 
   // ==========================================================
-  // DIRECTIONAL IMAGE FADE
+  // CURVED AVATAR TRANSITION
   // ==========================================================
 
   private static async drawMaskedAvatar(
@@ -853,20 +1232,31 @@ export class QuoteImageGenerator {
     width: number,
     height: number,
     style: 'color' | 'bw',
-    fadeEdge: 'left' | 'right'
+    fadeEdge: 'left' | 'right',
+    curvedTransition: boolean = false
   ): Promise<void> {
-    if (width <= 0 || height <= 0) {
+    if (
+      width <= 0 ||
+      height <= 0
+    ) {
       return;
     }
 
-    // Render the cropped avatar onto an off-screen canvas first. The alpha
-    // mask is then applied to that image only, so destination-in can never
-    // erase the unified background beneath it.
-    const offCanvas = createCanvas(width, height);
-    const offCtx = offCanvas.getContext('2d');
+    /*
+     * Render the avatar to an isolated canvas first.
+     *
+     * This prevents destination-in from modifying the black background
+     * underneath the avatar.
+     */
+    const offCanvas =
+      createCanvas(width, height);
+
+    const offCtx =
+      offCanvas.getContext('2d');
 
     if (style === 'bw') {
-      offCtx.filter = 'grayscale(100%)';
+      offCtx.filter =
+        'grayscale(100%)';
     }
 
     this.drawCoverImage(
@@ -879,36 +1269,126 @@ export class QuoteImageGenerator {
     );
 
     offCtx.filter = 'none';
-    offCtx.globalCompositeOperation = 'destination-in';
 
-    const fadeStart = width * 0.5;
-    const maskGradient = fadeEdge === 'right'
-      ? offCtx.createLinearGradient(fadeStart, 0, width, 0)
-      : offCtx.createLinearGradient(0, 0, width - fadeStart, 0);
+    /*
+     * The normal double-message layout keeps the old straight fade.
+     *
+     * The single-message layout uses the new curved transition.
+     */
+    if (
+      curvedTransition &&
+      fadeEdge === 'right'
+    ) {
+      this.applyCurvedRightFade(
+        offCtx,
+        width,
+        height
+      );
+    } else {
+      this.applyLinearFade(
+        offCtx,
+        width,
+        height,
+        fadeEdge
+      );
+    }
+
+    ctx.drawImage(
+      offCanvas,
+      x,
+      y,
+      width,
+      height
+    );
+  }
+
+  /**
+   * Simple linear fade for the PFP right edge.
+   *
+   * The complex curved transition is now handled by the quarter-circle
+   * gradient overlay. This just provides a basic fade at the PFP edge so it
+   * doesn't end abruptly.
+   */
+  private static applyCurvedRightFade(
+    ctx: SKRSContext2D,
+    width: number,
+    height: number
+  ): void {
+    ctx.globalCompositeOperation = 'destination-in';
+
+    const maskGradient = ctx.createLinearGradient(
+      0,
+      0,
+      width,
+      0
+    );
+
+    // Simple linear fade: fully opaque on left, semi-transparent on right
+    maskGradient.addColorStop(0, 'rgba(0,0,0,1)');
+    maskGradient.addColorStop(0.7, 'rgba(0,0,0,1)');
+    maskGradient.addColorStop(0.85, 'rgba(0,0,0,0.7)');
+    maskGradient.addColorStop(1, 'rgba(0,0,0,0.4)');
+
+    ctx.fillStyle = maskGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /**
+   * Original straight fade used by the two-message layout.
+   */
+  private static applyLinearFade(
+    ctx: SKRSContext2D,
+    width: number,
+    height: number,
+    fadeEdge: 'left' | 'right'
+  ): void {
+    ctx.globalCompositeOperation = 'destination-in';
+
+    const maskGradient =
+      fadeEdge === 'right'
+        ? ctx.createLinearGradient(
+            0,
+            0,
+            width,
+            0
+          )
+        : ctx.createLinearGradient(
+            0,
+            0,
+            width,
+            0
+          );
+
+    // Floor kept well above 0 - the old stops erased the outer ~30% of the
+    // avatar down to fully transparent, which is what made the PFP look
+    // like it vanished. Now it only dims toward the gradient color that's
+    // painted on top, same as the reference look.
+    const MIN_ALPHA = 0.5;
 
     if (fadeEdge === 'right') {
       maskGradient.addColorStop(0, 'rgba(0,0,0,1)');
-      maskGradient.addColorStop(1, 'rgba(0,0,0,0)');
+      maskGradient.addColorStop(0.6, 'rgba(0,0,0,1)');
+      maskGradient.addColorStop(0.8, 'rgba(0,0,0,0.8)');
+      maskGradient.addColorStop(1, `rgba(0,0,0,${MIN_ALPHA})`);
     } else {
-      maskGradient.addColorStop(0, 'rgba(0,0,0,0)');
+      maskGradient.addColorStop(0, `rgba(0,0,0,${MIN_ALPHA})`);
+      maskGradient.addColorStop(0.2, 'rgba(0,0,0,0.8)');
+      maskGradient.addColorStop(0.4, 'rgba(0,0,0,1)');
       maskGradient.addColorStop(1, 'rgba(0,0,0,1)');
     }
 
-    offCtx.fillStyle = maskGradient;
-    offCtx.fillRect(0, 0, width, height);
+    ctx.fillStyle = maskGradient;
+    ctx.fillRect(0, 0, width, height);
 
-    ctx.drawImage(offCanvas, x, y, width, height);
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   // ==========================================================
   // TEXT GRADIENT
   // ==========================================================
 
-  // Feather radius for the text panel's edges. Blurring the fill instead
-  // of hard-cutting it at [x, y, width, height] is what makes the panel
-  // dissolve into the surrounding background wash instead of reading as
-  // a floating card with a visible seam/border - "seamless" comes from
-  // the edge literally being soft, not from color-matching alone.
   private static readonly PANEL_FEATHER = 34;
 
   private static drawTextGradient(
@@ -917,61 +1397,96 @@ export class QuoteImageGenerator {
     y: number,
     width: number,
     height: number,
-    gradient: GradientPresetId = DEFAULT_GRADIENT
+    gradient: GradientPresetId = DEFAULT_GRADIENT,
+    pfpEdge:
+      | 'left'
+      | 'right'
+      | 'none' = 'none'
   ): void {
     ctx.save();
 
-    const [r, g, b] = GRADIENT_PRESETS[gradient].color;
-    const feather = this.PANEL_FEATHER;
+    const [r, g, b] =
+      GRADIENT_PRESETS[
+        gradient
+      ].color;
 
-    // Inset the actual fill so that after blurring, the flat/opaque part
-    // of the panel still roughly matches the intended box footprint,
-    // with the blur radius spreading softly beyond it into the
-    // background rather than eating into the box's usable interior.
-    ctx.filter = `blur(${feather}px)`;
+    const feather =
+      this.PANEL_FEATHER;
 
-    // Solid color base first, so the WHOLE box - corners included - reads
-    // as the chosen gradient's color. Without this, the radial highlight
-    // below fades all the way to transparent at the box edges/corners,
-    // which lets the near-black canvas underneath show through and makes
-    // every gradient look like a black box instead of its own color.
-    ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
-    ctx.fillRect(
+    /*
+     * The curved transition is now handled by the quarter-circle gradient.
+     * This panel uses a simple soft-edged rectangle - no complex curves.
+     */
+    ctx.filter =
+      `blur(${feather}px)`;
+
+    ctx.beginPath();
+
+    // Simple rectangle for all cases - curve is in PFP mask only
+    ctx.rect(
       x + feather,
       y + feather,
-      Math.max(0, width - feather * 2),
-      Math.max(0, height - feather * 2)
+      Math.max(
+        0,
+        width - feather * 2
+      ),
+      Math.max(
+        0,
+        height - feather * 2
+      )
     );
 
-    // Soft radial highlight on top for a bit of depth in the center.
-    const centerX = x + width / 2;
-    const centerY = y + height / 2;
-    const radius = Math.max(width, height) * 0.85;
+    ctx.closePath();
 
-    const radialGradient = ctx.createRadialGradient(
-      centerX,
-      centerY,
+    ctx.fillStyle =
+      `rgba(${r},${g},${b},0.55)`;
+
+    ctx.fill();
+
+    const centerX =
+      x + width / 2;
+
+    const centerY =
+      y + height / 2;
+
+    const radius =
+      Math.max(
+        width,
+        height
+      ) * 0.85;
+
+    const radialGradient =
+      ctx.createRadialGradient(
+        centerX,
+        centerY,
+        0,
+        centerX,
+        centerY,
+        radius
+      );
+
+    radialGradient.addColorStop(
       0,
-      centerX,
-      centerY,
-      radius
+      `rgba(${r},${g},${b},0.4)`
     );
 
-    radialGradient.addColorStop(0, `rgba(${r},${g},${b},0.4)`);
-    radialGradient.addColorStop(0.5, `rgba(${r},${g},${b},0.2)`);
-    radialGradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    radialGradient.addColorStop(
+      0.5,
+      `rgba(${r},${g},${b},0.2)`
+    );
+
+    radialGradient.addColorStop(
+      1,
+      `rgba(${r},${g},${b},0)`
+    );
 
     ctx.fillStyle =
       radialGradient;
 
-    ctx.fillRect(
-      x + feather,
-      y + feather,
-      Math.max(0, width - feather * 2),
-      Math.max(0, height - feather * 2)
-    );
+    ctx.fill();
 
     ctx.filter = 'none';
+
     ctx.restore();
   }
 
@@ -982,33 +1497,103 @@ export class QuoteImageGenerator {
   private static fitQuoteInBox(
     ctx: SKRSContext2D,
     textParts: QuoteTextPart[],
-    box: { width: number; height: number },
-    options: { preferredSize: number; minimumSize: number }
-  ): { lines: QuoteTextPart[][]; fontSize: number; blockHeight: number } {
-    const lineHeightRatio = 1.2;
+    box: {
+      width: number;
+      height: number;
+    },
+    options: {
+      preferredSize: number;
+      minimumSize: number;
+    }
+  ): {
+    lines: QuoteTextPart[][];
+    fontSize: number;
+    blockHeight: number;
+  } {
+    const lineHeightRatio =
+      1.2;
 
-    for (let size = options.preferredSize; size >= options.minimumSize; size -= 2) {
-      const emojiSize = size * 1.05;
-      ctx.font = `bold ${size}px Butler`;
-      const lines = this.buildLinesWithEmojis(ctx, textParts, box.width, size, emojiSize);
-      const lineHeight = size * lineHeightRatio;
-      const blockHeight = lines.length * lineHeight;
+    for (
+      let size =
+        options.preferredSize;
+      size >=
+      options.minimumSize;
+      size -= 2
+    ) {
+      const emojiSize =
+        size * 1.05;
 
-      const fits = lines.every(line =>
-        this.measureLineWidth(ctx, line, size, emojiSize) <= box.width + 0.01
-      );
+      ctx.font =
+        `bold ${size}px Butler`;
 
-      if (fits && blockHeight <= box.height + 0.01) {
-        return { lines, fontSize: size, blockHeight };
+      const lines =
+        this.buildLinesWithEmojis(
+          ctx,
+          textParts,
+          box.width,
+          size,
+          emojiSize
+        );
+
+      const lineHeight =
+        size *
+        lineHeightRatio;
+
+      const blockHeight =
+        lines.length *
+        lineHeight;
+
+      const fits =
+        lines.every(
+          line =>
+            this.measureLineWidth(
+              ctx,
+              line,
+              size,
+              emojiSize
+            ) <=
+            box.width + 0.01
+        );
+
+      if (
+        fits &&
+        blockHeight <=
+        box.height + 0.01
+      ) {
+        return {
+          lines,
+          fontSize: size,
+          blockHeight,
+        };
       }
     }
 
-    // The wrapper splits overlong words, so the minimum size should normally fit.
-    const size = options.minimumSize;
-    const emojiSize = size * 1.05;
-    ctx.font = `bold ${size}px Butler`;
-    const lines = this.buildLinesWithEmojis(ctx, textParts, box.width, size, emojiSize);
-    return { lines, fontSize: size, blockHeight: lines.length * size * lineHeightRatio };
+    const size =
+      options.minimumSize;
+
+    const emojiSize =
+      size * 1.05;
+
+    ctx.font =
+      `bold ${size}px Butler`;
+
+    const lines =
+      this.buildLinesWithEmojis(
+        ctx,
+        textParts,
+        box.width,
+        size,
+        emojiSize
+      );
+
+    return {
+      lines,
+      fontSize: size,
+      blockHeight:
+        lines.length *
+        size *
+        lineHeightRatio,
+    };
   }
 
   private static getQuoteFontSize(
@@ -1017,11 +1602,24 @@ export class QuoteImageGenerator {
     maxWidth: number,
     maxHeight: number = 400
   ): number {
-    // Kept for compatibility with any external/internal callers.
-    const parts: QuoteTextPart[] = [{ type: 'text', value: text }];
+    const parts: QuoteTextPart[] = [
+      {
+        type: 'text',
+        value: text,
+      },
+    ];
+
     return this.fitQuoteInBox(
-      ctx, parts, { width: maxWidth, height: maxHeight },
-      { preferredSize: 64, minimumSize: 20 }
+      ctx,
+      parts,
+      {
+        width: maxWidth,
+        height: maxHeight,
+      },
+      {
+        preferredSize: 64,
+        minimumSize: 20,
+      }
     ).fontSize;
   }
 
@@ -1031,8 +1629,14 @@ export class QuoteImageGenerator {
     maxWidth: number,
     fontSize: number = 58
   ): string[] {
-    ctx.font = `bold ${fontSize}px Butler`;
-    return this.wrapText(ctx, text, maxWidth);
+    ctx.font =
+      `bold ${fontSize}px Butler`;
+
+    return this.wrapText(
+      ctx,
+      text,
+      maxWidth
+    );
   }
 
   // ==========================================================
@@ -1050,7 +1654,6 @@ export class QuoteImageGenerator {
       | 'right'
       | 'center' = 'left'
   ): void {
-    // 20% smaller than the original 36 / 32px sizes.
     const fontSize =
       isProminent
         ? 29
@@ -1058,8 +1661,11 @@ export class QuoteImageGenerator {
 
     ctx.save();
 
-    ctx.textAlign = align;
-    ctx.textBaseline = 'top';
+    ctx.textAlign =
+      align;
+
+    ctx.textBaseline =
+      'top';
 
     ctx.font =
       `bold ${fontSize}px Butler`;
@@ -1075,7 +1681,7 @@ export class QuoteImageGenerator {
       '#A0A0A0';
 
     ctx.fillText(
-      `— ${username}`,
+      `${username}`,
       x,
       y
     );
@@ -1094,15 +1700,26 @@ export class QuoteImageGenerator {
     width: number
   ): void {
     ctx.save();
-    
-    ctx.strokeStyle = '#FFFFFF';
+
+    ctx.strokeStyle =
+      '#FFFFFF';
+
     ctx.lineWidth = 1;
-    
+
     ctx.beginPath();
-    ctx.moveTo(centerX - width / 2, y);
-    ctx.lineTo(centerX + width / 2, y);
+
+    ctx.moveTo(
+      centerX - width / 2,
+      y
+    );
+
+    ctx.lineTo(
+      centerX + width / 2,
+      y
+    );
+
     ctx.stroke();
-    
+
     ctx.restore();
   }
 
@@ -1116,54 +1733,134 @@ export class QuoteImageGenerator {
     x: number,
     y: number,
     fontSize: number,
-    align: 'left' | 'right' | 'center' = 'left'
+    align:
+      | 'left'
+      | 'right'
+      | 'center' = 'left'
   ): Promise<void> {
-    const lineHeight = fontSize * 1.2;
-    const emojiSize = fontSize * 1.05;
+    const lineHeight =
+      fontSize * 1.2;
+
+    const emojiSize =
+      fontSize * 1.05;
 
     ctx.save();
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.font = `bold ${fontSize}px Butler`;
-    ctx.shadowColor = 'rgba(0,0,0,0.95)';
+
+    ctx.textAlign =
+      'left';
+
+    ctx.textBaseline =
+      'top';
+
+    ctx.font =
+      `bold ${fontSize}px Butler`;
+
+    ctx.shadowColor =
+      'rgba(0,0,0,0.95)';
+
     ctx.shadowBlur = 10;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 3;
-    ctx.fillStyle = '#FFFFFF';
 
-    for (const [lineIndex, line] of lines.entries()) {
-      const lineY = y + lineIndex * lineHeight;
-      const lineWidth = this.measureLineWidth(ctx, line, fontSize, emojiSize);
-      let currentX = align === 'center' ? x - lineWidth / 2 : align === 'right' ? x - lineWidth : x;
+    ctx.fillStyle =
+      '#FFFFFF';
 
-      for (const part of line) {
-        if (part.type === 'text') {
-          ctx.fillText(part.value, currentX, lineY);
-          currentX += ctx.measureText(part.value).width;
-        } else if (part.buffer) {
-          const scaled = this.fitWithinBounds(
-            part.width || emojiSize, part.height || emojiSize,
-            emojiSize, emojiSize
+    for (
+      const [lineIndex, line]
+      of lines.entries()
+    ) {
+      const lineY =
+        y +
+        lineIndex *
+        lineHeight;
+
+      const lineWidth =
+        this.measureLineWidth(
+          ctx,
+          line,
+          fontSize,
+          emojiSize
+        );
+
+      let currentX =
+        align === 'center'
+          ? x - lineWidth / 2
+          : align === 'right'
+            ? x - lineWidth
+            : x;
+
+      for (
+        const part
+        of line
+      ) {
+        if (
+          part.type === 'text'
+        ) {
+          ctx.fillText(
+            part.value,
+            currentX,
+            lineY
           );
-          const image = await this.loadImageFromBuffer(part.buffer);
+
+          currentX +=
+            ctx.measureText(
+              part.value
+            ).width;
+        } else if (
+          part.buffer
+        ) {
+          const scaled =
+            this.fitWithinBounds(
+              part.width ||
+              emojiSize,
+              part.height ||
+              emojiSize,
+              emojiSize,
+              emojiSize
+            );
+
+          const image =
+            await this.loadImageFromBuffer(
+              part.buffer
+            );
+
           ctx.drawImage(
             image,
             currentX,
-            lineY + (lineHeight - scaled.height) / 2,
+            lineY +
+            (lineHeight -
+              scaled.height) /
+            2,
             scaled.width,
             scaled.height
           );
-          currentX += scaled.width;
-        } else if (part.value) {
-          // Fallback: we couldn't fetch an image for this emoji (network
-          // failure, unrecognized codepoint, etc). Render the raw glyph
-          // with the bundled emoji font instead of silently dropping it.
+
+          currentX +=
+            scaled.width;
+        } else if (
+          part.value
+        ) {
           ctx.save();
-          ctx.font = `${fontSize}px NotoColorEmoji, Butler`;
-          ctx.fillText(part.value, currentX, lineY);
-          const fallbackWidth = ctx.measureText(part.value).width || emojiSize;
+
+          ctx.font =
+            `${fontSize}px NotoColorEmoji, Butler`;
+
+          ctx.fillText(
+            part.value,
+            currentX,
+            lineY
+          );
+
+          const fallbackWidth =
+            ctx.measureText(
+              part.value
+            ).width ||
+            emojiSize;
+
           ctx.restore();
-          currentX += fallbackWidth;
+
+          currentX +=
+            fallbackWidth;
         }
       }
     }
@@ -1178,82 +1875,200 @@ export class QuoteImageGenerator {
     fontSize: number,
     emojiSize: number
   ): QuoteTextPart[][] {
-    const lines: QuoteTextPart[][] = [];
-    let currentLine: QuoteTextPart[] = [];
+    const lines: QuoteTextPart[][] =
+      [];
+
+    let currentLine:
+      QuoteTextPart[] = [];
+
     let currentWidth = 0;
 
     const pushLine = () => {
-      // Do not emit whitespace-only lines.
-      if (currentLine.length > 0) {
-        lines.push(currentLine);
+      if (
+        currentLine.length > 0
+      ) {
+        lines.push(
+          currentLine
+        );
       }
+
       currentLine = [];
       currentWidth = 0;
     };
 
-    const addTextToken = (token: string) => {
-      if (!token) return;
-      const width = ctx.measureText(token).width;
-
-      if (currentWidth + width <= maxWidth) {
-        currentLine.push({ type: 'text', value: token });
-        currentWidth += width;
+    const addTextToken = (
+      token: string
+    ) => {
+      if (!token) {
         return;
       }
 
-      // Whitespace belongs to the following word only when there is room.
-      if (/^\s+$/.test(token)) return;
+      const width =
+        ctx.measureText(
+          token
+        ).width;
 
-      if (currentLine.length > 0) pushLine();
+      if (
+        currentWidth +
+        width <=
+        maxWidth
+      ) {
+        currentLine.push({
+          type: 'text',
+          value: token,
+        });
 
-      // A single giant word must also be split character-by-character.
-      if (width > maxWidth) {
+        currentWidth +=
+          width;
+
+        return;
+      }
+
+      if (
+        /^\s+$/.test(token)
+      ) {
+        return;
+      }
+
+      if (
+        currentLine.length > 0
+      ) {
+        pushLine();
+      }
+
+      if (
+        width >
+        maxWidth
+      ) {
         let chunk = '';
-        for (const char of Array.from(token)) {
-          const test = chunk + char;
-          if (ctx.measureText(test).width <= maxWidth) {
+
+        for (
+          const char
+          of Array.from(token)
+        ) {
+          const test =
+            chunk + char;
+
+          if (
+            ctx.measureText(
+              test
+            ).width <=
+            maxWidth
+          ) {
             chunk = test;
           } else {
-            if (chunk) lines.push([{ type: 'text', value: chunk }]);
+            if (chunk) {
+              lines.push([
+                {
+                  type: 'text',
+                  value: chunk,
+                },
+              ]);
+            }
+
             chunk = char;
           }
         }
+
         if (chunk) {
-          currentLine = [{ type: 'text', value: chunk }];
-          currentWidth = ctx.measureText(chunk).width;
+          currentLine = [
+            {
+              type: 'text',
+              value: chunk,
+            },
+          ];
+
+          currentWidth =
+            ctx.measureText(
+              chunk
+            ).width;
         }
       } else {
-        currentLine.push({ type: 'text', value: token });
-        currentWidth = width;
+        currentLine.push({
+          type: 'text',
+          value: token,
+        });
+
+        currentWidth =
+          width;
       }
     };
 
-    for (const part of textParts) {
-      if (part.type === 'text') {
-        const normalized = part.value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        const pieces = normalized.split(/(\n|\s+)/);
+    for (
+      const part
+      of textParts
+    ) {
+      if (
+        part.type === 'text'
+      ) {
+        const normalized =
+          part.value
+            .replace(
+              /\r\n/g,
+              '\n'
+            )
+            .replace(
+              /\r/g,
+              '\n'
+            );
 
-        for (const piece of pieces) {
-          if (!piece) continue;
-          if (piece === '\n') {
+        const pieces =
+          normalized.split(
+            /(\n|\s+)/
+          );
+
+        for (
+          const piece
+          of pieces
+        ) {
+          if (!piece) {
+            continue;
+          }
+
+          if (
+            piece === '\n'
+          ) {
             pushLine();
             continue;
           }
-          addTextToken(piece);
+
+          addTextToken(
+            piece
+          );
         }
       } else {
-        if (currentWidth + emojiSize > maxWidth && currentLine.length > 0) {
+        if (
+          currentWidth +
+          emojiSize >
+          maxWidth &&
+          currentLine.length >
+          0
+        ) {
           pushLine();
         }
-        currentLine.push(part);
-        currentWidth += emojiSize;
+
+        currentLine.push(
+          part
+        );
+
+        currentWidth +=
+          emojiSize;
       }
     }
 
     pushLine();
 
-    if (lines.length === 0) {
-      return [[{ type: 'text', value: '""' }]];
+    if (
+      lines.length === 0
+    ) {
+      return [
+        [
+          {
+            type: 'text',
+            value: '""',
+          },
+        ],
+      ];
     }
 
     return lines;
@@ -1266,13 +2081,24 @@ export class QuoteImageGenerator {
     emojiSize: number
   ): number {
     let width = 0;
-    for (const part of line) {
-      if (part.type === 'text') {
-        width += ctx.measureText(part.value).width;
+
+    for (
+      const part
+      of line
+    ) {
+      if (
+        part.type === 'text'
+      ) {
+        width +=
+          ctx.measureText(
+            part.value
+          ).width;
       } else {
-        width += emojiSize;
+        width +=
+          emojiSize;
       }
     }
+
     return width;
   }
 
@@ -1297,8 +2123,11 @@ export class QuoteImageGenerator {
 
     ctx.save();
 
-    ctx.textAlign = align;
-    ctx.textBaseline = 'top';
+    ctx.textAlign =
+      align;
+
+    ctx.textBaseline =
+      'top';
 
     ctx.font =
       `bold ${fontSize}px Butler`;
@@ -1325,7 +2154,9 @@ export class QuoteImageGenerator {
         ctx.fillText(
           line,
           x,
-          y + index * lineHeight
+          y +
+          index *
+          lineHeight
         );
       }
     );
@@ -1342,33 +2173,72 @@ export class QuoteImageGenerator {
     text: string,
     maxWidth: number
   ): string[] {
-    if (!text || !text.trim()) {
+    if (
+      !text ||
+      !text.trim()
+    ) {
       return ['""'];
     }
 
     const words =
-      text.trim().split(/\s+/);
+      text
+        .trim()
+        .split(/\s+/);
 
-    const lines: string[] = [];
+    const lines: string[] =
+      [];
 
-    for (const word of words) {
-      // Check if the word itself is wider than maxWidth
-      if (ctx.measureText(word).width > maxWidth) {
-        // Split the word character by character
-        const charLines = this.splitLongWord(ctx, word, maxWidth);
-        lines.push(...charLines);
+    for (
+      const word
+      of words
+    ) {
+      if (
+        ctx.measureText(
+          word
+        ).width >
+        maxWidth
+      ) {
+        const charLines =
+          this.splitLongWord(
+            ctx,
+            word,
+            maxWidth
+          );
+
+        lines.push(
+          ...charLines
+        );
       } else {
-        // Normal word wrapping
-        if (lines.length === 0) {
-          lines.push(word);
+        if (
+          lines.length === 0
+        ) {
+          lines.push(
+            word
+          );
         } else {
-          const lastLine = lines[lines.length - 1];
-          const testLine = lastLine + ' ' + word;
+          const lastLine =
+            lines[
+            lines.length - 1
+            ];
 
-          if (ctx.measureText(testLine).width <= maxWidth) {
-            lines[lines.length - 1] = testLine;
+          const testLine =
+            lastLine +
+            ' ' +
+            word;
+
+          if (
+            ctx.measureText(
+              testLine
+            ).width <=
+            maxWidth
+          ) {
+            lines[
+              lines.length - 1
+            ] = testLine;
           } else {
-            lines.push(word);
+            lines.push(
+              word
+            );
           }
         }
       }
@@ -1382,24 +2252,47 @@ export class QuoteImageGenerator {
     word: string,
     maxWidth: number
   ): string[] {
-    const lines: string[] = [];
+    const lines: string[] =
+      [];
+
     let currentLine = '';
 
-    for (const char of word) {
-      const testLine = currentLine + char;
+    for (
+      const char
+      of word
+    ) {
+      const testLine =
+        currentLine +
+        char;
 
-      if (ctx.measureText(testLine).width <= maxWidth) {
-        currentLine = testLine;
+      if (
+        ctx.measureText(
+          testLine
+        ).width <=
+        maxWidth
+      ) {
+        currentLine =
+          testLine;
       } else {
-        if (currentLine) {
-          lines.push(currentLine);
+        if (
+          currentLine
+        ) {
+          lines.push(
+            currentLine
+          );
         }
-        currentLine = char;
+
+        currentLine =
+          char;
       }
     }
 
-    if (currentLine) {
-      lines.push(currentLine);
+    if (
+      currentLine
+    ) {
+      lines.push(
+        currentLine
+      );
     }
 
     return lines;
@@ -1427,15 +2320,17 @@ export class QuoteImageGenerator {
 
     let sourceX = 0;
     let sourceY = 0;
+
     let sourceWidth =
       image.width;
+
     let sourceHeight =
       image.height;
 
     if (
-      imgRatio > destRatio
+      imgRatio >
+      destRatio
     ) {
-      // Crop left/right.
       sourceWidth =
         image.height *
         destRatio;
@@ -1445,7 +2340,6 @@ export class QuoteImageGenerator {
           sourceWidth) /
         2;
     } else {
-      // Crop top/bottom.
       sourceHeight =
         image.width /
         destRatio;

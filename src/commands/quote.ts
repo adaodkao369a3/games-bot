@@ -12,6 +12,7 @@ import {
   DEFAULT_EFFECT,
 } from '../utils/quote-image-generator.js';
 import { loadImage } from '@napi-rs/canvas';
+import { isRedirectEnabled, getDirectorsCutChannelId } from '../utils/redirect-manager.js';
 
 // ============================================================
 // QUOTE DATA STORAGE
@@ -149,6 +150,22 @@ export async function handleQuoteInteraction(interaction: StringSelectMenuIntera
       files: [attachment],
       components: styleRows,
     });
+
+    // Redirect to directors cut channel if enabled
+    if (isRedirectEnabled(quoteData.channelId)) {
+      const directorsCutChannelId = getDirectorsCutChannelId();
+      try {
+        const directorsCutChannel = await interaction.guild.channels.fetch(directorsCutChannelId);
+        if (directorsCutChannel && directorsCutChannel.isTextBased()) {
+          await directorsCutChannel.send({
+            files: [new AttachmentBuilder(imageBuffer, { name: 'quote.png' })],
+            components: styleRows,
+          });
+        }
+      } catch (error) {
+        console.error('[Quote Command] Error redirecting gradient change to directors cut channel:', error);
+      }
+    }
   } catch (error) {
     console.error('[Quote Command] Error applying gradient:', error);
     try {
@@ -618,18 +635,20 @@ export async function handleQuoteCommand(message: any, args: string[]): Promise<
       components: styleRows,
     });
 
-    // Redirect to directors cut channel
-    const directorsCutChannelId = '1526869451834654821';
-    try {
-      const directorsCutChannel = await message.guild.channels.fetch(directorsCutChannelId);
-      if (directorsCutChannel && directorsCutChannel.isTextBased()) {
-        await directorsCutChannel.send({
-          files: [new AttachmentBuilder(imageBuffer, { name: 'quote.png' })],
-          components: styleRows,
-        });
+    // Redirect to directors cut channel if enabled
+    if (isRedirectEnabled(message.channel.id)) {
+      const directorsCutChannelId = getDirectorsCutChannelId();
+      try {
+        const directorsCutChannel = await message.guild.channels.fetch(directorsCutChannelId);
+        if (directorsCutChannel && directorsCutChannel.isTextBased()) {
+          await directorsCutChannel.send({
+            files: [new AttachmentBuilder(imageBuffer, { name: 'quote.png' })],
+            components: styleRows,
+          });
+        }
+      } catch (error) {
+        console.error('[Quote Command] Error redirecting to directors cut channel:', error);
       }
-    } catch (error) {
-      console.error('[Quote Command] Error redirecting to directors cut channel:', error);
     }
 
   } catch (error) {
