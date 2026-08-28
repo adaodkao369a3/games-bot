@@ -2,14 +2,6 @@ import { Message, EmbedBuilder } from 'discord.js';
 import { getResidualsInfo, removeResiduals, awardResiduals } from '../services/residuals.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
-// Track active gambles by user ID to prevent simultaneous gambles
-const activeGambles = new Map<string, boolean>();
-
-// Sanity ceiling only - this is NOT meant to stop real wagers (,gamble 100k
-// etc. should always work as long as the player can afford it). It just
-// guards against absurd/overflowing numbers.
-const MAX_WAGER = 1_000_000_000; // 1 billion residuals
-
 const SLOT_SYMBOLS = ['🍒', '🍋', '🍇', '💎', '7️⃣', '🔔', '⭐'];
 const WIN_SYMBOL = '💎';
 
@@ -97,12 +89,6 @@ function buildSpinEmbed(wager: number, balanceBefore: number): EmbedBuilder {
 export async function handleGambleCommand(message: Message, args: string[]): Promise<void> {
   const userId = message.author.id;
 
-  // Check if user already has an active gamble
-  if (activeGambles.has(userId)) {
-    await message.reply('You already have a gamble in progress! Wait for the result before gambling again.');
-    return;
-  }
-
   // Parse wager amount
   if (args.length === 0) {
     await message.reply(
@@ -131,12 +117,6 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     return;
   }
 
-  // Validate maximum wager sanity limit
-  if (wager > MAX_WAGER) {
-    await message.reply(`Maximum wager is ${MAX_WAGER.toLocaleString()} residuals. Please try a smaller amount.`);
-    return;
-  }
-
   // Check if user has enough residuals
   if (residualInfo.balance < wager) {
     await message.reply(
@@ -146,30 +126,40 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     return;
   }
 
-  // Mark user as having an active gamble
-  activeGambles.set(userId, true);
-
   try {
     const balanceBefore = residualInfo.balance;
 
     // Send initial loading message with a spinning reel
     const initialMessage = await message.reply({ embeds: [buildLoadingEmbed(wager, balanceBefore)] });
 
-    // Deduct wager amount atomically
-    const deductionResult = await removeResiduals(
-      userId,
-      wager,
-      'gamble',
-      {
-        reason: 'Wager deducted for gamble',
-        description: `Gamble wager: ${wager} residuals`
+    // Deduct wager amount atomically with retry logic
+    let deductionResult = null;
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries && !deductionResult) {
+      deductionResult = await removeResiduals(
+        userId,
+        wager,
+        'gamble',
+        {
+          reason: 'Wager deducted for gamble',
+          description: `Gamble wager: ${wager} residuals`
+        }
+      );
+
+      if (!deductionResult) {
+        retryCount++;
+        if (retryCount < maxRetries) {
+          console.log(`[GAMBLE] Deduction failed for user ${userId}, retry ${retryCount}/${maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+        }
       }
-    );
+    }
 
     if (!deductionResult) {
       console.error(`[GAMBLE] Failed to deduct wager for user ${userId}. Amount: ${wager}`);
-      activeGambles.delete(userId);
-      await initialMessage.edit('Failed to process your wager. Please try again.');
+      await initialMessage.edit('Failed to process your wager. This may be due to a database connection issue. Please try again in a moment.');
       return;
     }
 
@@ -197,38 +187,67 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     if (won) {
       // WIN: Award 2x wager (user already lost wager, so add 2x to get net +wager)
       const payout = wager * 2;
-      const awardResult = await awardResiduals(
-        userId,
-        payout,
-        'gamble',
-        {
-          reason: 'Gamble winnings',
-          description: `Gamble win: ${payout} residuals (wager: ${wager})`
+      
+      // Award winnings with retry logic
+      let awardResult = null;
+      let awardRetryCount = 0;
+      const maxAwardRetries = 3;
+
+      while (awardRetryCount < maxAwardRetries && !awardResult) {
+        awardResult = await awardResiduals(
+          userId,
+          payout,
+          'gamble',
+          {
+            reason: 'Gamble winnings',
+            description: `Gamble win: ${payout} residuals (wager: ${wager})`
+          }
+        );
+
+        if (!awardResult) {
+          awardRetryCount++;
+          if (awardRetryCount < maxAwardRetries) {
+            console.log(`[GAMBLE] Award failed for user ${userId}, retry ${awardRetryCount}/${maxAwardRetries}`);
+            await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+          }
         }
-      );
+      }
 
       if (!awardResult) {
         console.error(`[GAMBLE] Failed to award winnings for user ${userId}. Wager: ${wager}, Payout: ${payout}. Attempting refund.`);
 
-        // Refund the wager if payout fails
-        const refundResult = await awardResiduals(
-          userId,
-          wager,
-          'gamble_refund',
-          {
-            reason: 'Refund after payout failure',
-            description: `Refunded wager: ${wager} residuals`
+        // Refund the wager if payout fails with retry logic
+        let refundResult = null;
+        let refundRetryCount = 0;
+        const maxRefundRetries = 3;
+
+        while (refundRetryCount < maxRefundRetries && !refundResult) {
+          refundResult = await awardResiduals(
+            userId,
+            wager,
+            'gamble_refund',
+            {
+              reason: 'Refund after payout failure',
+              description: `Refunded wager: ${wager} residuals`
+            }
+          );
+
+          if (!refundResult) {
+            refundRetryCount++;
+            if (refundRetryCount < maxRefundRetries) {
+              console.log(`[GAMBLE] Refund failed for user ${userId}, retry ${refundRetryCount}/${maxRefundRetries}`);
+              await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+            }
           }
-        );
+        }
 
         if (!refundResult) {
           console.error(`[GAMBLE] CRITICAL: Failed to refund wager for user ${userId} after payout failure. Amount: ${wager}`);
           await initialMessage.edit('Failed to process your winnings. Please contact support immediately - your wager may be affected.');
         } else {
-          await initialMessage.edit('Failed to process your winnings. Your wager has been refunded. Please try again.');
+          await initialMessage.edit('Failed to process your winnings due to a database issue. Your wager has been refunded. Please try again.');
         }
 
-        activeGambles.delete(userId);
         return;
       }
 
@@ -264,17 +283,31 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
   } catch (error) {
     console.error(`[GAMBLE] Unexpected error for user ${userId}. Wager: ${wager}. Error:`, error);
 
-    // Attempt to refund the wager on any unexpected error
+    // Attempt to refund the wager on any unexpected error with retry logic
     try {
-      const refundResult = await awardResiduals(
-        userId,
-        wager,
-        'gamble_error_refund',
-        {
-          reason: 'Refund after unexpected error',
-          description: `Refunded wager due to error: ${wager} residuals`
+      let refundResult = null;
+      let errorRefundRetryCount = 0;
+      const maxErrorRefundRetries = 3;
+
+      while (errorRefundRetryCount < maxErrorRefundRetries && !refundResult) {
+        refundResult = await awardResiduals(
+          userId,
+          wager,
+          'gamble_error_refund',
+          {
+            reason: 'Refund after unexpected error',
+            description: `Refunded wager due to error: ${wager} residuals`
+          }
+        );
+
+        if (!refundResult) {
+          errorRefundRetryCount++;
+          if (errorRefundRetryCount < maxErrorRefundRetries) {
+            console.log(`[GAMBLE] Error refund failed for user ${userId}, retry ${errorRefundRetryCount}/${maxErrorRefundRetries}`);
+            await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+          }
         }
-      );
+      }
 
       if (!refundResult) {
         console.error(`[GAMBLE] CRITICAL: Failed to refund wager for user ${userId} after unexpected error. Amount: ${wager}`);
@@ -283,9 +316,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       console.error(`[GAMBLE] CRITICAL: Exception during refund attempt for user ${userId}:`, refundError);
     }
 
+    await message.reply('An unexpected error occurred during gambling. Your wager may be refunded automatically. If you experience issues, please try again.');
     await ErrorHandler.handleMessageError(message, error, 'gamble command');
-  } finally {
-    // Remove user from active gambles
-    activeGambles.delete(userId);
   }
 }

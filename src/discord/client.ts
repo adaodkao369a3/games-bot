@@ -18,10 +18,8 @@ import { handleRouletteMaxCommand, handleRouletteMaxInteraction } from '../comma
 import { handlePissCompCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
 import { handleSmashMaxCommand, handleSmashMaxInteraction } from '../commands/smashmax.js';
 import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } from '../commands/trial.js';
-import { handleQuoteCommand, handleQuoteInteraction } from '../commands/quote.js';
 import { handleGambleCommand } from '../commands/gamble.js';
-import { handleWalletCommand } from '../commands/wallet.js';
-import { handleRedirectOnCommand, handleRedirectOffCommand } from '../commands/redirect.js';
+import { handleQuoteCommand } from '../commands/quote.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -157,31 +155,17 @@ export class DiscordClient {
         return;
       }
 
-      if (command === 'quote') {
-        await handleQuoteCommand(message, args);
-        return;
-      }
 
       if (command === 'gamble') {
         await handleGambleCommand(message, args);
         return;
       }
 
-      if (command === 'wal') {
-        await handleWalletCommand(message);
+      if (command === 'quote') {
+        await handleQuoteCommand(message, args);
         return;
       }
 
-      if (command === 'redirect') {
-        const subcommand = args[0]?.toLowerCase();
-        if (subcommand === 'on') {
-          await handleRedirectOnCommand(message);
-          return;
-        } else if (subcommand === 'off') {
-          await handleRedirectOffCommand(message);
-          return;
-        }
-      }
     }
 
     // Check for Wordle guesses (only if not a command)
@@ -238,11 +222,15 @@ export class DiscordClient {
       return;
     }
 
-    if (customId.startsWith('quote_gradient_')) {
-      await handleQuoteInteraction(interaction);
+    if (customId.startsWith('quote-')) {
+      // Handled entirely by the message-scoped collector created inside
+      // handleQuoteCommand (src/commands/quote.ts). Returning here stops
+      // it from falling through to handleSmashVote below, which was
+      // replying/acknowledging the interaction before our own collector's
+      // i.update() call, causing a "already acknowledged" crash.
       return;
     }
-    
+
     await handleSmashVote(interaction);
   }
 
