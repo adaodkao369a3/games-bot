@@ -57,7 +57,7 @@ export class DiscordClient {
     console.log(`Logged in as ${this.client.user?.tag}`);
     
     // Set bot status
-    this.client.user?.setActivity('googoo gaga niggas', { type: 3 as any });
+    this.client.user?.setActivity('quick draw on these bitches', { type: 3 as any });
     
     // Initialize AniList service (non-blocking, will populate cache in background if needed)
     const anilistService = AniListCharacterService.getInstance();
