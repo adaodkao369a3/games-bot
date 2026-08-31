@@ -138,6 +138,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     const maxRetries = 3;
 
     while (retryCount < maxRetries && !deductionResult) {
+      console.log(`[GAMBLE] Attempting deduction for user ${userId}, amount: ${wager}, attempt: ${retryCount + 1}/${maxRetries}`);
       deductionResult = await removeResiduals(
         userId,
         wager,
@@ -154,6 +155,8 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
           console.log(`[GAMBLE] Deduction failed for user ${userId}, retry ${retryCount}/${maxRetries}`);
           await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
         }
+      } else {
+        console.log(`[GAMBLE] Deduction succeeded for user ${userId}, new balance: ${deductionResult}`);
       }
     }
 

@@ -162,6 +162,13 @@ export async function addResiduals(
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Failed to add residuals:', error);
+    console.error('Error details:', {
+      userId,
+      amount,
+      source,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined
+    });
     return null;
   } finally {
     client.release();
