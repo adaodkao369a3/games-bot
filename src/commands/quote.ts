@@ -10,6 +10,7 @@ import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS } from '../quote/c
 import { ErrorHandler } from '../utils/error-handler.js';
 
 const THEME_NAMES: PresetName[] = ['classic', 'sunset', 'ocean', 'purple'];
+const QUOTE_REDIRECT_CHANNEL_ID = '1526869451834654821';
 
 export async function handleQuoteCommand(message: Message, args: string[]): Promise<void> {
   // Check if this is a reply to another message
@@ -73,6 +74,21 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       components: buildSelectRow(),
     });
 
+    // Send copy to redirect channel
+    try {
+      const redirectChannel = await message.guild?.channels.fetch(QUOTE_REDIRECT_CHANNEL_ID);
+      if (redirectChannel && redirectChannel.isTextBased()) {
+        await redirectChannel.send({
+          content: `🔗 [Jump to original message](${target.url})`,
+          files: [attachment],
+          components: buildSelectRow(),
+        });
+      }
+    } catch (redirectError) {
+      console.error('[QUOTE] Failed to send quote to redirect channel:', redirectError);
+      // Don't fail the original quote if redirect fails
+    }
+
     const collector = sent.createMessageComponentCollector({
       componentType: ComponentType.StringSelect,
       time: THEME_SELECT_EXPIRY_MS,
@@ -94,6 +110,20 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
         files: [newAttachment],
         components: buildSelectRow(),
       });
+
+      // Send updated copy to redirect channel
+      try {
+        const redirectChannel = await message.guild?.channels.fetch(QUOTE_REDIRECT_CHANNEL_ID);
+        if (redirectChannel && redirectChannel.isTextBased()) {
+          await redirectChannel.send({
+            content: `🔗 [Jump to original message](${target.url})`,
+            files: [newAttachment],
+            components: buildSelectRow(),
+          });
+        }
+      } catch (redirectError) {
+        console.error('[QUOTE] Failed to send updated quote to redirect channel:', redirectError);
+      }
     });
 
     collector.on('end', async () => {
