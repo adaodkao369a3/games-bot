@@ -104,6 +104,42 @@ async function initializeSchema(): Promise<void> {
       } else {
         console.log('✓ Database schema already exists with Bombo Coins');
       }
+
+      // Check if coin_transactions has game_instance_id column
+      const transactionsCheck = await pool!.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'coin_transactions' 
+        AND table_schema = 'public'
+        AND column_name = 'game_instance_id'
+      `);
+
+      if (transactionsCheck.rows.length === 0) {
+        console.log('⚠ coin_transactions table missing game_instance_id column, adding migration...');
+        
+        // Add game_instance_id column (allow NULL for existing rows)
+        await pool!.query(`
+          ALTER TABLE coin_transactions 
+          ADD COLUMN IF NOT EXISTS game_instance_id VARCHAR(255)
+        `);
+        
+        // Add UNIQUE constraint (idempotent - won't fail if constraint already exists)
+        try {
+          await pool!.query(`
+            ALTER TABLE coin_transactions 
+            ADD CONSTRAINT coin_transactions_game_instance_id_key UNIQUE (game_instance_id)
+          `);
+        } catch (constraintError: any) {
+          // Constraint might already exist, which is fine
+          if (!constraintError.message.includes('already exists')) {
+            throw constraintError;
+          }
+        }
+        
+        console.log('✓ Migration completed: game_instance_id column added to coin_transactions');
+      } else {
+        console.log('✓ coin_transactions table has game_instance_id column');
+      }
     }
   } catch (error) {
     console.error('✗ Failed to initialize database schema:', error);
