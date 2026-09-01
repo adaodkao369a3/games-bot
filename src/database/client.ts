@@ -151,6 +151,7 @@ async function getOrCreateUser(userId: string, client: PoolClient): Promise<Coin
  * @param source Source of the transaction (e.g., 'gamble', 'admin')
  * @param reason Optional reason for the transaction
  * @param description Optional description
+ * @param gameInstanceId Optional unique identifier for game instance (prevents duplicate rewards)
  * @returns New balance after transaction, or null if failed
  */
 export async function addCoins(
@@ -158,7 +159,8 @@ export async function addCoins(
   amount: number,
   source: string,
   reason?: string,
-  description?: string
+  description?: string,
+  gameInstanceId?: string
 ): Promise<number | null> {
   const client = await getClient();
   try {
@@ -205,25 +207,44 @@ export async function addCoins(
     if (amount > 0) transactionType = 'earn';
     if (amount < 0) transactionType = 'spend';
 
-    // Log transaction
-    await client.query(
-      `INSERT INTO coin_transactions 
-       (user_id, amount, balance_before, balance_after, transaction_type, source, reason, description)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        userId,
-        amount,
-        currentBalance,
-        newBalance,
-        transactionType,
-        source,
-        reason || null,
-        description || null,
-      ]
-    );
+    // Log transaction with optional game_instance_id
+    if (gameInstanceId) {
+      await client.query(
+        `INSERT INTO coin_transactions 
+         (user_id, amount, balance_before, balance_after, transaction_type, source, reason, description, game_instance_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          userId,
+          amount,
+          currentBalance,
+          newBalance,
+          transactionType,
+          source,
+          reason || null,
+          description || null,
+          gameInstanceId,
+        ]
+      );
+    } else {
+      await client.query(
+        `INSERT INTO coin_transactions 
+         (user_id, amount, balance_before, balance_after, transaction_type, source, reason, description)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          userId,
+          amount,
+          currentBalance,
+          newBalance,
+          transactionType,
+          source,
+          reason || null,
+          description || null,
+        ]
+      );
+    }
 
     await client.query('COMMIT');
-    console.log(`[COINS] Transaction successful: User ${userId}, Amount: ${amount}, New Balance: ${newBalance}, Source: ${source}`);
+    console.log(`[COINS] Transaction successful: User ${userId}, Amount: ${amount}, New Balance: ${newBalance}, Source: ${source}${gameInstanceId ? `, GameInstance: ${gameInstanceId}` : ''}`);
     return newBalance;
   } catch (error) {
     try {
@@ -236,6 +257,7 @@ export async function addCoins(
       userId,
       amount,
       source,
+      gameInstanceId,
       errorMessage: error instanceof Error ? error.message : String(error),
       errorStack: error instanceof Error ? error.stack : undefined
     });

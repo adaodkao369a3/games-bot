@@ -1,4 +1,5 @@
-import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder } from 'discord.js';
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder, TextChannel } from 'discord.js';
+import { awardGameReward } from '../utils/game-rewards.js';
 
 export interface RouletteMaxPlayer {
   id: string;
@@ -28,6 +29,7 @@ export interface RouletteMaxState {
   roundInSet: number;
   roundStartTime?: number;
   roundDecided: boolean;
+  gameInstanceId: string;
 }
 
 export enum RouletteMaxPhase {
@@ -133,6 +135,7 @@ export class RouletteMaxGame {
       currentRound: 1,
       roundInSet: 1,
       roundDecided: false,
+      gameInstanceId: `roulettemax_${channelId}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
     };
     this.onGameEnd = onGameEnd;
   }
@@ -1370,6 +1373,11 @@ export class RouletteMaxGame {
       components: [],
     });
 
+    // Award Bombo Coins to the winner
+    if (this.currentMessage?.channel) {
+      await awardGameReward(winner.id, 1200, 'Roulette Max', this.currentMessage.channel as TextChannel, this.state.gameInstanceId);
+    }
+
     // Call cleanup callback to remove game from active games
     if (this.onGameEnd) {
       this.onGameEnd();
@@ -1421,6 +1429,13 @@ export class RouletteMaxGame {
    */
   getState(): RouletteMaxState {
     return { ...this.state };
+  }
+
+  /**
+   * Get game instance ID
+   */
+  getGameInstanceId(): string {
+    return this.state.gameInstanceId;
   }
 
   /**

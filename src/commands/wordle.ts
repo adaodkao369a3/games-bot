@@ -5,6 +5,7 @@ import { WordleUI } from '../ui/wordle-ui.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { BobKunPersonality } from '../services/bob-kun-personality.js';
 import { isStaff } from '../utils/permissions.js';
+import { awardGameReward } from '../utils/game-rewards.js';
 
 // Active games keyed by channel ID
 const activeGames = new Map<string, WordleGame>();
@@ -221,6 +222,13 @@ async function announceWinner(game: WordleGame, channel: any, winner: string, se
       });
 
       console.log('[Wordle Winner] Winner announced successfully by editing message');
+
+      // Award Bombo Coins to the winner
+      const correctGuessers = game.getCorrectGuessers();
+      if (correctGuessers.length > 0) {
+        const winnerPlayerId = correctGuessers[0].playerId;
+        await awardGameReward(winnerPlayerId, 1000, 'Wordle', channel, game.getGameInstanceId());
+      }
     } catch (error) {
       console.error('[Wordle Winner] Failed to announce winner:', error);
     }

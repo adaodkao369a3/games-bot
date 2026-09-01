@@ -1,4 +1,5 @@
-import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder } from 'discord.js';
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder, TextChannel } from 'discord.js';
+import { awardGameReward } from '../utils/game-rewards.js';
 
 export interface PissCompPlayer {
   id: string;
@@ -17,6 +18,7 @@ export interface PissCompState {
   player1Meter: number;
   player2Meter: number;
   isDraw: boolean;
+  gameInstanceId: string;
 }
 
 export interface PissCompResult {
@@ -58,6 +60,7 @@ export class PissCompGame {
       player1Meter: 0,
       player2Meter: 0,
       isDraw: false,
+      gameInstanceId: `pisscomp_${channelId}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
     };
     this.onGameEnd = onGameEnd;
   }
@@ -186,6 +189,11 @@ export class PissCompGame {
       embeds: [victoryEmbed],
       components: this.createDisabledPumpButtons(),
     });
+
+    // Award Bombo Coins to the winner (only on victory, not on draw)
+    if (this.currentMessage?.channel) {
+      await awardGameReward(winnerId, 900, 'Piss Comp', this.currentMessage.channel as TextChannel, this.state.gameInstanceId);
+    }
 
     // Call cleanup callback to remove game from active games
     if (this.onGameEnd) {
@@ -326,6 +334,13 @@ export class PissCompGame {
    */
   getState(): PissCompState {
     return { ...this.state };
+  }
+
+  /**
+   * Get game instance ID
+   */
+  getGameInstanceId(): string {
+    return this.state.gameInstanceId;
   }
 
   /**

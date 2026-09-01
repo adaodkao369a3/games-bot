@@ -1,4 +1,5 @@
-import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder } from 'discord.js';
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder, TextChannel } from 'discord.js';
+import { awardGameReward } from '../utils/game-rewards.js';
 
 export interface RoulettePlayer {
   id: string;
@@ -23,6 +24,7 @@ export interface RouletteState {
   turnStartTime?: number;
   isDoubleTurnActive: boolean;
   doubleTurnShotNumber: number; // 1 or 2
+  gameInstanceId: string;
 }
 
 export interface RouletteResult {
@@ -63,6 +65,7 @@ export class RussianRouletteGame {
       currentChamberIndex: 0,
       isDoubleTurnActive: false,
       doubleTurnShotNumber: 0,
+      gameInstanceId: `roulette_${channelId}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
     };
     this.onGameEnd = onGameEnd;
   }
@@ -562,6 +565,11 @@ export class RussianRouletteGame {
       components: [],
     });
 
+    // Award Bombo Coins to the winner
+    if (this.currentMessage?.channel) {
+      await awardGameReward(winner.id, 700, 'Russian Roulette', this.currentMessage.channel as TextChannel, this.state.gameInstanceId);
+    }
+
     // Call cleanup callback to remove game from active games
     if (this.onGameEnd) {
       this.onGameEnd();
@@ -603,6 +611,13 @@ export class RussianRouletteGame {
    */
   getState(): RouletteState {
     return { ...this.state };
+  }
+
+  /**
+   * Get game instance ID
+   */
+  getGameInstanceId(): string {
+    return this.state.gameInstanceId;
   }
 
   /**

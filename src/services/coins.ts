@@ -3,6 +3,7 @@ import { addCoins, getCoinBalance, CoinBalance } from '../database/client.js';
 export interface CoinOptions {
   reason?: string;
   description?: string;
+  gameInstanceId?: string;
 }
 
 export class CoinsService {
@@ -27,7 +28,7 @@ export class CoinsService {
     
     console.log(`[COINS] Awarding ${amount} coins to user ${userId} from source: ${source}`);
     
-    return await addCoins(userId, amount, source, options?.reason, options?.description);
+    return await addCoins(userId, amount, source, options?.reason, options?.description, options?.gameInstanceId);
   }
   
   /**
@@ -52,7 +53,7 @@ export class CoinsService {
     console.log(`[COINS] Removing ${amount} coins from user ${userId} for: ${source}`);
     
     // Use negative amount for removal
-    return await addCoins(userId, -amount, source, options?.reason, options?.description);
+    return await addCoins(userId, -amount, source, options?.reason, options?.description, options?.gameInstanceId);
   }
   
   /**

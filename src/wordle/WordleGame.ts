@@ -16,6 +16,7 @@ export interface WordleGameState {
   playerCooldowns: Map<string, number>;
   correctGuessers: Array<{ username: string; playerId: string }>;
   wrongGuesses: string[];
+  gameInstanceId: string;
 }
 
 export interface GuessValidationResult {
@@ -52,6 +53,7 @@ export class WordleGame {
       playerCooldowns: new Map<string, number>(),
       correctGuessers: [],
       wrongGuesses: [],
+      gameInstanceId: `wordle_${channelId}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
     };
   }
   
@@ -175,10 +177,17 @@ export class WordleGame {
   }
   
   /**
-   * Get the full game state (including secret word)
+   * Get game state
    */
-  getFullState(): WordleGameState {
+  getState(): WordleGameState {
     return { ...this.state };
+  }
+
+  /**
+   * Get game instance ID
+   */
+  getGameInstanceId(): string {
+    return this.state.gameInstanceId;
   }
   
   /**

@@ -1,5 +1,6 @@
-import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder } from 'discord.js';
+import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder, TextChannel } from 'discord.js';
 import { QuickDrawImageGenerator } from '../utils/quickdraw-image-generator.js';
+import { awardGameReward } from '../utils/game-rewards.js';
 
 export interface QuickDrawState {
   channelId: string;
@@ -17,6 +18,7 @@ export interface QuickDrawState {
   messageId?: string;
   drawStartTime?: number;
   setupStartTime: number;
+  gameInstanceId: string;
 }
 
 export interface QuickDrawResult {
@@ -58,6 +60,7 @@ export class QuickDrawGame {
       player2Avatar,
       isGameOver: false,
       setupStartTime: Date.now(),
+      gameInstanceId: `quickdraw_${channelId}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
     };
   }
 
@@ -224,6 +227,11 @@ export class QuickDrawGame {
       files: [], // Clear any previous image attachments
       attachments: [], // Clear any previous attachments
     });
+
+    // Award Bombo Coins to the winner
+    if (this.currentMessage?.channel) {
+      await awardGameReward(winner, 700, 'Quick Draw', this.currentMessage.channel as TextChannel, this.state.gameInstanceId);
+    }
     
     return {
       winner,
@@ -259,6 +267,13 @@ export class QuickDrawGame {
    */
   getState(): QuickDrawState {
     return { ...this.state };
+  }
+
+  /**
+   * Get game instance ID
+   */
+  getGameInstanceId(): string {
+    return this.state.gameInstanceId;
   }
 
   /**
