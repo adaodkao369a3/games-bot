@@ -31,7 +31,7 @@ export async function handleQuickDrawMaxCommand(message: Message, args: string[]
     // Validate command: need a mentioned user
     if (message.mentions.users.size === 0) {
       await message.reply({
-        content: 'You need to mention another user to challenge! Usage: `,quickdrawmax @user`',
+        content: 'You need to mention another user to challenge! Usage: `.quickdrawmax @user`',
       });
       return;
     }

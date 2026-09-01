@@ -1,27 +1,29 @@
 import { Message, EmbedBuilder } from 'discord.js';
-import { getResidualsInfo } from '../services/residuals.js';
+import { getCoinBalanceInfo } from '../services/coins.js';
+import { createOrUpdateUser } from '../database/client.js';
 
 export async function handleWalletCommand(message: Message): Promise<void> {
   const userId = message.author.id;
 
-  // Get user's current balance
-  const residualInfo = await getResidualsInfo(userId);
-  if (!residualInfo) {
-    await message.reply('Unable to retrieve your residual balance. Please try again later.');
-    return;
+  // Get user's current balance (auto-creates user if doesn't exist)
+  let coinInfo = await getCoinBalanceInfo(userId);
+  
+  // If user doesn't exist, create them with 0 balance
+  if (!coinInfo) {
+    coinInfo = await createOrUpdateUser(userId);
   }
 
   // Create wallet embed
   const walletEmbed = new EmbedBuilder()
     .setTitle('💼 YOUR WALLET')
-    .setDescription('Current residual balance')
+    .setDescription('Current Bombo Coin balance')
     .setColor(0x00BFFF)
     .addFields(
-      { name: 'Balance', value: `${residualInfo.balance.toLocaleString()} residuals`, inline: true },
-      { name: 'Lifetime Earned', value: `${residualInfo.lifetime_earned.toLocaleString()} residuals`, inline: true },
-      { name: 'Lifetime Spent', value: `${residualInfo.lifetime_spent.toLocaleString()} residuals`, inline: true }
+      { name: 'Balance', value: `${coinInfo.balance.toLocaleString()} 🪙`, inline: true },
+      { name: 'Lifetime Earned', value: `${coinInfo.lifetime_earned.toLocaleString()} 🪙`, inline: true },
+      { name: 'Lifetime Spent', value: `${coinInfo.lifetime_spent.toLocaleString()} 🪙`, inline: true }
     )
-    .setFooter({ text: 'Residuals are the currency of the realm.' });
+    .setFooter({ text: 'Bombo Coins are the currency of the realm.' });
 
   await message.reply({ embeds: [walletEmbed] });
 }

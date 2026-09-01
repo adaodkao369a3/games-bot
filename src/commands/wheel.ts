@@ -42,7 +42,7 @@ export async function handleWheelCommand(message: Message, args: string[]): Prom
     if (!category) {
       // Show available categories
       const categories = getWheelCategories();
-      const categoryList = categories.map(cat => `,wheel ${cat}`).join('\n');
+      const categoryList = categories.map(cat => `.wheel ${cat}`).join('\n');
       
       await message.reply({
         content: `🎡 Wheel Categories\n\n${categoryList}`,
@@ -53,7 +53,7 @@ export async function handleWheelCommand(message: Message, args: string[]): Prom
     // Validate category
     if (!isValidCategory(category)) {
       await message.reply({
-        content: `❌ Unknown wheel category: "${category}"\n\nAvailable categories:\n${getWheelCategories().map(cat => `,wheel ${cat}`).join('\n')}`,
+        content: `❌ Unknown wheel category: "${category}"\n\nAvailable categories:\n${getWheelCategories().map(cat => `.wheel ${cat}`).join('\n')}`,
       });
       return;
     }

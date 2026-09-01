@@ -15,7 +15,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
   // Check if this is a reply to another message
   if (!message.reference?.messageId) {
     await message.reply(
-      'You need to reply to a message to create a quote card. Reply to a message and then use `,quote`.'
+      'You need to reply to a message to create a quote card. Reply to a message and then use `.quote`.'
     );
     return;
   }

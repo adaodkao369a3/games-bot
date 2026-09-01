@@ -1,32 +1,32 @@
 import { Pool, PoolClient, type QueryResultRow } from 'pg';
 import { config } from '../config/index.js';
+import fs from 'fs';
+import path from 'path';
 
 let pool: Pool | null = null;
 
-export interface User extends QueryResultRow {
-  user_id: string;
-  username: string;
-  nickname: string | null;
-  current_xp: number;
-  current_level: number;
-  current_progression_role: string;
-  promotion_eligibility_percentage: number;
-  total_residuals_balance: number;
-  lifetime_residuals_earned: number;
-  lifetime_residuals_spent: number;
-  last_xp_timestamp: Date | null;
-  daily_xp_earned: number;
-  last_daily_xp_reset: Date | null;
-  daily_bonus_paid: boolean;
-  last_promotion_timestamp: Date | null;
-  created_at: Date;
-  updated_at: Date;
+export interface CoinBalance {
+  balance: number;
+  lifetime_earned: number;
+  lifetime_spent: number;
 }
 
-interface ResidualBalanceRow extends QueryResultRow {
-  total_residuals_balance: number;
-  lifetime_residuals_earned: number;
-  lifetime_residuals_spent: number;
+function parseBigInt(value: string | number): number {
+  if (typeof value === 'number') return value;
+  return parseInt(value, 10);
+}
+
+export interface CoinTransaction {
+  id: number;
+  user_id: string;
+  amount: number;
+  balance_before: number;
+  balance_after: number;
+  transaction_type: string;
+  source: string;
+  reason: string | null;
+  description: string | null;
+  created_at: Date;
 }
 
 export async function connect(): Promise<void> {
@@ -48,6 +48,9 @@ export async function connect(): Promise<void> {
     // Test connection
     await pool.query('SELECT 1');
     console.log('✓ Database connected');
+
+    // Initialize schema
+    await initializeSchema();
   } catch (error) {
     console.error('✗ Failed to connect to database:', error);
     await pool.end().catch(endError => {
@@ -73,63 +76,126 @@ export async function getClient(): Promise<PoolClient> {
   return pool.connect();
 }
 
-export async function getUser(userId: string): Promise<User | null> {
-  const client = await getClient();
+async function initializeSchema(): Promise<void> {
   try {
-    const result = await client.query<User>(
-      'SELECT * FROM users WHERE user_id = $1',
-      [userId]
-    );
-
-    if (result.rows.length === 0) {
-      return null;
+    // Check if users table exists and has the correct schema
+    const tableCheck = await pool!.query(`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' 
+      AND table_schema = 'public'
+    `);
+    
+    if (tableCheck.rows.length === 0) {
+      // Table doesn't exist, create from schema
+      const schemaPath = path.join(process.cwd(), 'src', 'database', 'schema.sql');
+      const schema = fs.readFileSync(schemaPath, 'utf-8');
+      await pool!.query(schema);
+      console.log('✓ Database schema initialized');
+    } else {
+      // Check if it has the coin columns
+      const hasCoinColumns = tableCheck.rows.some(
+        (row: any) => row.column_name === 'coin_balance'
+      );
+      
+      if (!hasCoinColumns) {
+        console.error('✗ Existing users table does not have Bombo Coins schema. Please manually migrate or drop the table.');
+        throw new Error('Incompatible database schema detected');
+      } else {
+        console.log('✓ Database schema already exists with Bombo Coins');
+      }
     }
-
-    return mapRowToUser(result.rows[0]);
-  } finally {
-    client.release();
+  } catch (error) {
+    console.error('✗ Failed to initialize database schema:', error);
+    throw error;
   }
 }
 
-export async function addResiduals(
+/**
+ * Get or create a user's coin balance
+ * This ensures users exist in the database before transactions
+ */
+async function getOrCreateUser(userId: string, client: PoolClient): Promise<CoinBalance> {
+  // Try to get existing user
+  const result = await client.query(
+    'SELECT coin_balance as balance, lifetime_coins_earned as lifetime_earned, lifetime_coins_spent as lifetime_spent FROM users WHERE user_id = $1',
+    [userId]
+  );
+
+  if (result.rows.length > 0) {
+    const row = result.rows[0];
+    return {
+      balance: parseBigInt(row.balance),
+      lifetime_earned: parseBigInt(row.lifetime_earned),
+      lifetime_spent: parseBigInt(row.lifetime_spent)
+    };
+  }
+
+  // Create new user with 0 balance
+  await client.query(
+    'INSERT INTO users (user_id, coin_balance, lifetime_coins_earned, lifetime_coins_spent) VALUES ($1, 0, 0, 0)',
+    [userId]
+  );
+
+  return {
+    balance: 0,
+    lifetime_earned: 0,
+    lifetime_spent: 0
+  };
+}
+
+/**
+ * Add coins to a user's balance atomically
+ * @param userId Discord user ID
+ * @param amount Amount to add (positive for earning, negative for spending)
+ * @param source Source of the transaction (e.g., 'gamble', 'admin')
+ * @param reason Optional reason for the transaction
+ * @param description Optional description
+ * @returns New balance after transaction, or null if failed
+ */
+export async function addCoins(
   userId: string,
   amount: number,
   source: string,
   reason?: string,
-  adminUserId?: string,
   description?: string
 ): Promise<number | null> {
   const client = await getClient();
   try {
     await client.query('BEGIN');
 
-    // Get current balance with row lock for atomicity
-    const userResult = await client.query<ResidualBalanceRow>(
-      'SELECT total_residuals_balance, lifetime_residuals_earned, lifetime_residuals_spent FROM users WHERE user_id = $1 FOR UPDATE',
+    // Get or create user with row lock for atomicity
+    const balance = await getOrCreateUser(userId, client);
+    
+    // Lock the user row for this transaction
+    const lockResult = await client.query(
+      'SELECT coin_balance as balance, lifetime_coins_earned as lifetime_earned, lifetime_coins_spent as lifetime_spent FROM users WHERE user_id = $1 FOR UPDATE',
       [userId]
     );
-
-    if (userResult.rows.length === 0) {
+    
+    const currentBalance = parseBigInt(lockResult.rows[0].balance);
+    const newBalance = currentBalance + amount;
+    
+    // Prevent zero amount transactions
+    if (amount === 0) {
       await client.query('ROLLBACK');
+      console.error(`[COINS] Transaction rejected: zero amount. User: ${userId}`);
       return null;
     }
-
-    const balanceBefore = userResult.rows[0].total_residuals_balance;
-    const balanceAfter = balanceBefore + amount;
     
     // Prevent negative balance
-    if (balanceAfter < 0) {
+    if (newBalance < 0) {
       await client.query('ROLLBACK');
+      console.error(`[COINS] Transaction rejected: would result in negative balance. User: ${userId}, Current: ${currentBalance}, Amount: ${amount}`);
       return null;
     }
 
-    // Update user balance
+    // Update user balance atomically
     await client.query(
       `UPDATE users 
-       SET total_residuals_balance = total_residuals_balance + $1,
-           lifetime_residuals_earned = lifetime_residuals_earned + GREATEST($1, 0),
-           lifetime_residuals_spent = lifetime_residuals_spent + GREATEST(-$1, 0),
-           updated_at = CURRENT_TIMESTAMP
+       SET coin_balance = CAST(coin_balance AS BIGINT) + $1,
+           lifetime_coins_earned = CAST(lifetime_coins_earned AS BIGINT) + GREATEST($1, 0),
+           lifetime_coins_spent = CAST(lifetime_coins_spent AS BIGINT) + GREATEST(-$1, 0)
        WHERE user_id = $2`,
       [amount, userId]
     );
@@ -141,28 +207,32 @@ export async function addResiduals(
 
     // Log transaction
     await client.query(
-      `INSERT INTO residual_transactions 
-       (user_id, amount, balance_before, balance_after, transaction_type, source, reason, admin_user_id, description)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO coin_transactions 
+       (user_id, amount, balance_before, balance_after, transaction_type, source, reason, description)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         userId,
         amount,
-        balanceBefore,
-        balanceAfter,
+        currentBalance,
+        newBalance,
         transactionType,
         source,
         reason || null,
-        adminUserId || null,
         description || null,
       ]
     );
 
     await client.query('COMMIT');
-    return balanceAfter;
+    console.log(`[COINS] Transaction successful: User ${userId}, Amount: ${amount}, New Balance: ${newBalance}, Source: ${source}`);
+    return newBalance;
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Failed to add residuals:', error);
-    console.error('Error details:', {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('[COINS] Failed to rollback transaction:', rollbackError);
+    }
+    console.error('[COINS] Transaction failed:', error);
+    console.error('[COINS] Error details:', {
       userId,
       amount,
       source,
@@ -175,11 +245,16 @@ export async function addResiduals(
   }
 }
 
-export async function getResiduals(userId: string): Promise<{ balance: number; lifetime_earned: number; lifetime_spent: number } | null> {
+/**
+ * Get a user's current coin balance
+ * @param userId Discord user ID
+ * @returns User's coin balance info, or null if user doesn't exist
+ */
+export async function getCoinBalance(userId: string): Promise<CoinBalance | null> {
   const client = await getClient();
   try {
-    const result = await client.query<ResidualBalanceRow>(
-      'SELECT total_residuals_balance, lifetime_residuals_earned, lifetime_residuals_spent FROM users WHERE user_id = $1',
+    const result = await client.query(
+      'SELECT coin_balance as balance, lifetime_coins_earned as lifetime_earned, lifetime_coins_spent as lifetime_spent FROM users WHERE user_id = $1',
       [userId]
     );
 
@@ -189,33 +264,65 @@ export async function getResiduals(userId: string): Promise<{ balance: number; l
 
     const row = result.rows[0];
     return {
-      balance: row.total_residuals_balance,
-      lifetime_earned: row.lifetime_residuals_earned,
-      lifetime_spent: row.lifetime_residuals_spent,
+      balance: parseBigInt(row.balance),
+      lifetime_earned: parseBigInt(row.lifetime_earned),
+      lifetime_spent: parseBigInt(row.lifetime_spent)
     };
   } finally {
     client.release();
   }
 }
 
-function mapRowToUser(row: User): User {
-  return {
-    user_id: row.user_id,
-    username: row.username,
-    nickname: row.nickname,
-    current_xp: row.current_xp,
-    current_level: row.current_level,
-    current_progression_role: row.current_progression_role,
-    promotion_eligibility_percentage: row.promotion_eligibility_percentage,
-    total_residuals_balance: row.total_residuals_balance,
-    lifetime_residuals_earned: row.lifetime_residuals_earned,
-    lifetime_residuals_spent: row.lifetime_residuals_spent,
-    last_xp_timestamp: row.last_xp_timestamp,
-    daily_xp_earned: row.daily_xp_earned,
-    last_daily_xp_reset: row.last_daily_xp_reset,
-    daily_bonus_paid: row.daily_bonus_paid || false,
-    last_promotion_timestamp: row.last_promotion_timestamp,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
+/**
+ * Get transaction history for a user
+ * @param userId Discord user ID
+ * @param limit Maximum number of transactions to return
+ * @returns Array of transactions
+ */
+export async function getTransactionHistory(userId: string, limit: number = 50): Promise<CoinTransaction[]> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      'SELECT * FROM coin_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2',
+      [userId, limit]
+    );
+    return result.rows.map(row => ({
+      id: row.id,
+      user_id: row.user_id,
+      amount: parseBigInt(row.amount),
+      balance_before: parseBigInt(row.balance_before),
+      balance_after: parseBigInt(row.balance_after),
+      transaction_type: row.transaction_type,
+      source: row.source,
+      reason: row.reason,
+      description: row.description,
+      created_at: row.created_at
+    }));
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Create a user with 0 balance if they don't exist
+ * @param userId Discord user ID
+ * @returns User's coin balance info
+ */
+export async function createOrUpdateUser(userId: string): Promise<CoinBalance> {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const balance = await getOrCreateUser(userId, client);
+    await client.query('COMMIT');
+    return balance;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('[COINS] Failed to rollback transaction:', rollbackError);
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 }

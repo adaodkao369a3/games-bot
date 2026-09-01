@@ -7,7 +7,7 @@ A cute, chaotic Minion-inspired gaming Discord bot for the Mi Bom3o server. Bob 
 - **Smash This**: A simple head-to-head voting game between two random recently active users
 - **Smart Activity-Based Spawning**: Events spawn automatically after periods of inactivity followed by renewed chat activity
 - **20-Second Voting**: Fast-paced voting periods with instant winner reveals
-- **Prefix Commands**: Use `,smash` to force an event immediately
+- **Prefix Commands**: Use `.smash` to force an event immediately
 - **Recent Activity Selection**: Events feature people who have actually been active in the channel recently
 - **Random Delays**: Automatic events have a random 1-5 minute delay for surprise factor
 - **Persistent Data**: All event data and votes are stored in JSON
@@ -78,7 +78,7 @@ DISCORD_GUILD_ID=your_guild_id_here
 
 **Optional:**
 - `DATABASE_URL`: Path to JSON database file (default: `./data/bob-kun.json`)
-- `PREFIX`: Command prefix for bot commands (default: `,`)
+- `PREFIX`: Command prefix for bot commands (default: `.`)
 
 ### Activity-Based Spawning Behavior
 
@@ -147,9 +147,9 @@ Bob Kun automatically creates Smash events based on chat activity:
 
 ### Manual Trigger
 
-You can force an event immediately using `,smash`:
+You can force an event immediately using `.smash`:
 
-1. Use `,smash` command
+1. Use `.smash` command
 2. Bob Kun selects two random recently active users
 3. Event appears immediately (no delay)
 4. Normal 20-second voting period
@@ -159,7 +159,7 @@ You can force an event immediately using `,smash`:
 
 You can specify users to smash:
 
-1. Use `,smash @User1 @User2` command
+1. Use `.smash @User1 @User2` command
 2. Bob Kun validates both users are real members and not bots
 3. Event appears immediately with the specified users
 4. Normal 20-second voting period
@@ -238,7 +238,7 @@ pm2 restart bob-kun
 bob-kun-discord-bot/
 ├── src/
 │   ├── commands/           # Prefix command handlers
-│   │   └── smash.ts        # ,smash command
+│   │   └── smash.ts        # .smash command
 │   ├── games/              # Game modules
 │   │   └── smash-this/
 │   │       ├── smash-event.ts    # Event handler
@@ -275,7 +275,7 @@ bob-kun-discord-bot/
 
 ### Commands not working
 
-- Ensure your message starts with the configured prefix (default: `,`)
+- Ensure your message starts with the configured prefix (default: `.`)
 - Check that Message Content Intent is enabled in Discord Developer Portal
 - Verify bot has permission to read messages in the channel
 - Try restarting the bot if prefix commands aren't responding
@@ -300,13 +300,13 @@ bob-kun-discord-bot/
 - Users need to have sent messages recently (within 7 days) to be eligible
 - Check that the random 1-5 minute delay hasn't made it seem like spawning isn't working
 
-### `,smash` command fails
+### `.smash` command fails
 
 - Ensure there are at least 2 recently active users in the channel
 - Check that users have sent messages recently (within 7 days)
 - Verify bot has permission to send messages in the channel
 - Check that there isn't already an active Smash event in the channel
-- When using `,@User1 @User2`, ensure both tags are valid server members and not bots
+- When using `.@User1 @User2`, ensure both tags are valid server members and not bots
 
 ## Adding More Games
 

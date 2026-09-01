@@ -24,12 +24,12 @@ export async function handleTrialCommand(message: Message): Promise<void> {
       return;
     }
 
-    // Parse command: ,trial @user [accusation]
+    // Parse command: .trial @user [accusation]
     const args = message.content.trim().split(/\s+/);
     
     if (args.length < 3) {
       await message.reply({
-        content: `${BobKunPersonality.error} Usage: \`,trial @user [accusation]\nExample: \`,trial @Devin stealing all the sandwiches`,
+        content: `${BobKunPersonality.error} Usage: \`.trial @user [accusation]\nExample: \`.trial @Devin stealing all the sandwiches`,
       });
       return;
     }

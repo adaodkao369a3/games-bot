@@ -31,7 +31,7 @@ export async function handlePissCompCommand(message: Message, args: string[]): P
     // Validate command: need a mentioned user
     if (message.mentions.users.size === 0) {
       await message.reply({
-        content: 'You need to mention another user to challenge! Usage: `,pisscomp @user`',
+        content: 'You need to mention another user to challenge! Usage: `.pisscomp @user`',
       });
       return;
     }

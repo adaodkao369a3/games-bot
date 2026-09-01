@@ -8,7 +8,7 @@ export const config = {
     clientId: process.env.DISCORD_CLIENT_ID || '',
     guildId: process.env.DISCORD_GUILD_ID || '',
   },
-  prefix: process.env.PREFIX || ',',
+  prefix: process.env.PREFIX || '.',
   database: {
     url: process.env.DATABASE_URL || '',
   },

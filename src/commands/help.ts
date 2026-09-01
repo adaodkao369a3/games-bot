@@ -17,17 +17,22 @@ export async function handleHelpCommand(message: Message): Promise<void> {
     embed.addFields([
       {
         name: '🎮 **Games**',
-        value: '`,wordle` — Start a multiplayer Wordle game\n`,smash @user1 @user2` — Start a Smash or Pass vote\n`,trial @user [accusation]` — Hold a courtroom trial\n`,roulette @user1 @user2...` — Play Russian Roulette\n`,roulettemax @user` — Play Roulette Max (2 players only)\n`,quickdraw @user` — Start a Quick Draw duel\n`,quickdrawmax @user` — Start a Quick Draw Max duel with distraction\n`,gamble [amount]` — Play Bob\'s slot machine gamble',
+        value: '`.wordle` — Start a multiplayer Wordle game\n`.smash @user1 @user2` — Start a Smash or Pass vote\n`.trial @user [accusation]` — Hold a courtroom trial\n`.roulette @user1 @user2...` — Play Russian Roulette\n`.roulettemax @user` — Play Roulette Max (2 players only)\n`.quickdraw @user` — Start a Quick Draw duel\n`.quickdrawmax @user` — Start a Quick Draw Max duel with distraction\n`.gamble [amount]` — Play Bob\'s slot machine gamble',
         inline: false,
       },
       {
         name: '💬 **Quote Cards**',
-        value: '`,quote [theme]` — Create a quote card from a replied message (themes: classic, sunset, ocean, purple)',
+        value: '`.quote [theme]` — Create a quote card from a replied message (themes: classic, sunset, ocean, purple)',
         inline: false,
       },
       {
         name: '🎡 **Wheels**',
-        value: '`,wheel pfp` — Spin the PFP-changing wheel\n`,wheel truthordare` — Spin the Truth or Dare wheel\n`,wheel punishment` — Spin the punishment wheel\n`,wheel act` — Spin the acting/challenge wheel',
+        value: '`.wheel pfp` — Spin the PFP-changing wheel\n`.wheel truthordare` — Spin the Truth or Dare wheel\n`.wheel punishment` — Spin the punishment wheel\n`.wheel act` — Spin the acting/challenge wheel',
+        inline: false,
+      },
+      {
+        name: '💼 **Currency**',
+        value: '`.wallet` — Check your Bombo Coin balance',
         inline: false,
       },
     ]);
@@ -37,7 +42,7 @@ export async function handleHelpCommand(message: Message): Promise<void> {
       embed.addFields([
         {
           name: '🛠️ **Staff Commands**',
-          value: '`,fonttest` — Test font rendering\n`,smashtest` — Test Smash image generation\n`,wheeltest` — Test wheel geometry\n`,wheelfonttest` — Test wheel font rendering',
+          value: '`.fonttest` — Test font rendering\n`.smashtest` — Test Smash image generation\n`.wheeltest` — Test wheel geometry\n`.wheelfonttest` — Test wheel font rendering',
           inline: false,
         },
       ]);

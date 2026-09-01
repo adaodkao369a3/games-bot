@@ -47,7 +47,7 @@ export async function handleSmashMaxCommand(message: Message): Promise<void> {
         mode = 'female';
       } else {
         await message.reply({
-          content: 'Invalid mode. Use: `,smashmax` (normal) or `,smashmax f` (female-only).',
+          content: 'Invalid mode. Use: `.smashmax` (normal) or `.smashmax f` (female-only).',
         });
         return;
       }
