@@ -143,7 +143,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       }
     );
 
-    if (!deductionResult) {
+    if (deductionResult === null) {
       console.error(`[GAMBLE] Failed to deduct wager for user ${userId}. Amount: ${wager}`);
       await initialMessage.edit('Failed to process your wager. This may be due to a database connection issue. Please try again in a moment.');
       return;
@@ -185,7 +185,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
         }
       );
 
-      if (!awardResult) {
+      if (awardResult === null) {
         console.error(`[GAMBLE] Failed to award winnings for user ${userId}. Wager: ${wager}, Payout: ${payout}. Attempting refund.`);
 
         // Refund the wager if payout fails
@@ -199,7 +199,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
           }
         );
 
-        if (!refundResult) {
+        if (refundResult === null) {
           console.error(`[GAMBLE] CRITICAL: Failed to refund wager for user ${userId} after payout failure. Amount: ${wager}`);
           await initialMessage.edit('Failed to process your winnings. Please contact support immediately - your wager may be affected.');
         } else {
@@ -253,7 +253,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
         }
       );
 
-      if (!refundResult) {
+      if (refundResult === null) {
         console.error(`[GAMBLE] CRITICAL: Failed to refund wager for user ${userId} after unexpected error. Amount: ${wager}`);
       }
     } catch (refundError) {
