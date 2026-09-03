@@ -66,8 +66,8 @@ function buildLoadingEmbed(wager: number, balanceBefore: number): EmbedBuilder {
     .setDescription('_Putting your Bombo Coins on the line..._\n\n**```\n' + randomReelFrame() + '\n```**')
     .setColor(0xFFD700)
     .addFields(
-      { name: '💵 Wager', value: `${wager.toLocaleString()} 🪙`, inline: true },
-      { name: '🏦 Balance', value: `${balanceBefore.toLocaleString()} 🪙`, inline: true },
+      { name: '💵 Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+      { name: '🏦 Balance', value: `${balanceBefore.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
       { name: '🎲 Odds', value: '50/50 · 2x payout', inline: true }
     )
     .setFooter({ text: 'Spinning the reels...' });
@@ -79,8 +79,8 @@ function buildSpinEmbed(wager: number, balanceBefore: number): EmbedBuilder {
     .setDescription('**```\n' + randomReelFrame() + '\n```**')
     .setColor(0xFFD700)
     .addFields(
-      { name: '💵 Wager', value: `${wager.toLocaleString()} 🪙`, inline: true },
-      { name: '🏦 Balance', value: `${balanceBefore.toLocaleString()} 🪙`, inline: true },
+      { name: '💵 Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+      { name: '🏦 Balance', value: `${balanceBefore.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
       { name: '🎲 Odds', value: '50/50 · 2x payout', inline: true }
     )
     .setFooter({ text: 'Spinning the reels...' });
@@ -120,7 +120,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
   // Check if user has enough coins
   if (coinInfo.balance < wager) {
     await message.reply(
-      `You don't have enough Bombo Coins! Your current balance: ${coinInfo.balance.toLocaleString()} 🪙.\n` +
+      `You don't have enough Bombo Coins! Your current balance: ${coinInfo.balance.toLocaleString()} <:bombocoin:1545139736312815840>.\n` +
       `Tip: use \`.gamble all\` to wager your entire balance.`
     );
     return;
@@ -215,10 +215,10 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
         .setDescription('**```\n' + landingFrame + '\n```**\n💰 **THE MACHINE LIKES YOU.**')
         .setColor(0x00FF00)
         .addFields(
-          { name: '💵 You bet', value: `${wager.toLocaleString()} 🪙`, inline: true },
-          { name: '<:15394trophy:1545135066148118628>Payout', value: `${payout.toLocaleString()} 🪙`, inline: true },
-          { name: '✨ Profit', value: `+${wager.toLocaleString()} 🪙`, inline: true },
-          { name: '🏦 New Balance', value: `${balanceAfter.toLocaleString()} 🪙`, inline: false }
+          { name: '💵 You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '<:15394trophy:1545135066148118628>Payout', value: `${payout.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '✨ Profit', value: `+${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '🏦 New Balance', value: `${balanceAfter.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: false }
         )
         .setFooter({ text: 'Bob has temporarily approved your financial decisions.' });
     } else {
@@ -227,10 +227,10 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
         .setDescription('**```\n' + landingFrame + '\n```**\n💀 **THE MACHINE HAS SPOKEN.**')
         .setColor(0xFF0000)
         .addFields(
-          { name: '💵 You bet', value: `${wager.toLocaleString()} 🪙`, inline: true },
-          { name: '<:15394trophy:1545135066148118628>Payout', value: '0 🪙', inline: true },
-          { name: '📉 Loss', value: `-${wager.toLocaleString()} 🪙`, inline: true },
-          { name: '🏦 New Balance', value: `${balanceAfterDeduction.toLocaleString()} 🪙`, inline: false }
+          { name: '💵 You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '<:15394trophy:1545135066148118628>Payout', value: '0 <:bombocoin:1545139736312815840>', inline: true },
+          { name: '📉 Loss', value: `-${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '🏦 New Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: false }
         )
         .setFooter({ text: 'Bob recommends pretending this never happened.' });
     }

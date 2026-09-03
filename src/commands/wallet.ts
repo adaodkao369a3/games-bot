@@ -19,9 +19,9 @@ export async function handleWalletCommand(message: Message): Promise<void> {
     .setDescription('Current Bombo Coin balance')
     .setColor(0x00BFFF)
     .addFields(
-      { name: 'Balance', value: `${coinInfo.balance.toLocaleString()} 🪙`, inline: true },
-      { name: 'Lifetime Earned', value: `${coinInfo.lifetime_earned.toLocaleString()} 🪙`, inline: true },
-      { name: 'Lifetime Spent', value: `${coinInfo.lifetime_spent.toLocaleString()} 🪙`, inline: true }
+      { name: 'Balance', value: `${coinInfo.balance.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+      { name: 'Lifetime Earned', value: `${coinInfo.lifetime_earned.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+      { name: 'Lifetime Spent', value: `${coinInfo.lifetime_spent.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true }
     )
     .setFooter({ text: 'Bombo Coins are the currency of the realm.' });
 

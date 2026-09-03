@@ -31,7 +31,7 @@ export async function awardGameReward(
 
     // Send reward announcement embed only if coins were actually awarded
     const rewardEmbed = new EmbedBuilder()
-      .setTitle('🪙 Bombo Coins Earned')
+      .setTitle('<:bombocoin:1545139736312815840> Bombo Coins Earned')
       .setDescription(`<@${winnerId}> won the game and earned **${amount.toLocaleString()} Bombo Coins!**`)
       .setColor(0xFFD700)
       .setFooter({ text: 'Bombo Coins are the currency of the realm.' });
