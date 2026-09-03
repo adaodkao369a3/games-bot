@@ -285,7 +285,7 @@ export class WordleRenderer {
   static getStateEmoji(state: LetterState): string {
     switch (state) {
       case LetterState.CORRECT:
-        return '🟩';
+        return '<a:statustyping:1545155645630582794>';
       case LetterState.WRONG_POSITION:
         return '🟨';
       case LetterState.NOT_FOUND:

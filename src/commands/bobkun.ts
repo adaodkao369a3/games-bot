@@ -22,7 +22,7 @@ export async function handleBobkunCommand(message: Message): Promise<void> {
     embed.addFields([
       {
         name: '<:controller:1545149011894210642> GAME ZONE',
-        value: '🟩 `.wordle` — Start a multiplayer Wordle game\n💘 `.smash @user1 @user2` — Start a Smash or Pass vote\n<a:hammer:1545148999386931272> `.trial @user [accusation]` — Put someone on trial in the courtroom\n<:gunpoint:1545149018160631868> `.roulette @user1 @user2...` — Play Russian Roulette\n<a:purplebomb:1545149042378407986> `.roulettemax @user` — Play Roulette Max — 2 players only\n🤠 `.quickdraw @user` — Challenge someone to a Quick Draw duel\n🌀 `.quickdrawmax @user` — Quick Draw Max with a distraction\n\n<:15394trophy:1545135066148118628>Challenge your friends.\n🤡 Embarrass your friends.\n💀 Regret your decisions.',
+        value: '<a:statustyping:1545155645630582794> `.wordle` — Start a multiplayer Wordle game\n💘 `.smash @user1 @user2` — Start a Smash or Pass vote\n<a:hammer:1545148999386931272> `.trial @user [accusation]` — Put someone on trial in the courtroom\n<:gunpoint:1545149018160631868> `.roulette @user1 @user2...` — Play Russian Roulette\n<a:purplebomb:1545149042378407986> `.roulettemax @user` — Play Roulette Max — 2 players only\n🤠 `.quickdraw @user` — Challenge someone to a Quick Draw duel\n🌀 `.quickdrawmax @user` — Quick Draw Max with a distraction\n\n<:15394trophy:1545135066148118628>Challenge your friends.\n🤡 Embarrass your friends.\n💀 Regret your decisions.',
         inline: false,
       },
       {

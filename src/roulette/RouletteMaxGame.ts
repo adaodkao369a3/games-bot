@@ -283,7 +283,7 @@ export class RouletteMaxGame {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('roulettemax_trigger')
-        .setLabel('<:gunpoint:1545149018160631868> PULL TRIGGER')
+        .setLabel('PULL TRIGGER')
         .setStyle(ButtonStyle.Danger)
     );
 
@@ -320,7 +320,7 @@ export class RouletteMaxGame {
     const currentPlayer = this.getCurrentPlayer();
     
     const embed = new EmbedBuilder()
-      .setTitle('⏰ TIMEOUT')
+      .setTitle('<a:alarm1:1545148991782518844> TIMEOUT')
       .setDescription(`<@${currentPlayer.id}> took too long...\n\nThe revolver will fire automatically.`)
       .setColor(0xFF0000);
 
@@ -1079,7 +1079,7 @@ export class RouletteMaxGame {
     this.state.currentPhase = RouletteMaxPhase.ROUND_RESULT;
 
     const embed = new EmbedBuilder()
-      .setTitle('⏰ TIMEOUT')
+      .setTitle('<a:alarm1:1545148991782518844> TIMEOUT')
       .setDescription('Neither fighter attacked in time.\n\nThe round is a draw.')
       .setColor(0x808080);
 

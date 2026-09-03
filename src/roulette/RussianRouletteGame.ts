@@ -251,7 +251,7 @@ export class RussianRouletteGame {
     const currentPlayer = this.state.players[this.state.currentPlayerIndex];
     
     const embed = new EmbedBuilder()
-      .setTitle('⏰ TIMEOUT')
+      .setTitle('<a:alarm1:1545148991782518844> TIMEOUT')
       .setDescription(`<@${currentPlayer.id}> took too long...\n\nThe revolver will fire automatically.`)
       .setColor(0xFF0000);
 

@@ -30,7 +30,7 @@ export class WordleUI {
   static createGameEmbed(data: WordleUIData): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setColor(0x538d4e) // Wordle green
-      .setTitle('🟩 WORDLE')
+      .setTitle('<a:statustyping:1545155645630582794> WORDLE')
       .setDescription(`Guess the ${data.wordLength}-letter word!\n\nType your guess in chat to play.`)
       .setFooter({ text: `${data.guessCount} / ${data.maxGuesses} guesses` });
 
@@ -43,7 +43,7 @@ export class WordleUI {
   static createUpdatedEmbed(data: WordleUIData, lastPlayer?: string): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setColor(0x538d4e)
-      .setTitle('🟩 WORDLE')
+      .setTitle('<a:statustyping:1545155645630582794> WORDLE')
       .setDescription(`Guess the ${data.wordLength}-letter word!\n\nType your guess in chat to play.`)
       .setFooter({ text: `${data.guessCount} / ${data.maxGuesses} guesses` });
 

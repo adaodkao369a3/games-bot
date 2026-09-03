@@ -49,7 +49,7 @@ export class BobKunPersonality {
     trialAccusation: `<a:alert:1545148996434137149> **A VERY SERIOUS ACCUSATION HAS BEEN MADE.** <a:alert:1545148996434137149>`,
     trialDefense: (accused: string, time: string) => `<a:typing:1545149057503207497> ${accused}, what do you have to say for yourself?!\n\n<a:alarm1:1545148991782518844> You have **${time}**.\nMake it count. 😭`,
     trialVoting: `👨‍<a:hammer:1545148999386931272> **JURY, THE COURT AWAITS YOUR VERDICT.**\n\nGuilty or innocent?\nChoose wisely... 👁️`,
-    trialVotingAlmostDone: `⏰ **THE JURY IS RUNNING OUT OF TIME...**`,
+    trialVotingAlmostDone: `<a:alarm1:1545148991782518844> **THE JURY IS RUNNING OUT OF TIME...**`,
     trialDrawFirst: `<a:hammer:1545148999386931272> **HOLD ON.**\n\nIT'S A DRAW?! 😭\n\nThe court refuses to end like this.\nThe accused gets **another chance to defend themselves.**\n\n<a:typing:1545149057503207497> **30 SECONDS. GO.**`,
     trialDrawSecond: `😭 **YOU'VE GOT TO BE KIDDING ME.**\n\nSTILL A DRAW.\n\nOne final defense...\n<a:alarm1:1545148991782518844> **15 SECONDS.**`,
     trialNoJudgement: `<a:hammer:1545148999386931272>💀 **NO JUDGEMENT COULD BE MADE TODAY.**\n\nThe jury has failed Bob Kun.`,

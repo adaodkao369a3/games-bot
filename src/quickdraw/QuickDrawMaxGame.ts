@@ -422,7 +422,7 @@ export class QuickDrawMaxGame {
   private createTimeoutEmbed() {
     return {
       title: '🤠 QUICK DRAW MAX',
-      description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n⏰ Time's up! No one drew.`,
+      description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n<a:alarm1:1545148991782518844> Time's up! No one drew.`,
       color: 0x808080,
       thumbnail: {
         url: this.state.player1Avatar,
