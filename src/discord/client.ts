@@ -162,7 +162,7 @@ export class DiscordClient {
         return;
       }
 
-      if (command === 'wallet') {
+      if (command === 'wallet' || command === 'w' || command === 'wal') {
         await handleWalletCommand(message);
         return;
       }
