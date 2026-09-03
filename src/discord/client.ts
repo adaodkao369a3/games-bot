@@ -21,6 +21,7 @@ import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } fr
 import { handleGambleCommand } from '../commands/gamble.js';
 import { handleQuoteCommand } from '../commands/quote.js';
 import { handleWalletCommand } from '../commands/wallet.js';
+import { handleHighscoreCommand } from '../commands/highscore.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -164,6 +165,11 @@ export class DiscordClient {
 
       if (command === 'wallet' || command === 'w' || command === 'wal') {
         await handleWalletCommand(message);
+        return;
+      }
+
+      if (command === 'highscore' || command === 'leaderboard' || command === 'lb') {
+        await handleHighscoreCommand(message);
         return;
       }
 

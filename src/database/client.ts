@@ -384,3 +384,37 @@ export async function createOrUpdateUser(userId: string): Promise<CoinBalance> {
     client.release();
   }
 }
+
+export interface LeaderboardEntry {
+  user_id: string;
+  balance: number;
+  lifetime_earned: number;
+  lifetime_spent: number;
+}
+
+/**
+ * Get the leaderboard of users sorted by coin balance
+ * @param limit Maximum number of users to return
+ * @returns Array of leaderboard entries
+ */
+export async function getLeaderboard(limit: number = 10): Promise<LeaderboardEntry[]> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      `SELECT user_id, coin_balance as balance, lifetime_coins_earned as lifetime_earned, lifetime_coins_spent as lifetime_spent 
+       FROM users 
+       WHERE coin_balance > 0 
+       ORDER BY coin_balance DESC 
+       LIMIT $1`,
+      [limit]
+    );
+    return result.rows.map(row => ({
+      user_id: row.user_id,
+      balance: parseBigInt(row.balance),
+      lifetime_earned: parseBigInt(row.lifetime_earned),
+      lifetime_spent: parseBigInt(row.lifetime_spent)
+    }));
+  } finally {
+    client.release();
+  }
+}
