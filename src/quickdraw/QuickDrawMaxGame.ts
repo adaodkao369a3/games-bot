@@ -261,7 +261,7 @@ export class QuickDrawMaxGame {
       .addComponents(
         new ButtonBuilder()
           .setCustomId('quickdrawmax_fire')
-          .setLabel('🔫 DRAW!')
+          .setLabel('<:gunpoint:1545149018160631868> DRAW!')
           .setStyle(ButtonStyle.Danger)
           .setDisabled(true)
       );
@@ -390,8 +390,8 @@ export class QuickDrawMaxGame {
 
     return {
       embed: {
-        title: '🔫 QUICK DRAW MAX',
-        description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n# 🔫 DRAW!`,
+        title: '<:gunpoint:1545149018160631868> QUICK DRAW MAX',
+        description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n# <:gunpoint:1545149018160631868> DRAW!`,
         color: 0xFF0000,
         image: {
           url: 'attachment://header.png',
@@ -412,7 +412,7 @@ export class QuickDrawMaxGame {
       .setDescription(
         `**<@${this.state.winner}> VS <@${this.state.loser}>**\n\n` +
         `### 🥇 <@${this.state.winner}> is the fastest gun!\n\n` +
-        `🎯 **Reaction Time:** \`${formattedSeconds}s\` (${reactionTime}ms)\n\n` +
+        `<a:cargando:1545149001983197364> **Reaction Time:** \`${formattedSeconds}s\` (${reactionTime}ms)\n\n` +
         `💀 **Fallen Cowboy:** <@${this.state.loser}>`
       )
       .setImage(winGif)
@@ -448,7 +448,7 @@ export class QuickDrawMaxGame {
       .addComponents(
         new ButtonBuilder()
           .setCustomId('quickdrawmax_fire')
-          .setLabel('🔫 DRAW!')
+          .setLabel('<:gunpoint:1545149018160631868> DRAW!')
           .setStyle(ButtonStyle.Danger)
           .setDisabled(true)
       );
@@ -462,7 +462,7 @@ export class QuickDrawMaxGame {
       .addComponents(
         new ButtonBuilder()
           .setCustomId('quickdrawmax_fire')
-          .setLabel('🔫 DRAW!')
+          .setLabel('<:gunpoint:1545149018160631868> DRAW!')
           .setStyle(ButtonStyle.Danger)
           .setDisabled(false)
       );

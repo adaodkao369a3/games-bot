@@ -109,7 +109,7 @@ export async function handleTrialCommand(message: Message): Promise<void> {
 
     // Send initial message
     const replyMessage = await message.reply({
-      content: '🍌 Bob Kun is preparing the courtroom...',
+      content: '<:bob:1545141387656302663> Bob Kun is preparing the courtroom...',
     });
 
     // Create trial

@@ -45,7 +45,7 @@ export async function handleWheelCommand(message: Message, args: string[]): Prom
       const categoryList = categories.map(cat => `.wheel ${cat}`).join('\n');
       
       await message.reply({
-        content: `🎡 Wheel Categories\n\n${categoryList}`,
+        content: `<a:cd:1545149009855778848> Wheel Categories\n\n${categoryList}`,
       });
       return;
     }
@@ -114,7 +114,7 @@ async function startWheelSpin(message: Message, category: string, options: any[]
     // Create attachment and embed
     const gifAttachment = new AttachmentBuilder(gifBuffer, { name: gifFilename });
     const initialEmbed = new EmbedBuilder()
-      .setDescription(`🎡 <@${message.author.id}> is spinning the wheel...`)
+      .setDescription(`<a:cd:1545149009855778848> <@${message.author.id}> is spinning the wheel...`)
       .setImage(`attachment://${gifFilename}`);
 
     const replyMessage = await message.reply({
@@ -141,8 +141,8 @@ async function startWheelSpin(message: Message, category: string, options: any[]
     const pngAttachment = new AttachmentBuilder(pngBuffer, { name: pngFilename });
     const finalEmbed = new EmbedBuilder()
       .setDescription(
-        `🎡 <@${message.author.id}> spun the wheel!\n\n` +
-        `🎯 **${selectedOption.label}**\n\n` +
+        `<a:cd:1545149009855778848> <@${message.author.id}> spun the wheel!\n\n` +
+        `<a:cargando:1545149001983197364> **${selectedOption.label}**\n\n` +
         `${selectedOption.description}\n\n` +
         `⏳ Wheel cooldown: 2 minutes`
       )

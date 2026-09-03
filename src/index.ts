@@ -12,13 +12,13 @@ async function main(): Promise<void> {
 
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
-      console.log('\n🍌 Bob Kun is shutting down...');
+      console.log('\n<:bob:1545141387656302663> Bob Kun is shutting down...');
       await disconnect();
       process.exit(0);
     });
 
     process.on('SIGTERM', async () => {
-      console.log('\n🍌 Bob Kun is shutting down...');
+      console.log('\n<:bob:1545141387656302663> Bob Kun is shutting down...');
       await disconnect();
       process.exit(0);
     });

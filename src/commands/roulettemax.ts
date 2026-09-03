@@ -53,7 +53,7 @@ export async function handleRouletteMaxCommand(message: Message): Promise<void> 
 
   try {
     // Send initial message
-    const initialMessage = await message.reply('🔫 Loading Roulette Max...');
+    const initialMessage = await message.reply('<:gunpoint:1545149018160631868> Loading Roulette Max...');
 
     // Create players
     const player1: RouletteMaxPlayer = {

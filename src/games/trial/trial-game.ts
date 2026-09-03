@@ -670,7 +670,7 @@ export class TrialGame {
     const remainingTime = Math.max(0, Math.ceil((this.state.votingEndsAt! - Date.now()) / 1000));
 
     await interaction.reply({
-      content: `📝 Sentence submitted! ⏱️ **${remainingTime} seconds remaining**`,
+      content: `📝 Sentence submitted! <a:alarm1:1545148991782518844> **${remainingTime} seconds remaining**`,
       ephemeral: true,
     });
   }

@@ -213,7 +213,7 @@ export class QuickDrawGame {
       .addComponents(
         new ButtonBuilder()
           .setCustomId('quickdraw_fire')
-          .setLabel('🔫 DRAW!')
+          .setLabel('<:gunpoint:1545149018160631868> DRAW!')
           .setStyle(ButtonStyle.Danger)
           .setDisabled(true)
       );
@@ -342,8 +342,8 @@ export class QuickDrawGame {
 
     return {
       embed: {
-        title: '🔫 QUICK DRAW',
-        description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n# 🔫 DRAW!`,
+        title: '<:gunpoint:1545149018160631868> QUICK DRAW',
+        description: `<@${this.state.player1Id}> **VS** <@${this.state.player2Id}>\n\n# <:gunpoint:1545149018160631868> DRAW!`,
         color: 0xFF0000,
         image: {
           url: 'attachment://header.png',
@@ -356,7 +356,7 @@ export class QuickDrawGame {
   private createShotFiredEmbed() {
     return {
       title: '� QUICK DRAW',
-      description: `<@${this.state.winner}> **VS** <@${this.state.loser}>\n\n💥 Shot fired...`,
+      description: `<@${this.state.winner}> **VS** <@${this.state.loser}>\n\n<a:purplebomb:1545149042378407986> Shot fired...`,
       color: 0xFF4500,
       thumbnail: {
         url: this.state.winner === this.state.player1Id ? this.state.player1Avatar : this.state.player2Avatar,
@@ -378,7 +378,7 @@ export class QuickDrawGame {
       .setDescription(
         `**<@${this.state.winner}> VS <@${this.state.loser}>**\n\n` +
         `### 🥇 <@${this.state.winner}> is the fastest gun!\n\n` +
-        `🎯 **Reaction Time:** \`${formattedSeconds}s\` (${reactionTime}ms)\n\n` +
+        `<a:cargando:1545149001983197364> **Reaction Time:** \`${formattedSeconds}s\` (${reactionTime}ms)\n\n` +
         `💀 **Fallen Cowboy:** <@${this.state.loser}>`
       )
       .setImage(winGif)
@@ -414,7 +414,7 @@ export class QuickDrawGame {
       .addComponents(
         new ButtonBuilder()
           .setCustomId('quickdraw_fire')
-          .setLabel('🔫 DRAW!')
+          .setLabel('<:gunpoint:1545149018160631868> DRAW!')
           .setStyle(ButtonStyle.Danger)
           .setDisabled(true)
       );
@@ -428,7 +428,7 @@ export class QuickDrawGame {
       .addComponents(
         new ButtonBuilder()
           .setCustomId('quickdraw_fire')
-          .setLabel('🔫 DRAW!')
+          .setLabel('<:gunpoint:1545149018160631868> DRAW!')
           .setStyle(ButtonStyle.Danger)
           .setDisabled(false)
       );

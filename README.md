@@ -1,4 +1,4 @@
-# Bob Kun Discord Bot 🍌
+# Bob Kun Discord Bot <:bob:1545141387656302663>
 
 A cute, chaotic Minion-inspired gaming Discord bot for the Mi Bom3o server. Bob Kun brings social gaming fun with the first game: **Smash This**.
 
@@ -186,7 +186,7 @@ You can specify users to smash:
 
 - Landscape card (approximately 554px × 251px)
 - Two player panels with avatars
-- One "💥 SMASH" button under each player
+- One "<a:purplebomb:1545149042378407986> SMASH" button under each player
 - Cute decorative border with hearts/stars/sparkles/banana motifs
 - No giant VS graphic in center
 - Clean, symmetrical layout
@@ -336,4 +336,4 @@ For issues or questions, please check the troubleshooting section or create an i
 
 ---
 
-🍌 **Bob Kun** - Bringing chaotic fun to Mi Bom3o! 🍌
+<:bob:1545141387656302663> **Bob Kun** - Bringing chaotic fun to Mi Bom3o! <:bob:1545141387656302663>

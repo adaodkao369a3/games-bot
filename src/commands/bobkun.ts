@@ -16,18 +16,18 @@ export async function handleBobkunCommand(message: Message): Promise<void> {
     const embed = new EmbedBuilder()
       .setTitle('🕹️ BOB\'S ARCADE')
       .setColor('#5865F2')
-      .setDescription('🎮 Games • Chaos • Challenges • Good Times\n\nWelcome to Bob\'s Arcade! 🕹️\nYour home for multiplayer games, random challenges, questionable decisions, and maximum chaos.\n\nHow to play: Type `.` followed by a command to get started!');
+      .setDescription('<:controller:1545149011894210642> Games • Chaos • Challenges • Good Times\n\nWelcome to Bob\'s Arcade! 🕹️\nYour home for multiplayer games, random challenges, questionable decisions, and maximum chaos.\n\nHow to play: Type `.` followed by a command to get started!');
 
     // Game Zone section
     embed.addFields([
       {
-        name: '🎮 GAME ZONE',
-        value: '🟩 `.wordle` — Start a multiplayer Wordle game\n💘 `.smash @user1 @user2` — Start a Smash or Pass vote\n⚖️ `.trial @user [accusation]` — Put someone on trial in the courtroom\n🔫 `.roulette @user1 @user2...` — Play Russian Roulette\n💥 `.roulettemax @user` — Play Roulette Max — 2 players only\n🤠 `.quickdraw @user` — Challenge someone to a Quick Draw duel\n🌀 `.quickdrawmax @user` — Quick Draw Max with a distraction\n\n<:15394trophy:1545135066148118628>Challenge your friends.\n🤡 Embarrass your friends.\n💀 Regret your decisions.',
+        name: '<:controller:1545149011894210642> GAME ZONE',
+        value: '🟩 `.wordle` — Start a multiplayer Wordle game\n💘 `.smash @user1 @user2` — Start a Smash or Pass vote\n<a:hammer:1545148999386931272> `.trial @user [accusation]` — Put someone on trial in the courtroom\n<:gunpoint:1545149018160631868> `.roulette @user1 @user2...` — Play Russian Roulette\n<a:purplebomb:1545149042378407986> `.roulettemax @user` — Play Roulette Max — 2 players only\n🤠 `.quickdraw @user` — Challenge someone to a Quick Draw duel\n🌀 `.quickdrawmax @user` — Quick Draw Max with a distraction\n\n<:15394trophy:1545135066148118628>Challenge your friends.\n🤡 Embarrass your friends.\n💀 Regret your decisions.',
         inline: false,
       },
       {
-        name: '🎡 THE WHEEL OF CHAOS',
-        value: 'Spin your fate and see what happens...\n\n🖼️ `.wheel pfp` — Spin the PFP-changing wheel\n🎲 `.wheel truthordare` — Spin the Truth or Dare wheel\n☠️ `.wheel punishment` — Spin the punishment wheel\n🎭 `.wheel act` — Spin the acting & challenge wheel\n\n⚠️ The wheel has spoken. No refunds.',
+        name: '<a:cd:1545149009855778848> THE WHEEL OF CHAOS',
+        value: 'Spin your fate and see what happens...\n\n🖼️ `.wheel pfp` — Spin the PFP-changing wheel\n<a:dice:1545149015652307104> `.wheel truthordare` — Spin the Truth or Dare wheel\n☠️ `.wheel punishment` — Spin the punishment wheel\n🎭 `.wheel act` — Spin the acting & challenge wheel\n\n⚠️ The wheel has spoken. No refunds.',
         inline: false,
       },
       {
@@ -38,7 +38,7 @@ export async function handleBobkunCommand(message: Message): Promise<void> {
     ]);
 
     embed.setFooter({ 
-      text: '🕹️ BOB\'S ARCADE\nInsert coin. Pick a game. Cause problems.\n\n🎮 Version 1.0 • Made with ❤️ by Bob Kun',
+      text: '🕹️ BOB\'S ARCADE\nInsert coin. Pick a game. Cause problems.\n\n<:controller:1545149011894210642> Version 1.0 • Made with ❤️ by Bob Kun',
       iconURL: botAvatar
     });
     embed.setTimestamp();

@@ -157,8 +157,8 @@ export class RouletteMaxGame {
     this.state.currentPhase = RouletteMaxPhase.STARTING_PLAYER_SELECTION;
 
     const embed = new EmbedBuilder()
-      .setTitle('🔫 ROULETTE MAX')
-      .setDescription('🎲 Choosing the first player...\n\nThe chamber is ready.')
+      .setTitle('<:gunpoint:1545149018160631868> ROULETTE MAX')
+      .setDescription('<a:dice:1545149015652307104> Choosing the first player...\n\nThe chamber is ready.')
       .setColor(0xFFD700)
       .setImage(RouletteMaxGame.STARTING_PLAYER_GIF);
 
@@ -204,7 +204,7 @@ export class RouletteMaxGame {
     }
     
     const embed = new EmbedBuilder()
-      .setTitle('🎯 FIRST TURN')
+      .setTitle('<a:cargando:1545149001983197364> FIRST TURN')
       .setDescription(`<@${firstPlayer.id}>\n\nYou have been chosen to go first.`)
       .setColor(0xFFD700)
       .setThumbnail(firstPlayer.avatar);
@@ -253,8 +253,8 @@ export class RouletteMaxGame {
    */
   private async showBarrelSpin(player: RouletteMaxPlayer): Promise<void> {
     const embed = new EmbedBuilder()
-      .setTitle('🔫 RUSSIAN ROULETTE')
-      .setDescription(`🎯 <@${player.id}>\n\nThe barrel spins...`)
+      .setTitle('<:gunpoint:1545149018160631868> RUSSIAN ROULETTE')
+      .setDescription(`<a:cargando:1545149001983197364> <@${player.id}>\n\nThe barrel spins...`)
       .setColor(0xFFD700)
       .setImage(RouletteMaxGame.BARREL_SPIN_GIF);
 
@@ -283,14 +283,14 @@ export class RouletteMaxGame {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('roulettemax_trigger')
-        .setLabel('🔫 PULL TRIGGER')
+        .setLabel('<:gunpoint:1545149018160631868> PULL TRIGGER')
         .setStyle(ButtonStyle.Danger)
     );
 
     const embed = new EmbedBuilder()
-      .setTitle('🔫 RUSSIAN ROULETTE')
+      .setTitle('<:gunpoint:1545149018160631868> RUSSIAN ROULETTE')
       .setDescription(
-        `🎯 <@${player.id}>\n\nThe barrel has stopped.\n\n<@${player.id}>, pull the trigger.`
+        `<a:cargando:1545149001983197364> <@${player.id}>\n\nThe barrel has stopped.\n\n<@${player.id}>, pull the trigger.`
       )
       .setColor(0xFFD700)
       .setThumbnail(player.avatar);
@@ -558,7 +558,7 @@ export class RouletteMaxGame {
    */
   private async showEmptyResult(player: RouletteMaxPlayer): Promise<void> {
     const embed = new EmbedBuilder()
-      .setTitle('🔫 RUSSIAN ROULETTE')
+      .setTitle('<:gunpoint:1545149018160631868> RUSSIAN ROULETTE')
       .setDescription(
         `😮 CLICK...\n\n<@${player.id}> survived.\n\nThe chamber was empty.`
       )
@@ -1129,15 +1129,15 @@ export class RouletteMaxGame {
         if (winnerScore === 1) {
           gifUrl = RouletteMaxGame.PLAYER2_HIT1_GIF;
           gifDuration = 7500;
-          description = `💥 RYU STRIKES!\n\n<@${winner.id}> lands the first hit!\n\nThe battlefield shakes.`;
+          description = `<a:purplebomb:1545149042378407986> RYU STRIKES!\n\n<@${winner.id}> lands the first hit!\n\nThe battlefield shakes.`;
         } else if (winnerScore === 2) {
           gifUrl = RouletteMaxGame.PLAYER2_HIT2_GIF;
           gifDuration = 3000;
-          description = `💥 SECOND HIT!\n\n<@${winner.id}> refuses to fall behind.\n\nOne more decisive strike could end this.`;
+          description = `<a:purplebomb:1545149042378407986> SECOND HIT!\n\n<@${winner.id}> refuses to fall behind.\n\nOne more decisive strike could end this.`;
         } else {
           gifUrl = RouletteMaxGame.PLAYER2_HIT3_GIF;
           gifDuration = 9630;
-          description = `💥 FINAL STRIKE!\n\n<@${winner.id}> delivers the decisive blow!\n\nThe battle is decided.`;
+          description = `<a:purplebomb:1545149042378407986> FINAL STRIKE!\n\n<@${winner.id}> delivers the decisive blow!\n\nThe battle is decided.`;
         }
       } else {
         // Player 3 (Uro) attack GIFs
@@ -1301,7 +1301,7 @@ export class RouletteMaxGame {
     this.state.winner = winner.id;
 
     const embed = new EmbedBuilder()
-      .setTitle('👑 DOMAIN VICTORY')
+      .setTitle('<:15394trophy:1545135066148118628> DOMAIN VICTORY')
       .setDescription(description)
       .setColor(0xFFD700)
       .setImage(victoryGif);
@@ -1356,7 +1356,7 @@ export class RouletteMaxGame {
       description = 
         `<:15394trophy:1545135066148118628>ROULETTE MAX — VICTORY\n\n` +
         `<@${this.state.player1.id}> VS <@${this.state.player2.id}>\n\n` +
-        `👑 WINNER\n<@${winner.id}>\n\n` +
+        `<:15394trophy:1545135066148118628> WINNER\n<@${winner.id}>\n\n` +
         `⚔️ DOMAIN BATTLE\n` +
         `Score:\n<@${this.state.player1.id}>: ${this.state.player1Score}\n<@${this.state.player2.id}>: ${this.state.player2Score}\n\n` +
         `"The roulette was only the beginning."`;

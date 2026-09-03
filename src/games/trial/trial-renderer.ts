@@ -35,7 +35,7 @@ export class TrialRenderer {
    */
   static createCourtOpeningEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('⚖️ COURT IS STARTING. EVERYONE BE SEATED. ⚖️')
+      .setTitle('<a:hammer:1545148999386931272> COURT IS STARTING. EVERYONE BE SEATED. <a:hammer:1545148999386931272>')
       .setDescription('🤫 **SHUT UP, THE COURT IS IN SESSION.**')
       .setColor(0xFFD700)
       .setImage('https://c.tenor.com/IfF54WALGpsAAAAd/tenor.gif');
@@ -54,12 +54,12 @@ export class TrialRenderer {
       ? `${Math.floor(remainingSeconds / 60)}:${(remainingSeconds % 60).toString().padStart(2, '0')}`
       : `${remainingSeconds}`;
     return new EmbedBuilder()
-      .setTitle('⚖️ DEFENSE STAGE')
+      .setTitle('<a:hammer:1545148999386931272> DEFENSE STAGE')
       .setDescription(
-        `🚨 **A VERY SERIOUS ACCUSATION HAS BEEN MADE.** 🚨\n\n` +
+        `<a:alert:1545148996434137149> **A VERY SERIOUS ACCUSATION HAS BEEN MADE.** <a:alert:1545148996434137149>\n\n` +
         `${accusedMention} has been accused of **"${accusation}"** by ${accuserMention}.\n\n` +
-        `🗣️ ${accusedMention}, what do you have to say for yourself?!\n\n` +
-        `⏱️ You have **${timeStr}**. Make it count. 😭`
+        `<a:typing:1545149057503207497> ${accusedMention}, what do you have to say for yourself?!\n\n` +
+        `<a:alarm1:1545148991782518844> You have **${timeStr}**. Make it count. 😭`
       )
       .setColor(0xFFA500)
       .setTimestamp();
@@ -78,12 +78,12 @@ export class TrialRenderer {
       ? `${Math.floor(remainingSeconds / 60)}:${(remainingSeconds % 60).toString().padStart(2, '0')}`
       : `${remainingSeconds}`;
     return new EmbedBuilder()
-      .setTitle('⚖️ BOB KUN COURT IS NOW IN SESSION ⚖️')
+      .setTitle('<a:hammer:1545148999386931272> BOB KUN COURT IS NOW IN SESSION <a:hammer:1545148999386931272>')
       .setDescription(
-        `🚨 **A VERY SERIOUS ACCUSATION HAS BEEN MADE.** 🚨\n\n` +
+        `<a:alert:1545148996434137149> **A VERY SERIOUS ACCUSATION HAS BEEN MADE.** <a:alert:1545148996434137149>\n\n` +
         `${accusedMention} has been accused of **"${accusation}"** by ${accuserMention}.\n\n` +
-        `🗣️ ${accusedMention}, what do you have to say for yourself?!\n\n` +
-        `⏱️ You have **${timeStr}**. Make it count. 😭`
+        `<a:typing:1545149057503207497> ${accusedMention}, what do you have to say for yourself?!\n\n` +
+        `<a:alarm1:1545148991782518844> You have **${timeStr}**. Make it count. 😭`
       )
       .setColor(0xFFA500)
       .setImage('https://c.tenor.com/dCK5UBjLY7YAAAAC/tenor.gif')
@@ -95,7 +95,7 @@ export class TrialRenderer {
    */
   static createDefenseGifEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('⚖️ DEFENSE STAGE')
+      .setTitle('<a:hammer:1545148999386931272> DEFENSE STAGE')
       .setColor(0xFFA500)
       .setImage('https://c.tenor.com/dCK5UBjLY7YAAAAC/tenor.gif');
   }
@@ -105,7 +105,7 @@ export class TrialRenderer {
    */
   static createJuryEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('👥 JURY VOTING')
+      .setTitle('<:people:1545149032303689768> JURY VOTING')
       .setDescription(
         `${BobKunPersonality.trialEveryoneVote}\n\n` +
         BobKunPersonality.trialVoting
@@ -267,7 +267,7 @@ export class TrialRenderer {
     const description = `**${accusedMention} has been found guilty of "${accusation}" and is sentenced to ${sentenceText}**`;
 
     return new EmbedBuilder()
-      .setTitle('⚖️ GUILTY VERDICT')
+      .setTitle('<a:hammer:1545148999386931272> GUILTY VERDICT')
       .setDescription(description)
       .setColor(0xFF0000)
       .setTimestamp();
@@ -348,7 +348,7 @@ export class TrialRenderer {
    */
   static createInnocentResultEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('⚖️ INNOCENT VERDICT')
+      .setTitle('<a:hammer:1545148999386931272> INNOCENT VERDICT')
       .setDescription(BobKunPersonality.trialInnocent)
       .setColor(0x00FF00)
       .setTimestamp();
@@ -359,7 +359,7 @@ export class TrialRenderer {
    */
   static createInnocentResultEmbedWithGif(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('⚖️ INNOCENT VERDICT')
+      .setTitle('<a:hammer:1545148999386931272> INNOCENT VERDICT')
       .setDescription(BobKunPersonality.trialInnocent)
       .setColor(0x00FF00)
       .setImage('https://c.tenor.com/OhVr0qy0GzAAAAAd/tenor.gif')
@@ -385,7 +385,7 @@ export class TrialRenderer {
    */
   static createNoJudgementEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('⚖️ NO JUDGEMENT')
+      .setTitle('<a:hammer:1545148999386931272> NO JUDGEMENT')
       .setDescription(BobKunPersonality.trialNoJudgement)
       .setColor(0x808080)
       .setTimestamp();

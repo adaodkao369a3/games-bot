@@ -2,11 +2,11 @@ import { config } from '../config/index.js';
 
 export class BobKunPersonality {
   private static readonly EMOJIS = {
-    banana: '🍌',
+    banana: '<:bob:1545141387656302663>',
     sparkle: '✨',
-    boom: '💥',
+    boom: '<a:purplebomb:1545149042378407986>',
     skull: '💀',
-    crown: '👑',
+    crown: '<:15394trophy:1545135066148118628>',
     confused: '😵',
     excited: '🤩',
     thinking: '🤔',
@@ -45,18 +45,18 @@ export class BobKunPersonality {
     wordleGameOver: (word: string) => `${this.EMOJIS.skull} The word was **${word}**. Bob Kun is sad.`,
     wordleThinking: `${this.EMOJIS.thinking} Bob Kun is thinking about words...`,
     // Trial-specific messages
-    trialCourtOpening: `⚖️🍌 **BOB KUN COURT IS NOW IN SESSION** 🍌⚖️\nEveryone shut up. The court is cooking. 👨‍⚖️`,
-    trialAccusation: `🚨 **A VERY SERIOUS ACCUSATION HAS BEEN MADE.** 🚨`,
-    trialDefense: (accused: string, time: string) => `🗣️ ${accused}, what do you have to say for yourself?!\n\n⏱️ You have **${time}**.\nMake it count. 😭`,
-    trialVoting: `👨‍⚖️ **JURY, THE COURT AWAITS YOUR VERDICT.**\n\nGuilty or innocent?\nChoose wisely... 👁️`,
+    trialCourtOpening: `<a:hammer:1545148999386931272><:bob:1545141387656302663> **BOB KUN COURT IS NOW IN SESSION** <:bob:1545141387656302663><a:hammer:1545148999386931272>\nEveryone shut up. The court is cooking. 👨‍<a:hammer:1545148999386931272>`,
+    trialAccusation: `<a:alert:1545148996434137149> **A VERY SERIOUS ACCUSATION HAS BEEN MADE.** <a:alert:1545148996434137149>`,
+    trialDefense: (accused: string, time: string) => `<a:typing:1545149057503207497> ${accused}, what do you have to say for yourself?!\n\n<a:alarm1:1545148991782518844> You have **${time}**.\nMake it count. 😭`,
+    trialVoting: `👨‍<a:hammer:1545148999386931272> **JURY, THE COURT AWAITS YOUR VERDICT.**\n\nGuilty or innocent?\nChoose wisely... 👁️`,
     trialVotingAlmostDone: `⏰ **THE JURY IS RUNNING OUT OF TIME...**`,
-    trialDrawFirst: `⚖️ **HOLD ON.**\n\nIT'S A DRAW?! 😭\n\nThe court refuses to end like this.\nThe accused gets **another chance to defend themselves.**\n\n🗣️ **30 SECONDS. GO.**`,
-    trialDrawSecond: `😭 **YOU'VE GOT TO BE KIDDING ME.**\n\nSTILL A DRAW.\n\nOne final defense...\n⏱️ **15 SECONDS.**`,
-    trialNoJudgement: `⚖️💀 **NO JUDGEMENT COULD BE MADE TODAY.**\n\nThe jury has failed Bob Kun.`,
-    trialGuilty: (accused: string, accusation: string, sentence: string) => `🚨 **VERDICT: GUILTY** 🚨\n\n${accused} has been found guilty of:\n\n**"${accusation}"**\n\n⚖️ **SENTENCED TO:**\n\n*"${sentence}"*\n\n😭 It's over for you, buddy.`,
-    trialInnocent: `⚖️ **VERDICT: NOT GUILTY** ⚖️\n\nThe jury has spoken! Justice prevails! <a:confettipopper:1545132978139693227>`,
+    trialDrawFirst: `<a:hammer:1545148999386931272> **HOLD ON.**\n\nIT'S A DRAW?! 😭\n\nThe court refuses to end like this.\nThe accused gets **another chance to defend themselves.**\n\n<a:typing:1545149057503207497> **30 SECONDS. GO.**`,
+    trialDrawSecond: `😭 **YOU'VE GOT TO BE KIDDING ME.**\n\nSTILL A DRAW.\n\nOne final defense...\n<a:alarm1:1545148991782518844> **15 SECONDS.**`,
+    trialNoJudgement: `<a:hammer:1545148999386931272>💀 **NO JUDGEMENT COULD BE MADE TODAY.**\n\nThe jury has failed Bob Kun.`,
+    trialGuilty: (accused: string, accusation: string, sentence: string) => `<a:alert:1545148996434137149> **VERDICT: GUILTY** <a:alert:1545148996434137149>\n\n${accused} has been found guilty of:\n\n**"${accusation}"**\n\n<a:hammer:1545148999386931272> **SENTENCED TO:**\n\n*"${sentence}"*\n\n😭 It's over for you, buddy.`,
+    trialInnocent: `<a:hammer:1545148999386931272> **VERDICT: NOT GUILTY** <a:hammer:1545148999386931272>\n\nThe jury has spoken! Justice prevails! <a:confettipopper:1545132978139693227>`,
     trialJump: `😳 **OUUU SHIIII...**`,
-    trialEveryoneVote: `🗳️ **EVERYONE IS A JUROR.**\n\nProsecutor? Vote.\nDefense? Vote.\nRandom guy eating a sandwich? **VOTE.** 🍌`,
+    trialEveryoneVote: `🗳️ **EVERYONE IS A JUROR.**\n\nProsecutor? Vote.\nDefense? Vote.\nRandom guy eating a sandwich? **VOTE.** <:bob:1545141387656302663>`,
   };
 
   static get ready(): string {
@@ -226,7 +226,7 @@ export class BobKunPersonality {
       `${this.EMOJIS.banana} Bob Kun says banana!`,
       `${this.EMOJIS.banana} BANANA!`,
       `${this.EMOJIS.banana} Bob Kun loves bananas!`,
-      `${this.EMOJIS.banana} 🍌`,
+      `${this.EMOJIS.banana} <:bob:1545141387656302663>`,
     ];
     return bananaMessages[Math.floor(Math.random() * bananaMessages.length)];
   }

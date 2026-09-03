@@ -271,11 +271,15 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
       // Generate result description text
       let resultDescription: string;
       if (winner === 'tie') {
-        resultDescription = '🤝 Both are certified smashes!';
+        if (voteData.player1Votes === 0 && voteData.player2Votes === 0) {
+          resultDescription = 'passes';
+        } else {
+          resultDescription = '<:pass:1545149029573329007> Both are certified PASSES LOL!';
+        }
       } else {
         const winnerUser = winner === 'subject1' ? voteData.user1 : voteData.user2;
         const winnerUserId = winnerUser.id; // Use actual Discord user ID for mention
-        resultDescription = `<a:pinkheartexclaim:1529443130104090734> <@${winnerUserId}> is a total smash by public choice!`;
+        resultDescription = `<:smash:1545149052017049751> <@${winnerUserId}> is a total smash by public choice!`;
         console.log('[End Voting] Using Discord mention for user ID:', winnerUserId);
       }
 
@@ -283,7 +287,7 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
         .setColor(winner === 'tie' ? 0xFFA500 : 0xFFD700)
         .setDescription(resultDescription)
         .setImage('attachment://smash-result.png')
-        .setFooter({ text: 'Bob Kun 🍌' });
+        .setFooter({ text: 'Bob Kun <:bob:1545141387656302663>' });
 
       // Post as reply to the original voting message
       if (channel && 'messages' in channel) {

@@ -56,7 +56,7 @@ export async function handleSmashMaxCommand(message: Message): Promise<void> {
     // Send initial loading message
     const loadingEmbed = new EmbedBuilder()
       .setTitle('🔥 SMASHMAX')
-      .setDescription('🎲 Fetching anime characters...\n\nPlease wait.')
+      .setDescription('<a:dice:1545149015652307104> Fetching anime characters...\n\nPlease wait.')
       .setColor(0xFFD700);
 
     const replyMessage = await message.reply({

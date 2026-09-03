@@ -103,8 +103,8 @@ export class RussianRouletteGame {
    */
   private async showStartingPlayerSelection(): Promise<void> {
     const embed = new EmbedBuilder()
-      .setTitle('🔫 RUSSIAN ROULETTE')
-      .setDescription('🎲 Choosing the first player...\n\nThe chamber is ready.')
+      .setTitle('<:gunpoint:1545149018160631868> RUSSIAN ROULETTE')
+      .setDescription('<a:dice:1545149015652307104> Choosing the first player...\n\nThe chamber is ready.')
       .setColor(0xFFD700)
       .setImage(RussianRouletteGame.STARTING_PLAYER_GIF);
 
@@ -134,7 +134,7 @@ export class RussianRouletteGame {
     const firstPlayer = this.state.players[this.state.currentPlayerIndex];
     
     const embed = new EmbedBuilder()
-      .setTitle('🎯 FIRST TURN')
+      .setTitle('<a:cargando:1545149001983197364> FIRST TURN')
       .setDescription(`<@${firstPlayer.id}>\n\nYou have been chosen to go first.`)
       .setColor(0xFFD700)
       .setThumbnail(firstPlayer.avatar);
@@ -173,8 +173,8 @@ export class RussianRouletteGame {
    */
   private async showBarrelSpin(player: RoulettePlayer): Promise<void> {
     const embed = new EmbedBuilder()
-      .setTitle('🔫 RUSSIAN ROULETTE')
-      .setDescription(`🎯 <@${player.id}>\n\nThe barrel spins...`)
+      .setTitle('<:gunpoint:1545149018160631868> RUSSIAN ROULETTE')
+      .setDescription(`<a:cargando:1545149001983197364> <@${player.id}>\n\nThe barrel spins...`)
       .setColor(0xFFD700)
       .setImage(RussianRouletteGame.BARREL_SPIN_GIF);
 
@@ -203,7 +203,7 @@ export class RussianRouletteGame {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('roulette_trigger')
-        .setLabel('🔫 PULL TRIGGER')
+        .setLabel('<:gunpoint:1545149018160631868> PULL TRIGGER')
         .setStyle(ButtonStyle.Danger)
     );
 
@@ -218,13 +218,13 @@ export class RussianRouletteGame {
     }
 
     const embed = new EmbedBuilder()
-      .setTitle('🔫 RUSSIAN ROULETTE')
+      .setTitle('<:gunpoint:1545149018160631868> RUSSIAN ROULETTE')
       .setDescription(
-        `🎯 <@${player.id}>\n\nThe barrel has stopped.\n\n<@${player.id}>, pull the trigger.`
+        `<a:cargando:1545149001983197364> <@${player.id}>\n\nThe barrel has stopped.\n\n<@${player.id}>, pull the trigger.`
       )
       .setColor(0xFFD700)
       .setThumbnail(player.avatar)
-      .addFields({ name: '👥 PLAYERS', value: this.getPlayerListString() });
+      .addFields({ name: '<:people:1545149032303689768> PLAYERS', value: this.getPlayerListString() });
 
     await this.currentMessage?.edit({
       embeds: [embed],
@@ -367,7 +367,7 @@ export class RussianRouletteGame {
    */
   private async showEmptyResult(player: RoulettePlayer, shouldAdvanceTurn: boolean = true): Promise<void> {
     const embed = new EmbedBuilder()
-      .setTitle('🔫 RUSSIAN ROULETTE')
+      .setTitle('<:gunpoint:1545149018160631868> RUSSIAN ROULETTE')
       .setDescription(
         `😮 CLICK...\n\n<@${player.id}> survived.\n\nThe chamber was empty.`
       )
@@ -411,7 +411,7 @@ export class RussianRouletteGame {
     const embed = new EmbedBuilder()
       .setTitle('💀 RUSSIAN ROULETTE')
       .setDescription(
-        `💥 BANG!\n\n<@${player.id}> has been eliminated.\n\nYou are cooked.`
+        `<a:purplebomb:1545149042378407986> BANG!\n\n<@${player.id}> has been eliminated.\n\nYou are cooked.`
       ) 
       .setColor(0xFF0000)
       .setImage(RussianRouletteGame.BULLET_GIF);
@@ -489,7 +489,7 @@ export class RussianRouletteGame {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('roulette_trigger')
-        .setLabel('🔫 PULL TRIGGER')
+        .setLabel('<:gunpoint:1545149018160631868> PULL TRIGGER')
         .setStyle(ButtonStyle.Danger)
     );
 
@@ -500,7 +500,7 @@ export class RussianRouletteGame {
       )
       .setColor(0xFFD700)
       .setThumbnail(player.avatar)
-      .addFields({ name: '👥 PLAYERS', value: this.getPlayerListString() });
+      .addFields({ name: '<:people:1545149032303689768> PLAYERS', value: this.getPlayerListString() });
 
     await this.currentMessage?.edit({
       embeds: [embed],
@@ -555,7 +555,7 @@ export class RussianRouletteGame {
     const embed = new EmbedBuilder()
       .setTitle('<:15394trophy:1545135066148118628>RUSSIAN ROULETTE')
       .setDescription(
-        `👑 LAST PLAYER STANDING\n\n<@${winner.id}>\n\nYou survived everyone.\n\nThe chamber has gone silent.`
+        `<:15394trophy:1545135066148118628> LAST PLAYER STANDING\n\n<@${winner.id}>\n\nYou survived everyone.\n\nThe chamber has gone silent.`
       )
       .setColor(0xFFD700)
       .setThumbnail(winner.avatar);

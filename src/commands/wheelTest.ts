@@ -84,7 +84,7 @@ export async function handleWheelTestCommand(message: Message): Promise<void> {
     const finalEmbed = new EmbedBuilder()
       .setDescription(
         `🧪 <@${message.author.id}> tested the wheel!\n\n` +
-        `🎯 **${selectedOption.label}**\n\n` +
+        `<a:cargando:1545149001983197364> **${selectedOption.label}**\n\n` +
         `${selectedOption.description}`
       )
       .setImage(`attachment://${pngFilename}`);

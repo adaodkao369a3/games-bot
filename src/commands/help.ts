@@ -9,29 +9,29 @@ export async function handleHelpCommand(message: Message): Promise<void> {
     const staffMember = isStaff(message.member);
 
     const embed = new EmbedBuilder()
-      .setTitle('🤖 Bob Kun — Commands')
+      .setTitle('<:bob:1545141387656302663> Bob Kun — Commands')
       .setColor('#5865F2')
       .setDescription('Here are all the commands you can use:');
 
     // User-facing commands
     embed.addFields([
       {
-        name: '🎮 **Games**',
+        name: '<:controller:1545149011894210642> **Games**',
         value: '`.wordle` — Start a multiplayer Wordle game\n`.smash @user1 @user2` — Start a Smash or Pass vote\n`.trial @user [accusation]` — Hold a courtroom trial\n`.roulette @user1 @user2...` — Play Russian Roulette\n`.roulettemax @user` — Play Roulette Max (2 players only)\n`.quickdraw @user` — Start a Quick Draw duel\n`.quickdrawmax @user` — Start a Quick Draw Max duel with distraction\n`.gamble [amount]` — Play Bob\'s slot machine gamble',
         inline: false,
       },
       {
-        name: '💬 **Quote Cards**',
-        value: '`.quote [theme]` — Create a quote card from a replied message (themes: classic, sunset, ocean, purple)',
+        name: '<:pixelsymbolupside:1545149037135536168> **Quotes** <:pixelsymboltop:1545149034593910886>',
+        value: '`.quote` — Create a quote card from a replied message (themes: classic, sunset, ocean, purple)',
         inline: false,
       },
       {
-        name: '🎡 **Wheels**',
+        name: '<a:cd:1545149009855778848> **Wheels**',
         value: '`.wheel pfp` — Spin the PFP-changing wheel\n`.wheel truthordare` — Spin the Truth or Dare wheel\n`.wheel punishment` — Spin the punishment wheel\n`.wheel act` — Spin the acting/challenge wheel',
         inline: false,
       },
       {
-        name: '💼 **Currency**',
+        name: '<:moneybag:1545149026528268308> **Currency**',
         value: '`.wallet` — Check your Bombo Coin balance',
         inline: false,
       },
@@ -41,7 +41,7 @@ export async function handleHelpCommand(message: Message): Promise<void> {
     if (staffMember) {
       embed.addFields([
         {
-          name: '🛠️ **Staff Commands**',
+          name: '<a:staff:1545149054936289345> **Staff Commands**',
           value: '`.fonttest` — Test font rendering\n`.smashtest` — Test Smash image generation\n`.wheeltest` — Test wheel geometry\n`.wheelfonttest` — Test wheel font rendering',
           inline: false,
         },

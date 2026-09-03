@@ -82,7 +82,7 @@ export class SmashMaxGame {
 
     const embed = new EmbedBuilder()
       .setTitle('🔥 SMASHMAX')
-      .setDescription('🎲 Loading anime character images...\n\nPlease wait.')
+      .setDescription('<a:dice:1545149015652307104> Loading anime character images...\n\nPlease wait.')
       .setColor(0xFFD700);
 
     await this.currentMessage?.edit({
@@ -317,7 +317,7 @@ export class SmashMaxGame {
       .setColor(resultColor)
       .setImage('attachment://smashmax-result.png')
       .setTimestamp()
-      .setFooter({ text: 'Bob Kun 🍌' });
+      .setFooter({ text: 'Bob Kun <:bob:1545141387656302663>' });
 
     await this.currentMessage?.edit({
       files: [attachment],

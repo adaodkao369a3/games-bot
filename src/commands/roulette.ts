@@ -84,7 +84,7 @@ export async function handleRouletteCommand(message: Message): Promise<void> {
 
   try {
     // Send initial message
-    const initialMessage = await message.reply('🔫 Loading Russian Roulette...');
+    const initialMessage = await message.reply('<:gunpoint:1545149018160631868> Loading Russian Roulette...');
 
     // Create cleanup callback
     const onGameEnd = () => {

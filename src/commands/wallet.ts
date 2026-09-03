@@ -15,7 +15,7 @@ export async function handleWalletCommand(message: Message): Promise<void> {
 
   // Create wallet embed
   const walletEmbed = new EmbedBuilder()
-    .setTitle('💼 YOUR WALLET')
+    .setTitle('<:moneybag:1545149026528268308> YOUR WALLET')
     .setDescription('Current Bombo Coin balance')
     .setColor(0x00BFFF)
     .addFields(
