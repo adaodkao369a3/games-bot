@@ -56,7 +56,7 @@ export class WordleUI {
   static createWinEmbed(winner: string, secretWord: string, guessCount: number, data?: WordleUIData): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setColor(0xFFD700) // Gold
-      .setTitle('🎉 WE HAVE A WINNER!')
+      .setTitle('<a:confettipopper:1545132978139693227> WE HAVE A WINNER!')
       .setDescription(
         `🏆 **${winner}** guessed the word **${secretWord.toUpperCase()}**!\n\n` +
         `GG everyone!`

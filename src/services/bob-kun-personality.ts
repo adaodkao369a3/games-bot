@@ -54,7 +54,7 @@ export class BobKunPersonality {
     trialDrawSecond: `😭 **YOU'VE GOT TO BE KIDDING ME.**\n\nSTILL A DRAW.\n\nOne final defense...\n⏱️ **15 SECONDS.**`,
     trialNoJudgement: `⚖️💀 **NO JUDGEMENT COULD BE MADE TODAY.**\n\nThe jury has failed Bob Kun.`,
     trialGuilty: (accused: string, accusation: string, sentence: string) => `🚨 **VERDICT: GUILTY** 🚨\n\n${accused} has been found guilty of:\n\n**"${accusation}"**\n\n⚖️ **SENTENCED TO:**\n\n*"${sentence}"*\n\n😭 It's over for you, buddy.`,
-    trialInnocent: `⚖️ **VERDICT: NOT GUILTY** ⚖️\n\nThe jury has spoken! Justice prevails! 🎉`,
+    trialInnocent: `⚖️ **VERDICT: NOT GUILTY** ⚖️\n\nThe jury has spoken! Justice prevails! <a:confettipopper:1545132978139693227>`,
     trialJump: `😳 **OUUU SHIIII...**`,
     trialEveryoneVote: `🗳️ **EVERYONE IS A JUROR.**\n\nProsecutor? Vote.\nDefense? Vote.\nRandom guy eating a sandwich? **VOTE.** 🍌`,
   };
