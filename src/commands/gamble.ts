@@ -3,7 +3,7 @@ import { getCoinBalanceInfo, removeCoins, awardCoins } from '../services/coins.j
 import { ErrorHandler } from '../utils/error-handler.js';
 
 const SLOT_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>', '<:slotsstrawberry:1545161917834993804>'];
-const WIN_SYMBOL = '<a:win:1545165325614583888>';
+const WIN_SYMBOL = '<:slotsseven:1545161915649753119>';
 
 function randomSymbol(exclude?: string): string {
   let symbol: string;
