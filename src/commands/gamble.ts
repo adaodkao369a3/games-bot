@@ -165,8 +165,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
     // Create result embed
     const resultEmbed = new EmbedBuilder()
-      .setTitle('<a:slots:1545149049328640120> BOB\'S GAMBLE')
-      .setThumbnail(message.author.displayAvatarURL({ size: 128 }));
+      .setTitle('<a:slots:1545149049328640120> BOB\'S GAMBLE');
 
     const landingFrame = finalReelFrame(won);
 
