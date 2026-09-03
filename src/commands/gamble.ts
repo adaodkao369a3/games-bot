@@ -2,8 +2,8 @@ import { Message, EmbedBuilder } from 'discord.js';
 import { getCoinBalanceInfo, removeCoins, awardCoins } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
-const SLOT_SYMBOLS = ['🍒', '🍋', '🍇', '💎', '7️⃣', '🔔', '⭐'];
-const WIN_SYMBOL = '💎';
+const SLOT_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>', '<:slotsstrawberry:1545161917834993804>'];
+const WIN_SYMBOL = '<:slotsseven:1545161915649753119>';
 
 function randomSymbol(exclude?: string): string {
   let symbol: string;
@@ -14,7 +14,7 @@ function randomSymbol(exclude?: string): string {
 }
 
 function randomReelFrame(): string {
-  return `${randomSymbol()} ${randomSymbol()} ${randomSymbol()}`;
+  return `<a:slots:1545149049328640120> <a:slots:1545149049328640120> <a:slots:1545149049328640120>`;
 }
 
 // Landing frame: 3-of-a-kind on the win symbol for a win, a guaranteed
@@ -62,8 +62,8 @@ function parseWagerAmount(raw: string, balance: number): number | null {
 
 function buildLoadingEmbed(wager: number, balanceBefore: number): EmbedBuilder {
   return new EmbedBuilder()
-    .setTitle('<a:slots:1545149049328640120> BOB\'S GAMBLE')
-    .setDescription('_Putting your Bombo Coins on the line..._\n\n**```\n' + randomReelFrame() + '\n```**')
+    .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE')
+    .setDescription('_Putting your Bombo Coins on the line..._\n\n' + randomReelFrame())
     .setColor(0xFFD700)
     .addFields(
       { name: '<:cash:1545149005544165416> Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
@@ -75,8 +75,8 @@ function buildLoadingEmbed(wager: number, balanceBefore: number): EmbedBuilder {
 
 function buildSpinEmbed(wager: number, balanceBefore: number): EmbedBuilder {
   return new EmbedBuilder()
-    .setTitle('<a:slots:1545149049328640120> BOB\'S GAMBLE')
-    .setDescription('**```\n' + randomReelFrame() + '\n```**')
+    .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE')
+    .setDescription(randomReelFrame())
     .setColor(0xFFD700)
     .addFields(
       { name: '<:cash:1545149005544165416> Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
@@ -165,7 +165,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
     // Create result embed
     const resultEmbed = new EmbedBuilder()
-      .setTitle('<a:slots:1545149049328640120> BOB\'S GAMBLE');
+      .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE');
 
     const landingFrame = finalReelFrame(won);
 
@@ -211,7 +211,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       const balanceAfter = balanceAfterDeduction + payout;
 
       resultEmbed
-        .setDescription('**```\n' + landingFrame + '\n```**\n💰 **THE MACHINE LIKES YOU.**')
+        .setDescription(landingFrame + '\n💰 **THE MACHINE LIKES YOU.**')
         .setColor(0x00FF00)
         .addFields(
           { name: '<:cash:1545149005544165416> You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
@@ -223,7 +223,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     } else {
       // LOSE: User gets nothing back (wager already deducted)
       resultEmbed
-        .setDescription('**```\n' + landingFrame + '\n```**\n💀 **THE MACHINE HAS SPOKEN.**')
+        .setDescription(landingFrame + '\n💀 **THE MACHINE HAS SPOKEN.**')
         .setColor(0xFF0000)
         .addFields(
           { name: '<:cash:1545149005544165416> You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
