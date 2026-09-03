@@ -2,8 +2,8 @@ import { Message, EmbedBuilder } from 'discord.js';
 import { getCoinBalanceInfo, removeCoins, awardCoins } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
-const SLOT_SYMBOLS = ['🍒', '🍋', '🍇', '💎', '7️⃣', '🔔', '⭐'];
-const WIN_SYMBOL = '💎';
+const SLOT_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>', '<:slotsstrawberry:1545161917834993804>'];
+const WIN_SYMBOL = '<a:win:1545165325614583888>';
 
 function randomSymbol(exclude?: string): string {
   let symbol: string;
@@ -14,13 +14,13 @@ function randomSymbol(exclude?: string): string {
 }
 
 function randomReelFrame(): string {
-  return `${randomSymbol()} ${randomSymbol()} ${randomSymbol()}`;
+  return `<a:slots:1545149049328640120> <a:slots:1545149049328640120> <a:slots:1545149049328640120>`;
 }
 
 function progressiveReelFrame(stopped1: string | null, stopped2: string | null, stopped3: string | null): string {
-  const reel1 = stopped1 || randomSymbol();
-  const reel2 = stopped2 || randomSymbol();
-  const reel3 = stopped3 || randomSymbol();
+  const reel1 = stopped1 || '<a:slots:1545149049328640120>';
+  const reel2 = stopped2 || '<a:slots:1545149049328640120>';
+  const reel3 = stopped3 || '<a:slots:1545149049328640120>';
   return `${reel1} ${reel2} ${reel3}`;
 }
 
@@ -67,30 +67,16 @@ function parseWagerAmount(raw: string, balance: number): number | null {
   return value;
 }
 
-function buildLoadingEmbed(wager: number, balanceBefore: number): EmbedBuilder {
+function buildLoadingEmbed(): EmbedBuilder {
   return new EmbedBuilder()
-    .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
-    .setDescription('_Putting your Bombo Coins on the line..._\n\n' + randomReelFrame())
-    .setColor(0xFFD700)
-    .addFields(
-      { name: '<:cash:1545149005544165416> Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-      { name: '<:bank:1545157599912009868> Balance', value: `${balanceBefore.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-      { name: '<a:dice:1545149015652307104> Odds', value: '50/50 · 2x payout', inline: true }
-    )
-    .setFooter({ text: 'Spinning the reels...' });
+    .setDescription(randomReelFrame())
+    .setColor(0xFFD700);
 }
 
-function buildSpinEmbed(wager: number, balanceBefore: number): EmbedBuilder {
+function buildSpinEmbed(): EmbedBuilder {
   return new EmbedBuilder()
-    .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
     .setDescription(randomReelFrame())
-    .setColor(0xFFD700)
-    .addFields(
-      { name: '<:cash:1545149005544165416> Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-      { name: '<:bank:1545157599912009868> Balance', value: `${balanceBefore.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-      { name: '<a:dice:1545149015652307104> Odds', value: '50/50 · 2x payout', inline: true }
-    )
-    .setFooter({ text: 'Spinning the reels...' });
+    .setColor(0xFFD700);
 }
 
 export async function handleGambleCommand(message: Message, args: string[]): Promise<void> {
@@ -136,8 +122,8 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
   try {
     const balanceBefore = coinInfo.balance;
 
-    // Send initial loading message with a spinning reel
-    const initialMessage = await message.reply({ embeds: [buildLoadingEmbed(wager, balanceBefore)] });
+    // Send initial message with spinning animation
+    const initialMessage = await message.reply({ embeds: [buildLoadingEmbed()] });
 
     // Deduct wager amount atomically (no retries needed - transaction system handles this)
     const deductionResult = await removeCoins(
@@ -152,7 +138,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
     if (deductionResult === null) {
       console.error(`[GAMBLE] Failed to deduct wager for user ${userId}. Amount: ${wager}`);
-      await initialMessage.edit('Failed to process your wager. This may be due to a database connection issue. Please try again in a moment.');
+      await message.reply('Failed to process your wager. This may be due to a database connection issue. Please try again in a moment.');
       return;
     }
 
@@ -169,71 +155,40 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     const symbol2 = parts[1] || '<:slotsseven:1545161915649753119>';
     const symbol3 = parts[2] || '<:slotsseven:1545161915649753119>';
 
-    // Progressive reel stopping animation
-    // First, spin all reels together for a bit
-    const initialSpinFrames = 2;
-    for (let i = 0; i < initialSpinFrames; i++) {
+    // First message: spinning animation only
+    const spinFrames = 3;
+    for (let i = 0; i < spinFrames; i++) {
       await new Promise(resolve => setTimeout(resolve, 500));
-      await initialMessage.edit({ embeds: [buildSpinEmbed(wager, balanceAfterDeduction)] });
+      await initialMessage.edit({ embeds: [buildSpinEmbed()] });
     }
 
-    // Stop reels one by one
+    // Stop reels one by one in the first message
     // Reel 1 stops
     await new Promise(resolve => setTimeout(resolve, 600));
     const reel1Embed = new EmbedBuilder()
-      .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
       .setDescription(progressiveReelFrame(symbol1, null, null))
-      .setColor(0xFFD700)
-      .addFields(
-        { name: '<:cash:1545149005544165416> Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-        { name: '<:bank:1545157599912009868> Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-        { name: '<a:dice:1545149015652307104> Odds', value: '50/50 · 2x payout', inline: true }
-      )
-      .setFooter({ text: 'Spinning the reels...' });
+      .setColor(0xFFD700);
     await initialMessage.edit({ embeds: [reel1Embed] });
 
     // Reel 2 stops
     await new Promise(resolve => setTimeout(resolve, 600));
     const reel2Embed = new EmbedBuilder()
-      .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
       .setDescription(progressiveReelFrame(symbol1, symbol2, null))
-      .setColor(0xFFD700)
-      .addFields(
-        { name: '<:cash:1545149005544165416> Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-        { name: '<:bank:1545157599912009868> Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-        { name: '<a:dice:1545149015652307104> Odds', value: '50/50 · 2x payout', inline: true }
-      )
-      .setFooter({ text: 'Spinning the reels...' });
+      .setColor(0xFFD700);
     await initialMessage.edit({ embeds: [reel2Embed] });
 
-    // Reel 3 stops (final result)
+    // Reel 3 stops (final result in first message)
     await new Promise(resolve => setTimeout(resolve, 600));
-
-    // Show final result emojis first
-    const finalResultEmbed = new EmbedBuilder()
-      .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
+    const finalSpinEmbed = new EmbedBuilder()
       .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3))
-      .setColor(0xFFD700)
-      .addFields(
-        { name: '<:cash:1545149005544165416> Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-        { name: '<:bank:1545157599912009868> Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-        { name: '<a:dice:1545149015652307104> Odds', value: '50/50 · 2x payout', inline: true }
-      )
-      .setFooter({ text: 'Spinning the reels...' });
-    await initialMessage.edit({ embeds: [finalResultEmbed] });
+      .setColor(0xFFD700);
+    await initialMessage.edit({ embeds: [finalSpinEmbed] });
 
-    // Short pause before showing win/loss result
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    // Create win/loss result embed
-    const resultEmbed = new EmbedBuilder();
-
+    // Second message: result with details
     if (won) {
-      // Update title to win emoji for winning result
-      resultEmbed.setTitle('<a:win:1545165325614583888> BOB\'S GAMBLE');
       // WIN: Award 2x wager (user already lost wager, so add 2x to get net +wager)
       const payout = wager * 2;
-
+      
       // Award winnings (no retries needed - transaction system handles this)
       const awardResult = await awardCoins(
         userId,
@@ -261,9 +216,9 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
         if (refundResult === null) {
           console.error(`[GAMBLE] CRITICAL: Failed to refund wager for user ${userId} after payout failure. Amount: ${wager}`);
-          await initialMessage.edit('Failed to process your winnings. Please contact support immediately - your wager may be affected.');
+          await message.reply('Failed to process your winnings. Please contact support immediately - your wager may be affected.');
         } else {
-          await initialMessage.edit('Failed to process your winnings due to a database issue. Your wager has been refunded. Please try again.');
+          await message.reply('Failed to process your winnings due to a database issue. Your wager has been refunded. Please try again.');
         }
 
         return;
@@ -271,29 +226,37 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
       const balanceAfter = balanceAfterDeduction + payout;
 
-      resultEmbed
-        .setDescription('You won double!')
+      // Send second message with win result
+      const winResultEmbed = new EmbedBuilder()
+        .setTitle('<a:win:1545165325614583888> YOU WON!')
+        .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3) + '\n💰 **DOUBLE YOUR MONEY!**')
         .setColor(0x00FF00)
         .addFields(
-          { name: 'Your winnings', value: `${payout.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '<:bank:1545157599912009868> New Balance', value: `${balanceAfter.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true }
+          { name: '<:cash:1545149005544165416> You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '<:15394trophy:1545135066148118628>Payout', value: `${payout.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '✨ Profit', value: `+${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '<:bank:1545157599912009868> New Balance', value: `${balanceAfter.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: false }
         )
         .setFooter({ text: 'Bob has temporarily approved your financial decisions.' });
+
+      await message.reply({ embeds: [winResultEmbed] });
     } else {
       // LOSE: User gets nothing back (wager already deducted)
-      resultEmbed
-        .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
-        .setDescription('You lost!')
+      // Send second message with lose result
+      const loseResultEmbed = new EmbedBuilder()
+        .setTitle('<:lotteryslots:1545161895261241454> YOU LOST')
+        .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3) + '\n💀 **BETTER LUCK NEXT TIME!**')
         .setColor(0xFF0000)
         .addFields(
-          { name: 'Your loss', value: `-${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '<:bank:1545157599912009868> New Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true }
+          { name: '<:cash:1545149005544165416> You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '<:15394trophy:1545135066148118628>Payout', value: '0 <:bombocoin:1545139736312815840>', inline: true },
+          { name: '📉 Loss', value: `-${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '<:bank:1545157599912009868> New Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: false }
         )
         .setFooter({ text: 'Bob recommends pretending this never happened.' });
-    }
 
-    // Edit message with win/loss result
-    await initialMessage.edit({ embeds: [resultEmbed] });
+      await message.reply({ embeds: [loseResultEmbed] });
+    }
 
   } catch (error) {
     console.error(`[GAMBLE] Unexpected error for user ${userId}. Wager: ${wager}. Error:`, error);
