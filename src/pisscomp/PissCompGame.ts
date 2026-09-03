@@ -248,7 +248,7 @@ export class PissCompGame {
    */
   private createVictoryEmbed(winnerId: string, loserId: string): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('🏆 PISS COMPETITION — WINNER')
+      .setTitle('<:15394trophy:1545135066148118628>PISS COMPETITION — WINNER')
       .setDescription(
         `<@${winnerId}> filled the meter first!\n\n` +
         `<@${this.state.player1.id}> VS <@${this.state.player2.id}>`

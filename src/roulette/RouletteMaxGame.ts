@@ -1344,7 +1344,7 @@ export class RouletteMaxGame {
       }
 
       description = 
-        `🏆 DOMAIN BATTLE — VICTORY\n\n` +
+        `<:15394trophy:1545135066148118628>DOMAIN BATTLE — VICTORY\n\n` +
         `<@${winner.id}> HAS WON!\n\n` +
         `Final Score\n<@${this.state.player1.id}>  ${this.state.player1Score}\n<@${this.state.player2.id}>  ${this.state.player2Score}\n<@${this.state.player3!.id}>  ${this.state.player3Score}\n\n` +
         `The roulette was only the beginning.`;
@@ -1354,7 +1354,7 @@ export class RouletteMaxGame {
       resultGif = this.state.player1Score >= 3 ? RouletteMaxGame.PLAYER1_RESULT_GIF : RouletteMaxGame.PLAYER2_RESULT_GIF;
 
       description = 
-        `🏆 ROULETTE MAX — VICTORY\n\n` +
+        `<:15394trophy:1545135066148118628>ROULETTE MAX — VICTORY\n\n` +
         `<@${this.state.player1.id}> VS <@${this.state.player2.id}>\n\n` +
         `👑 WINNER\n<@${winner.id}>\n\n` +
         `⚔️ DOMAIN BATTLE\n` +
@@ -1363,7 +1363,7 @@ export class RouletteMaxGame {
     }
 
     const embed = new EmbedBuilder()
-      .setTitle('🏆 DOMAIN BATTLE — VICTORY')
+      .setTitle('<:15394trophy:1545135066148118628>DOMAIN BATTLE — VICTORY')
       .setDescription(description)
       .setColor(0xFFD700)
       .setImage(resultGif);

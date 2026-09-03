@@ -216,7 +216,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
         .setColor(0x00FF00)
         .addFields(
           { name: '💵 You bet', value: `${wager.toLocaleString()} 🪙`, inline: true },
-          { name: '🏆 Payout', value: `${payout.toLocaleString()} 🪙`, inline: true },
+          { name: '<:15394trophy:1545135066148118628>Payout', value: `${payout.toLocaleString()} 🪙`, inline: true },
           { name: '✨ Profit', value: `+${wager.toLocaleString()} 🪙`, inline: true },
           { name: '🏦 New Balance', value: `${balanceAfter.toLocaleString()} 🪙`, inline: false }
         )
@@ -228,7 +228,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
         .setColor(0xFF0000)
         .addFields(
           { name: '💵 You bet', value: `${wager.toLocaleString()} 🪙`, inline: true },
-          { name: '🏆 Payout', value: '0 🪙', inline: true },
+          { name: '<:15394trophy:1545135066148118628>Payout', value: '0 🪙', inline: true },
           { name: '📉 Loss', value: `-${wager.toLocaleString()} 🪙`, inline: true },
           { name: '🏦 New Balance', value: `${balanceAfterDeduction.toLocaleString()} 🪙`, inline: false }
         )

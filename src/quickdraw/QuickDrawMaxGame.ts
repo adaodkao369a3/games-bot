@@ -407,7 +407,7 @@ export class QuickDrawMaxGame {
     const winGif = this.state.winner === this.state.player1Id ? QuickDrawMaxGame.PLAYER1_WIN_GIF : QuickDrawMaxGame.PLAYER2_WIN_GIF;
 
     return new EmbedBuilder()
-      .setTitle('🏆 QUICK DRAW MAX RESULTS')
+      .setTitle('<:15394trophy:1545135066148118628>QUICK DRAW MAX RESULTS')
       .setColor(0xFFD700)
       .setDescription(
         `**<@${this.state.winner}> VS <@${this.state.loser}>**\n\n` +

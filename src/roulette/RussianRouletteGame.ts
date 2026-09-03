@@ -553,7 +553,7 @@ export class RussianRouletteGame {
     this.clearTimers();
 
     const embed = new EmbedBuilder()
-      .setTitle('🏆 RUSSIAN ROULETTE')
+      .setTitle('<:15394trophy:1545135066148118628>RUSSIAN ROULETTE')
       .setDescription(
         `👑 LAST PLAYER STANDING\n\n<@${winner.id}>\n\nYou survived everyone.\n\nThe chamber has gone silent.`
       )

@@ -307,7 +307,7 @@ export class SmashMaxGame {
     } else {
       const winnerChar = winner === 'subject1' ? char1 : char2;
       const loserChar = winner === 'subject1' ? char2 : char1;
-      resultDescription = `🏆 **${winnerChar.name} WINS!**\n\n${winnerChar.anime ? `*${winnerChar.anime}*\n` : ''}The people have spoken!\n\n**Final Score:**\n${char1.name}: ${this.state.player1Votes} votes\n${char2.name}: ${this.state.player2Votes} votes`;
+      resultDescription = `<:15394trophy:1545135066148118628>**${winnerChar.name} WINS!**\n\n${winnerChar.anime ? `*${winnerChar.anime}*\n` : ''}The people have spoken!\n\n**Final Score:**\n${char1.name}: ${this.state.player1Votes} votes\n${char2.name}: ${this.state.player2Votes} votes`;
       resultColor = 0xFFD700;
     }
 

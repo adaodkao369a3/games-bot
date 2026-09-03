@@ -22,7 +22,7 @@ export async function handleBobkunCommand(message: Message): Promise<void> {
     embed.addFields([
       {
         name: '🎮 GAME ZONE',
-        value: '🟩 `.wordle` — Start a multiplayer Wordle game\n💘 `.smash @user1 @user2` — Start a Smash or Pass vote\n⚖️ `.trial @user [accusation]` — Put someone on trial in the courtroom\n🔫 `.roulette @user1 @user2...` — Play Russian Roulette\n💥 `.roulettemax @user` — Play Roulette Max — 2 players only\n🤠 `.quickdraw @user` — Challenge someone to a Quick Draw duel\n🌀 `.quickdrawmax @user` — Quick Draw Max with a distraction\n\n🏆 Challenge your friends.\n🤡 Embarrass your friends.\n💀 Regret your decisions.',
+        value: '🟩 `.wordle` — Start a multiplayer Wordle game\n💘 `.smash @user1 @user2` — Start a Smash or Pass vote\n⚖️ `.trial @user [accusation]` — Put someone on trial in the courtroom\n🔫 `.roulette @user1 @user2...` — Play Russian Roulette\n💥 `.roulettemax @user` — Play Roulette Max — 2 players only\n🤠 `.quickdraw @user` — Challenge someone to a Quick Draw duel\n🌀 `.quickdrawmax @user` — Quick Draw Max with a distraction\n\n<:15394trophy:1545135066148118628>Challenge your friends.\n🤡 Embarrass your friends.\n💀 Regret your decisions.',
         inline: false,
       },
       {

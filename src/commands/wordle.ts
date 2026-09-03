@@ -119,14 +119,6 @@ export async function handleWordleGuess(message: Message): Promise<void> {
       return;
     }
 
-    // Valid guess - delete user's message
-    try {
-      await message.delete();
-    } catch (error) {
-      console.warn('[Wordle Guess] Could not delete user message (likely permission issue):', error);
-      // Continue anyway - the game should still work
-    }
-
     // Update the game message
     await updateGameMessage(game, message.channel, username);
     

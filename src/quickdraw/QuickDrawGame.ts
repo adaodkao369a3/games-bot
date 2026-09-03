@@ -373,7 +373,7 @@ export class QuickDrawGame {
     const winGif = this.state.winner === this.state.player1Id ? QuickDrawGame.PLAYER1_WIN_GIF : QuickDrawGame.PLAYER2_WIN_GIF;
 
     return new EmbedBuilder()
-      .setTitle('🏆 QUICK DRAW RESULTS')
+      .setTitle('<:15394trophy:1545135066148118628>QUICK DRAW RESULTS')
       .setColor(0xFFD700)
       .setDescription(
         `**<@${this.state.winner}> VS <@${this.state.loser}>**\n\n` +

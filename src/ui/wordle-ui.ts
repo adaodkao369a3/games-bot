@@ -58,7 +58,7 @@ export class WordleUI {
       .setColor(0xFFD700) // Gold
       .setTitle('<a:confettipopper:1545132978139693227> WE HAVE A WINNER!')
       .setDescription(
-        `🏆 **${winner}** guessed the word **${secretWord.toUpperCase()}**!\n\n` +
+        `<:15394trophy:1545135066148118628>**${winner}** guessed the word **${secretWord.toUpperCase()}**!\n\n` +
         `GG everyone!`
       )
       .setFooter({ text: `Won in ${guessCount} guesses • Bob Kun 🍌` });
