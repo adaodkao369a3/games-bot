@@ -216,14 +216,8 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       // Send second message with win result
       const winResultEmbed = new EmbedBuilder()
         .setTitle('<a:win:1545165325614583888> YOU WON!')
-        .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3) + '\n💰 **DOUBLE YOUR MONEY!**')
+        .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3) + `\n+${wager.toLocaleString()} BomboCoins`)
         .setColor(0x00FF00)
-        .addFields(
-          { name: '<:cash:1545149005544165416> You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '<:15394trophy:1545135066148118628>Payout', value: `${payout.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '✨ Profit', value: `+${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '<:bank:1545157599912009868> New Balance', value: `${balanceAfter.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: false }
-        )
         .setFooter({ text: 'Bob has temporarily approved your financial decisions.' });
 
       await message.reply({ embeds: [winResultEmbed] });
@@ -232,14 +226,8 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       // Send second message with lose result
       const loseResultEmbed = new EmbedBuilder()
         .setTitle('<:lotteryslots:1545161895261241454> YOU LOST')
-        .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3) + '\n💀 **BETTER LUCK NEXT TIME!**')
+        .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3) + `\n-${wager.toLocaleString()} BomboCoins`)
         .setColor(0xFF0000)
-        .addFields(
-          { name: '<:cash:1545149005544165416> You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '<:15394trophy:1545135066148118628>Payout', value: '0 <:bombocoin:1545139736312815840>', inline: true },
-          { name: '📉 Loss', value: `-${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '<:bank:1545157599912009868> New Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: false }
-        )
         .setFooter({ text: 'Bob recommends pretending this never happened.' });
 
       await message.reply({ embeds: [loseResultEmbed] });
