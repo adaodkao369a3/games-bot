@@ -67,16 +67,12 @@ function parseWagerAmount(raw: string, balance: number): number | null {
   return value;
 }
 
-function buildLoadingEmbed(): EmbedBuilder {
-  return new EmbedBuilder()
-    .setDescription(randomReelFrame())
-    .setColor(0xFFD700);
+function buildLoadingMessage(): string {
+  return randomReelFrame();
 }
 
-function buildSpinEmbed(): EmbedBuilder {
-  return new EmbedBuilder()
-    .setDescription(randomReelFrame())
-    .setColor(0xFFD700);
+function buildSpinMessage(): string {
+  return randomReelFrame();
 }
 
 export async function handleGambleCommand(message: Message, args: string[]): Promise<void> {
@@ -123,7 +119,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     const balanceBefore = coinInfo.balance;
 
     // Send initial message with spinning animation
-    const initialMessage = await message.reply({ embeds: [buildLoadingEmbed()] });
+    const initialMessage = await message.reply(buildLoadingMessage());
 
     // Deduct wager amount atomically (no retries needed - transaction system handles this)
     const deductionResult = await removeCoins(
@@ -159,30 +155,21 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     const spinFrames = 3;
     for (let i = 0; i < spinFrames; i++) {
       await new Promise(resolve => setTimeout(resolve, 500));
-      await initialMessage.edit({ embeds: [buildSpinEmbed()] });
+      await initialMessage.edit(buildSpinMessage());
     }
 
     // Stop reels one by one in the first message
     // Reel 1 stops
     await new Promise(resolve => setTimeout(resolve, 600));
-    const reel1Embed = new EmbedBuilder()
-      .setDescription(progressiveReelFrame(symbol1, null, null))
-      .setColor(0xFFD700);
-    await initialMessage.edit({ embeds: [reel1Embed] });
+    await initialMessage.edit(progressiveReelFrame(symbol1, null, null));
 
     // Reel 2 stops
     await new Promise(resolve => setTimeout(resolve, 600));
-    const reel2Embed = new EmbedBuilder()
-      .setDescription(progressiveReelFrame(symbol1, symbol2, null))
-      .setColor(0xFFD700);
-    await initialMessage.edit({ embeds: [reel2Embed] });
+    await initialMessage.edit(progressiveReelFrame(symbol1, symbol2, null));
 
     // Reel 3 stops (final result in first message)
     await new Promise(resolve => setTimeout(resolve, 600));
-    const finalSpinEmbed = new EmbedBuilder()
-      .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3))
-      .setColor(0xFFD700);
-    await initialMessage.edit({ embeds: [finalSpinEmbed] });
+    await initialMessage.edit(progressiveReelFrame(symbol1, symbol2, symbol3));
 
     // Second message: result with details
     if (won) {
