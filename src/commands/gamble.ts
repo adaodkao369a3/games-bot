@@ -17,6 +17,13 @@ function randomReelFrame(): string {
   return `<a:slots:1545149049328640120> <a:slots:1545149049328640120> <a:slots:1545149049328640120>`;
 }
 
+function progressiveReelFrame(stopped1: string | null, stopped2: string | null, stopped3: string | null): string {
+  const reel1 = stopped1 || '<a:slots:1545149049328640120>';
+  const reel2 = stopped2 || '<a:slots:1545149049328640120>';
+  const reel3 = stopped3 || '<a:slots:1545149049328640120>';
+  return `${reel1} ${reel2} ${reel3}`;
+}
+
 // Landing frame: 3-of-a-kind on the win symbol for a win, a guaranteed
 // non-matching combo for a loss.
 function finalReelFrame(won: boolean): string {
@@ -62,7 +69,7 @@ function parseWagerAmount(raw: string, balance: number): number | null {
 
 function buildLoadingEmbed(wager: number, balanceBefore: number): EmbedBuilder {
   return new EmbedBuilder()
-    .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE')
+    .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
     .setDescription('_Putting your Bombo Coins on the line..._\n\n' + randomReelFrame())
     .setColor(0xFFD700)
     .addFields(
@@ -154,20 +161,58 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     // Determine result up front (50/50) so the reel animation can land on it.
     const won = Math.random() < 0.5;
 
-    // Slot-machine style suspense: a couple of spinning frames before the
-    // reveal, landing on the pre-determined result.
-    const spinFrames = 3;
-    for (let i = 0; i < spinFrames; i++) {
-      await new Promise(resolve => setTimeout(resolve, 550));
+    // Pre-calculate the final landing frame and extract individual symbols
+    const landingFrame = finalReelFrame(won);
+    // Extract the three symbols by splitting (format: "emoji1 emoji2 emoji3")
+    const parts = landingFrame.split(' ').filter(part => part.trim().length > 0);
+    const symbol1 = parts[0] || '<:slotsseven:1545161915649753119>';
+    const symbol2 = parts[1] || '<:slotsseven:1545161915649753119>';
+    const symbol3 = parts[2] || '<:slotsseven:1545161915649753119>';
+
+    // Progressive reel stopping animation
+    // First, spin all reels together for a bit
+    const initialSpinFrames = 2;
+    for (let i = 0; i < initialSpinFrames; i++) {
+      await new Promise(resolve => setTimeout(resolve, 500));
       await initialMessage.edit({ embeds: [buildSpinEmbed(wager, balanceAfterDeduction)] });
     }
-    await new Promise(resolve => setTimeout(resolve, 550));
+
+    // Stop reels one by one
+    // Reel 1 stops
+    await new Promise(resolve => setTimeout(resolve, 600));
+    const reel1Embed = new EmbedBuilder()
+      .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE')
+      .setDescription(progressiveReelFrame(symbol1, null, null))
+      .setColor(0xFFD700)
+      .addFields(
+        { name: '<:cash:1545149005544165416> Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+        { name: '<:bank:1545157599912009868> Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+        { name: '<a:dice:1545149015652307104> Odds', value: '50/50 · 2x payout', inline: true }
+      )
+      .setFooter({ text: 'Spinning the reels...' });
+    await initialMessage.edit({ embeds: [reel1Embed] });
+
+    // Reel 2 stops
+    await new Promise(resolve => setTimeout(resolve, 600));
+    const reel2Embed = new EmbedBuilder()
+      .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE')
+      .setDescription(progressiveReelFrame(symbol1, symbol2, null))
+      .setColor(0xFFD700)
+      .addFields(
+        { name: '<:cash:1545149005544165416> Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+        { name: '<:bank:1545157599912009868> Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+        { name: '<a:dice:1545149015652307104> Odds', value: '50/50 · 2x payout', inline: true }
+      )
+      .setFooter({ text: 'Spinning the reels...' });
+    await initialMessage.edit({ embeds: [reel2Embed] });
+
+    // Reel 3 stops (final result)
+    await new Promise(resolve => setTimeout(resolve, 600));
 
     // Create result embed
     const resultEmbed = new EmbedBuilder()
-      .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE');
-
-    const landingFrame = finalReelFrame(won);
+      .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE')
+      .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3));
 
     if (won) {
       // WIN: Award 2x wager (user already lost wager, so add 2x to get net +wager)
@@ -211,7 +256,6 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       const balanceAfter = balanceAfterDeduction + payout;
 
       resultEmbed
-        .setDescription(landingFrame + '\n💰 **THE MACHINE LIKES YOU.**')
         .setColor(0x00FF00)
         .addFields(
           { name: '<:cash:1545149005544165416> You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
@@ -223,7 +267,6 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     } else {
       // LOSE: User gets nothing back (wager already deducted)
       resultEmbed
-        .setDescription(landingFrame + '\n💀 **THE MACHINE HAS SPOKEN.**')
         .setColor(0xFF0000)
         .addFields(
           { name: '<:cash:1545149005544165416> You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
