@@ -2,8 +2,8 @@ import { Message, EmbedBuilder } from 'discord.js';
 import { getCoinBalanceInfo, removeCoins, awardCoins } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
-const SLOT_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>', '<:slotsstrawberry:1545161917834993804>'];
-const WIN_SYMBOL = '<:slotsseven:1545161915649753119>';
+const SLOT_SYMBOLS = ['🍒', '🍋', '🍇', '💎', '7️⃣', '🔔', '⭐'];
+const WIN_SYMBOL = '💎';
 
 function randomSymbol(exclude?: string): string {
   let symbol: string;
@@ -14,13 +14,13 @@ function randomSymbol(exclude?: string): string {
 }
 
 function randomReelFrame(): string {
-  return `<a:slots:1545149049328640120> <a:slots:1545149049328640120> <a:slots:1545149049328640120>`;
+  return `${randomSymbol()} ${randomSymbol()} ${randomSymbol()}`;
 }
 
 function progressiveReelFrame(stopped1: string | null, stopped2: string | null, stopped3: string | null): string {
-  const reel1 = stopped1 || '<a:slots:1545149049328640120>';
-  const reel2 = stopped2 || '<a:slots:1545149049328640120>';
-  const reel3 = stopped3 || '<a:slots:1545149049328640120>';
+  const reel1 = stopped1 || randomSymbol();
+  const reel2 = stopped2 || randomSymbol();
+  const reel3 = stopped3 || randomSymbol();
   return `${reel1} ${reel2} ${reel3}`;
 }
 
@@ -82,7 +82,7 @@ function buildLoadingEmbed(wager: number, balanceBefore: number): EmbedBuilder {
 
 function buildSpinEmbed(wager: number, balanceBefore: number): EmbedBuilder {
   return new EmbedBuilder()
-    .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE')
+    .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
     .setDescription(randomReelFrame())
     .setColor(0xFFD700)
     .addFields(
@@ -181,7 +181,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     // Reel 1 stops
     await new Promise(resolve => setTimeout(resolve, 600));
     const reel1Embed = new EmbedBuilder()
-      .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE')
+      .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
       .setDescription(progressiveReelFrame(symbol1, null, null))
       .setColor(0xFFD700)
       .addFields(
@@ -195,7 +195,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     // Reel 2 stops
     await new Promise(resolve => setTimeout(resolve, 600));
     const reel2Embed = new EmbedBuilder()
-      .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE')
+      .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
       .setDescription(progressiveReelFrame(symbol1, symbol2, null))
       .setColor(0xFFD700)
       .addFields(
@@ -209,15 +209,31 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     // Reel 3 stops (final result)
     await new Promise(resolve => setTimeout(resolve, 600));
 
-    // Create result embed
-    const resultEmbed = new EmbedBuilder()
-      .setTitle('<:slotsseven:1545161915649753119> BOB\'S GAMBLE')
-      .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3));
+    // Show final result emojis first
+    const finalResultEmbed = new EmbedBuilder()
+      .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
+      .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3))
+      .setColor(0xFFD700)
+      .addFields(
+        { name: '<:cash:1545149005544165416> Wager', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+        { name: '<:bank:1545157599912009868> Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+        { name: '<a:dice:1545149015652307104> Odds', value: '50/50 · 2x payout', inline: true }
+      )
+      .setFooter({ text: 'Spinning the reels...' });
+    await initialMessage.edit({ embeds: [finalResultEmbed] });
+
+    // Short pause before showing win/loss result
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Create win/loss result embed
+    const resultEmbed = new EmbedBuilder();
 
     if (won) {
+      // Update title to win emoji for winning result
+      resultEmbed.setTitle('<a:win:1545165325614583888> BOB\'S GAMBLE');
       // WIN: Award 2x wager (user already lost wager, so add 2x to get net +wager)
       const payout = wager * 2;
-      
+
       // Award winnings (no retries needed - transaction system handles this)
       const awardResult = await awardCoins(
         userId,
@@ -256,28 +272,27 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       const balanceAfter = balanceAfterDeduction + payout;
 
       resultEmbed
+        .setDescription('You won double!')
         .setColor(0x00FF00)
         .addFields(
-          { name: '<:cash:1545149005544165416> You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '<:15394trophy:1545135066148118628>Payout', value: `${payout.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '✨ Profit', value: `+${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '<:bank:1545157599912009868> New Balance', value: `${balanceAfter.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: false }
+          { name: 'Your winnings', value: `${payout.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '<:bank:1545157599912009868> New Balance', value: `${balanceAfter.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true }
         )
         .setFooter({ text: 'Bob has temporarily approved your financial decisions.' });
     } else {
       // LOSE: User gets nothing back (wager already deducted)
       resultEmbed
+        .setTitle('<:lotteryslots:1545161895261241454> BOB\'S GAMBLE')
+        .setDescription('You lost!')
         .setColor(0xFF0000)
         .addFields(
-          { name: '<:cash:1545149005544165416> You bet', value: `${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '<:15394trophy:1545135066148118628>Payout', value: '0 <:bombocoin:1545139736312815840>', inline: true },
-          { name: '📉 Loss', value: `-${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
-          { name: '<:bank:1545157599912009868> New Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: false }
+          { name: 'Your loss', value: `-${wager.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true },
+          { name: '<:bank:1545157599912009868> New Balance', value: `${balanceAfterDeduction.toLocaleString()} <:bombocoin:1545139736312815840>`, inline: true }
         )
         .setFooter({ text: 'Bob recommends pretending this never happened.' });
     }
 
-    // Edit message with result
+    // Edit message with win/loss result
     await initialMessage.edit({ embeds: [resultEmbed] });
 
   } catch (error) {
