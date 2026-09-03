@@ -287,7 +287,7 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
         .setColor(winner === 'tie' ? 0xFFA500 : 0xFFD700)
         .setDescription(resultDescription)
         .setImage('attachment://smash-result.png')
-        .setFooter({ text: 'Bob Kun <:bob:1545141387656302663>' });
+        .setFooter({ text: 'Bob Kun 🎳' });
 
       // Post as reply to the original voting message
       if (channel && 'messages' in channel) {

@@ -61,7 +61,7 @@ export class WordleUI {
         `<:15394trophy:1545135066148118628>**${winner}** guessed the word **${secretWord.toUpperCase()}**!\n\n` +
         `GG everyone!`
       )
-      .setFooter({ text: `Won in ${guessCount} guesses • Bob Kun <:bob:1545141387656302663>` });
+      .setFooter({ text: `Won in ${guessCount} guesses • Bob Kun 🎳` });
 
     return embed;
   }
@@ -77,7 +77,7 @@ export class WordleUI {
         `The word was **${secretWord.toUpperCase()}**.\n\n` +
         `Better luck next time!`
       )
-      .setFooter({ text: `${guessCount} / 5 guesses used • Bob Kun <:bob:1545141387656302663>` });
+      .setFooter({ text: `${guessCount} / 5 guesses used • Bob Kun 🎳` });
 
     return embed;
   }

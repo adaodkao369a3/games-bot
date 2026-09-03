@@ -62,7 +62,7 @@ function parseWagerAmount(raw: string, balance: number): number | null {
 
 function buildLoadingEmbed(wager: number, balanceBefore: number): EmbedBuilder {
   return new EmbedBuilder()
-    .setTitle('🎰 BOB\'S GAMBLE')
+    .setTitle('<a:slots:1545149049328640120> BOB\'S GAMBLE')
     .setDescription('_Putting your Bombo Coins on the line..._\n\n**```\n' + randomReelFrame() + '\n```**')
     .setColor(0xFFD700)
     .addFields(
@@ -75,7 +75,7 @@ function buildLoadingEmbed(wager: number, balanceBefore: number): EmbedBuilder {
 
 function buildSpinEmbed(wager: number, balanceBefore: number): EmbedBuilder {
   return new EmbedBuilder()
-    .setTitle('🎰 BOB\'S GAMBLE')
+    .setTitle('<a:slots:1545149049328640120> BOB\'S GAMBLE')
     .setDescription('**```\n' + randomReelFrame() + '\n```**')
     .setColor(0xFFD700)
     .addFields(
@@ -165,7 +165,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
     // Create result embed
     const resultEmbed = new EmbedBuilder()
-      .setTitle('🎰 BOB\'S GAMBLE')
+      .setTitle('<a:slots:1545149049328640120> BOB\'S GAMBLE')
       .setThumbnail(message.author.displayAvatarURL({ size: 128 }));
 
     const landingFrame = finalReelFrame(won);

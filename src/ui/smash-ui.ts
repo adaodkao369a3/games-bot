@@ -125,7 +125,7 @@ export class SmashUI {
       .setThumbnail(winnerAvatarLarge)
       .setColor(0xFFD700)
       .setTimestamp()
-      .setFooter({ text: 'Bob Kun <:bob:1545141387656302663>' });
+      .setFooter({ text: 'Bob Kun 🎳' });
 
     return embed;
   }
@@ -192,7 +192,7 @@ export class SmashUI {
       )
       .setColor(0xFFA500)
       .setTimestamp()
-      .setFooter({ text: 'Bob Kun <:bob:1545141387656302663>' });
+      .setFooter({ text: 'Bob Kun 🎳' });
 
     return embed;
   }

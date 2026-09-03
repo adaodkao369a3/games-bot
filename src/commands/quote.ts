@@ -69,7 +69,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
     // Jump-to-original link goes above the image, as message content —
     // Discord renders content above attachments, unlike an embed.
     const sent = await message.reply({
-      content: `🔗 [Jump to original message](${target.url})`,
+      content: `<:link:1545149023701180566> [Jump to original message](${target.url})`,
       files: [attachment],
       components: buildSelectRow(),
     });
@@ -79,7 +79,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       const redirectChannel = await message.guild?.channels.fetch(QUOTE_REDIRECT_CHANNEL_ID);
       if (redirectChannel && redirectChannel.isTextBased()) {
         await redirectChannel.send({
-          content: `🔗 [Jump to original message](${target.url})`,
+          content: `<:link:1545149023701180566> [Jump to original message](${target.url})`,
           files: [attachment],
           components: buildSelectRow(),
         });
@@ -116,7 +116,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
         const redirectChannel = await message.guild?.channels.fetch(QUOTE_REDIRECT_CHANNEL_ID);
         if (redirectChannel && redirectChannel.isTextBased()) {
           await redirectChannel.send({
-            content: `🔗 [Jump to original message](${target.url})`,
+            content: `<:link:1545149023701180566> [Jump to original message](${target.url})`,
             files: [newAttachment],
             components: buildSelectRow(),
           });

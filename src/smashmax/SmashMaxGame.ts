@@ -317,7 +317,7 @@ export class SmashMaxGame {
       .setColor(resultColor)
       .setImage('attachment://smashmax-result.png')
       .setTimestamp()
-      .setFooter({ text: 'Bob Kun <:bob:1545141387656302663>' });
+      .setFooter({ text: 'Bob Kun 🎳' });
 
     await this.currentMessage?.edit({
       files: [attachment],
