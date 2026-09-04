@@ -19,6 +19,14 @@ import { handleQuoteCommand } from '../commands/quote.js';
 import { handleWalletCommand } from '../commands/wallet.js';
 import { handleHighscoreCommand } from '../commands/highscore.js';
 import { handleCashCommand } from '../commands/cash.js';
+import { handleFishCommand, handleFishInteraction } from '../commands/fish.js';
+import { handleDiceDuelCommand, handleDiceDuelInteraction } from '../commands/diceduel.js';
+import { handleHigherLowerCommand, handleHigherLowerInteraction } from '../commands/higherlower.js';
+import { handleCardRouletteCommand, handleCardRouletteInteraction } from '../commands/croulette.js';
+import { handleBombCommand, handleBombInteraction } from '../commands/bomb.js';
+import { handleWordBombCommand, handleWordBombInteraction, handleWordBombMessage } from '../commands/wordbomb.js';
+import { handleBjCommand, handleBjInteraction } from '../commands/bj.js';
+import { handleBj2Command, handleBj2Interaction } from '../commands/bj2.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -155,6 +163,46 @@ export class DiscordClient {
         return;
       }
 
+      if (command === 'fish') {
+        await handleFishCommand(message);
+        return;
+      }
+
+      if (command === 'diceduel') {
+        await handleDiceDuelCommand(message, args);
+        return;
+      }
+
+      if (command === 'hlow') {
+        await handleHigherLowerCommand(message, args);
+        return;
+      }
+
+      if (command === 'croulette') {
+        await handleCardRouletteCommand(message, args);
+        return;
+      }
+
+      if (command === 'bomb') {
+        await handleBombCommand(message, args);
+        return;
+      }
+
+      if (command === 'wordbomb') {
+        await handleWordBombCommand(message);
+        return;
+      }
+
+      if (command === 'bj') {
+        await handleBjCommand(message, args);
+        return;
+      }
+
+      if (command === 'bj2') {
+        await handleBj2Command(message, args);
+        return;
+      }
+
       if (command === 'quote') {
         await handleQuoteCommand(message, args);
         return;
@@ -164,6 +212,9 @@ export class DiscordClient {
 
     // Check for Wordle guesses (only if not a command)
     await handleWordleGuess(message);
+
+    // Check for Word Bomb word submissions
+    await handleWordBombMessage(message);
   }
 
   private async onInteractionCreate(interaction: any): Promise<void> {
@@ -213,6 +264,46 @@ export class DiscordClient {
 
     if (customId.startsWith('trial_')) {
       await handleTrialInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('fish_')) {
+      await handleFishInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('diceduel_')) {
+      await handleDiceDuelInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('higherlower_')) {
+      await handleHigherLowerInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('croulette_')) {
+      await handleCardRouletteInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('bomb_')) {
+      await handleBombInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('wordbomb_')) {
+      await handleWordBombInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('bj_')) {
+      await handleBjInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('bj2_')) {
+      await handleBj2Interaction(interaction);
       return;
     }
 

@@ -164,6 +164,26 @@ async function initializeSchema(): Promise<void> {
       } else {
         console.log('✓ users table has lifetime_gambled column');
       }
+
+      // Check if fishing_loot table exists
+      const fishingCheck = await pool!.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_name = 'fishing_loot' 
+        AND table_schema = 'public'
+      `);
+
+      if (fishingCheck.rows.length === 0) {
+        console.log('⚠ fishing_loot table does not exist, creating...');
+        
+        const fishingSchemaPath = path.join(process.cwd(), 'src', 'database', 'fishing-schema.sql');
+        const fishingSchema = fs.readFileSync(fishingSchemaPath, 'utf-8');
+        await pool!.query(fishingSchema);
+        
+        console.log('✓ fishing_loot table created');
+      } else {
+        console.log('✓ fishing_loot table exists');
+      }
     }
   } catch (error) {
     console.error('✗ Failed to initialize database schema:', error);
