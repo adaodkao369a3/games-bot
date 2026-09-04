@@ -216,7 +216,13 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       // Send second message with win result
       const winResultEmbed = new EmbedBuilder()
         .setTitle('<a:win:1545165325614583888> YOU WON!')
-        .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3) + `\n+${wager.toLocaleString()} <:bombocoin:1545139736312815840>`)
+        .setDescription(
+          progressiveReelFrame(symbol1, symbol2, symbol3) + 
+          `\n\n## **SLOTS RESULT**\n\n` +
+          `**BET**      **WIN/LOSS**\n` +
+          `${wager.toLocaleString()}             Y\n\n` +
+          `+${wager.toLocaleString()} <:bombocoin:1545139736312815840>`
+        )
         .setColor(0x00FF00)
         .setFooter({ text: 'Bob has temporarily approved your financial decisions.' });
 
@@ -226,7 +232,13 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       // Send second message with lose result
       const loseResultEmbed = new EmbedBuilder()
         .setTitle('<:lotteryslots:1545161895261241454> YOU LOST')
-        .setDescription(progressiveReelFrame(symbol1, symbol2, symbol3) + `\n-${wager.toLocaleString()} <:bombocoin:1545139736312815840>`)
+        .setDescription(
+          progressiveReelFrame(symbol1, symbol2, symbol3) + 
+          `\n\n## **SLOTS RESULT**\n\n` +
+          `**BET**      **WIN/LOSS**\n` +
+          `${wager.toLocaleString()}             N\n\n` +
+          `-${wager.toLocaleString()} <:bombocoin:1545139736312815840>`
+        )
         .setColor(0xFF0000)
         .setFooter({ text: 'Bob recommends pretending this never happened.' });
 
