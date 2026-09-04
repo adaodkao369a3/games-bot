@@ -9,6 +9,7 @@ export interface CoinBalance {
   balance: number;
   lifetime_earned: number;
   lifetime_spent: number;
+  lifetime_gambled: number;
 }
 
 function parseBigInt(value: string | number): number {
@@ -140,6 +141,29 @@ async function initializeSchema(): Promise<void> {
       } else {
         console.log('✓ coin_transactions table has game_instance_id column');
       }
+
+      // Check if users has lifetime_gambled column
+      const usersCheck = await pool!.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' 
+        AND table_schema = 'public'
+        AND column_name = 'lifetime_gambled'
+      `);
+
+      if (usersCheck.rows.length === 0) {
+        console.log('⚠ users table missing lifetime_gambled column, adding migration...');
+        
+        // Add lifetime_gambled column (allow NULL for existing rows)
+        await pool!.query(`
+          ALTER TABLE users 
+          ADD COLUMN IF NOT EXISTS lifetime_gambled BIGINT DEFAULT 0
+        `);
+        
+        console.log('✓ Migration completed: lifetime_gambled column added to users');
+      } else {
+        console.log('✓ users table has lifetime_gambled column');
+      }
     }
   } catch (error) {
     console.error('✗ Failed to initialize database schema:', error);
@@ -154,7 +178,7 @@ async function initializeSchema(): Promise<void> {
 async function getOrCreateUser(userId: string, client: PoolClient): Promise<CoinBalance> {
   // Try to get existing user
   const result = await client.query(
-    'SELECT coin_balance as balance, lifetime_coins_earned as lifetime_earned, lifetime_coins_spent as lifetime_spent FROM users WHERE user_id = $1',
+    'SELECT coin_balance as balance, lifetime_coins_earned as lifetime_earned, lifetime_coins_spent as lifetime_spent, lifetime_gambled FROM users WHERE user_id = $1',
     [userId]
   );
 
@@ -163,20 +187,22 @@ async function getOrCreateUser(userId: string, client: PoolClient): Promise<Coin
     return {
       balance: parseBigInt(row.balance),
       lifetime_earned: parseBigInt(row.lifetime_earned),
-      lifetime_spent: parseBigInt(row.lifetime_spent)
+      lifetime_spent: parseBigInt(row.lifetime_spent),
+      lifetime_gambled: parseBigInt(row.lifetime_gambled || 0)
     };
   }
 
   // Create new user with 0 balance
   await client.query(
-    'INSERT INTO users (user_id, coin_balance, lifetime_coins_earned, lifetime_coins_spent) VALUES ($1, 0, 0, 0)',
+    'INSERT INTO users (user_id, coin_balance, lifetime_coins_earned, lifetime_coins_spent, lifetime_gambled) VALUES ($1, 0, 0, 0, 0)',
     [userId]
   );
 
   return {
     balance: 0,
     lifetime_earned: 0,
-    lifetime_spent: 0
+    lifetime_spent: 0,
+    lifetime_gambled: 0
   };
 }
 
@@ -229,14 +255,27 @@ export async function addCoins(
     }
 
     // Update user balance atomically
-    await client.query(
-      `UPDATE users 
-       SET coin_balance = CAST(coin_balance AS BIGINT) + $1,
-           lifetime_coins_earned = CAST(lifetime_coins_earned AS BIGINT) + GREATEST($1, 0),
-           lifetime_coins_spent = CAST(lifetime_coins_spent AS BIGINT) + GREATEST(-$1, 0)
-       WHERE user_id = $2`,
-      [amount, userId]
-    );
+    // If source is 'gamble', also increment lifetime_gambled
+    if (source === 'gamble') {
+      await client.query(
+        `UPDATE users 
+         SET coin_balance = CAST(coin_balance AS BIGINT) + $1,
+             lifetime_coins_earned = CAST(lifetime_coins_earned AS BIGINT) + GREATEST($1, 0),
+             lifetime_coins_spent = CAST(lifetime_coins_spent AS BIGINT) + GREATEST(-$1, 0),
+             lifetime_gambled = CAST(lifetime_gambled AS BIGINT) + GREATEST(-$1, 0)
+         WHERE user_id = $2`,
+        [amount, userId]
+      );
+    } else {
+      await client.query(
+        `UPDATE users 
+         SET coin_balance = CAST(coin_balance AS BIGINT) + $1,
+             lifetime_coins_earned = CAST(lifetime_coins_earned AS BIGINT) + GREATEST($1, 0),
+             lifetime_coins_spent = CAST(lifetime_coins_spent AS BIGINT) + GREATEST(-$1, 0)
+         WHERE user_id = $2`,
+        [amount, userId]
+      );
+    }
 
     // Determine transaction type
     let transactionType = 'neutral';
@@ -312,7 +351,7 @@ export async function getCoinBalance(userId: string): Promise<CoinBalance | null
   const client = await getClient();
   try {
     const result = await client.query(
-      'SELECT coin_balance as balance, lifetime_coins_earned as lifetime_earned, lifetime_coins_spent as lifetime_spent FROM users WHERE user_id = $1',
+      'SELECT coin_balance as balance, lifetime_coins_earned as lifetime_earned, lifetime_coins_spent as lifetime_spent, lifetime_gambled FROM users WHERE user_id = $1',
       [userId]
     );
 
@@ -324,7 +363,8 @@ export async function getCoinBalance(userId: string): Promise<CoinBalance | null
     return {
       balance: parseBigInt(row.balance),
       lifetime_earned: parseBigInt(row.lifetime_earned),
-      lifetime_spent: parseBigInt(row.lifetime_spent)
+      lifetime_spent: parseBigInt(row.lifetime_spent),
+      lifetime_gambled: parseBigInt(row.lifetime_gambled || 0)
     };
   } finally {
     client.release();

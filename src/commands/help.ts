@@ -32,7 +32,7 @@ export async function handleHelpCommand(message: Message): Promise<void> {
       },
       {
         name: '<:moneybag:1545149026528268308> **Currency**',
-        value: '`.wallet` — Check your Bombo Coin balance',
+        value: '`.wallet` — Check your Bombo Coin balance\n`.highscore` / `.hs` — View the Bombo Coin leaderboard',
         inline: false,
       },
     ]);
@@ -42,7 +42,7 @@ export async function handleHelpCommand(message: Message): Promise<void> {
       embed.addFields([
         {
           name: '<a:staff:1545149054936289345> **Staff Commands**',
-          value: '`.fonttest` — Test font rendering\n`.smashtest` — Test Smash image generation\n`.wheeltest` — Test wheel geometry\n`.wheelfonttest` — Test wheel font rendering',
+          value: '`.cash @user [amount]` — Give Bombo Coins to a user',
           inline: false,
         },
       ]);

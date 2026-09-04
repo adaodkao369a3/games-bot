@@ -231,7 +231,7 @@ export class PissCompGame {
       )
       .setColor(0x00BFFF)
       .setThumbnail('https://cdn.discordapp.com/emojis/1256402744083284029.webp?size=96')
-      .setFooter({ text: 'First to 100% wins!' });
+      .setFooter({ text: '🏆 First to 100% wins!' });
   }
 
   /**
@@ -255,7 +255,7 @@ export class PissCompGame {
       )
       .setColor(0xFFD700)
       .setImage(PissCompGame.VICTORY_GIF)
-      .setFooter({ text: '💦 Golden shower achieved!' });
+      .setFooter({ text: '🏆 Golden shower achieved!' });
   }
 
   /**
@@ -269,7 +269,7 @@ export class PissCompGame {
       )
       .setColor(0xFFA500)
       .setImage(PissCompGame.DRAW_GIF)
-      .setFooter({ text: 'Restarting in 5 seconds...' });
+      .setFooter({ text: '⏱️ Restarting in 5 seconds...' });
   }
 
   /**

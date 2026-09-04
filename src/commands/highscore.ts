@@ -1,8 +1,8 @@
 import { Message, EmbedBuilder } from 'discord.js';
 import { getLeaderboard } from '../database/client.js';
 
-const MEDAL_EMOJIS = ['🥇', '🥈', '🥉'];
-const RANK_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+const MEDAL_EMOJIS = ['<a:firstplacetrophy:1545135079926267964>', '<a:secondplacetrophy:1545135074968608851>', '<a:thirdplacetrophy:1545135071068033024>'];
+const RANK_EMOJIS = ['<:one:1545379088775258112>', '<:two:1545379099394969660>', '<:three:1545379095498727546>', '<:four:1545379083872112641>', '<:five:1545379011876622386>', '<:six:1545379093250310185>', '<:seven:1545379091287506994>', '<:eight:1545379009846706196>', '<:nine:1545379086174527530>', '<:zero:1545379101496311808>'];
 
 export async function handleHighscoreCommand(message: Message): Promise<void> {
   try {
@@ -10,8 +10,8 @@ export async function handleHighscoreCommand(message: Message): Promise<void> {
 
     if (leaderboard.length === 0) {
       const emptyEmbed = new EmbedBuilder()
-        .setTitle('🏆 Bombo Coin Leaderboard')
-        .setDescription('__No players yet!__ Be the first to earn some <:bombocoin:1545139736312815840>!')
+        .setTitle('<:cash:1545149005544165416> Bombo Coin Leaderboard')
+        .setDescription('__No players yet!__ Be the first to earn some <:cash:1545149005544165416>!')
         .setColor(0xFFD700)
         .setFooter({ text: 'Start gambling to make your mark!' });
 
@@ -33,29 +33,23 @@ export async function handleHighscoreCommand(message: Message): Promise<void> {
       let username = 'Unknown User';
       try {
         const user = await message.client.users.fetch(entry.user_id);
-        username = user.username;
+        username = `<@!${entry.user_id}>`;
       } catch (error) {
         // User might not be in cache or doesn't exist
-        username = `<@${entry.user_id}>`;
+        username = `<@!${entry.user_id}>`;
       }
 
       // Format the entry
-      const balanceFormatted = entry.balance.toLocaleString();
-      const earnedFormatted = entry.lifetime_earned.toLocaleString();
+      const balanceFormatted = entry.balance.toLocaleString('en-US');
       
-      if (rank === 1) {
-        // Special formatting for #1
-        description += `**${rankEmoji} ${username}**\n`;
-        description += `> 💰 **${balanceFormatted}** <:bombocoin:1545139736312815840>\n`;
-        description += `> 📈 __Lifetime Earned:__ ${earnedFormatted}\n\n`;
-      } else {
-        description += `${rankEmoji} **${username}**\n`;
-        description += `> 💰 ${balanceFormatted} <:bombocoin:1545139736312815840>\n\n`;
-      }
+      // Use trophy emoji for top 3, bold plain number for others
+      const rankDisplay = rank <= 3 ? rankEmoji : `**${rank}.**`;
+      
+      description += `${rankDisplay} **${username}** | **${balanceFormatted}** <:bombocoin:1545139736312815840>\n`;
     }
 
     const leaderboardEmbed = new EmbedBuilder()
-      .setTitle('🏆 __Bombo Coin Leaderboard__')
+      .setTitle('<:cash:1545149005544165416> Bombo Coin Leaderboard')
       .setDescription(description)
       .setColor(0xFFD700)
       .setThumbnail('https://cdn.discordapp.com/emojis/1545139736312815840.webp?size=96&quality=lossless')

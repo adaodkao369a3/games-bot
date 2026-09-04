@@ -30,7 +30,7 @@ export class WordleUI {
   static createGameEmbed(data: WordleUIData): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setColor(0x538d4e) // Wordle green
-      .setTitle('<a:statustyping:1545155645630582794> WORDLE')
+      .setTitle('🔤 WORDLE')
       .setDescription(`Guess the ${data.wordLength}-letter word!\n\nType your guess in chat to play.`)
       .setFooter({ text: `${data.guessCount} / ${data.maxGuesses} guesses` });
 
@@ -43,7 +43,7 @@ export class WordleUI {
   static createUpdatedEmbed(data: WordleUIData, lastPlayer?: string): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setColor(0x538d4e)
-      .setTitle('<a:statustyping:1545155645630582794> WORDLE')
+      .setTitle('🔤 WORDLE')
       .setDescription(`Guess the ${data.wordLength}-letter word!\n\nType your guess in chat to play.`)
       .setFooter({ text: `${data.guessCount} / ${data.maxGuesses} guesses` });
 
@@ -58,10 +58,10 @@ export class WordleUI {
       .setColor(0xFFD700) // Gold
       .setTitle('<a:confettipopper:1545132978139693227> WE HAVE A WINNER!')
       .setDescription(
-        `<:15394trophy:1545135066148118628>**${winner}** guessed the word **${secretWord.toUpperCase()}**!\n\n` +
+        `🏆 **${winner}** guessed the word **${secretWord.toUpperCase()}**!\n\n` +
         `GG everyone!`
       )
-      .setFooter({ text: `Won in ${guessCount} guesses • Bob Kun 🎳` });
+      .setFooter({ text: `Won in ${guessCount} guesses • 🎮 Bob Kun` });
 
     return embed;
   }
@@ -77,7 +77,7 @@ export class WordleUI {
         `The word was **${secretWord.toUpperCase()}**.\n\n` +
         `Better luck next time!`
       )
-      .setFooter({ text: `${guessCount} / 5 guesses used • Bob Kun 🎳` });
+      .setFooter({ text: `${guessCount} / 5 guesses used • 🎮 Bob Kun` });
 
     return embed;
   }

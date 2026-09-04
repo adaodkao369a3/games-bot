@@ -31,10 +31,10 @@ export async function awardGameReward(
 
     // Send reward announcement embed only if coins were actually awarded
     const rewardEmbed = new EmbedBuilder()
-      .setTitle('<:bombocoin:1545139736312815840> Bombo Coins Earned')
-      .setDescription(`<@${winnerId}> won the game and earned **${amount.toLocaleString()} Bombo Coins!**`)
+      .setTitle('<:cash:1545149005544165416> Bombo Coins Earned')
+      .setDescription(`<@${winnerId}> won the game and earned **${amount.toLocaleString('en-US')} Bombo Coins!**`)
       .setColor(0xFFD700)
-      .setFooter({ text: 'Bombo Coins are the currency of the realm.' });
+      .setFooter({ text: '💵 Bombo Coins are the currency of the realm.' });
 
     await channel.send({ embeds: [rewardEmbed] });
     console.log(`[Game Rewards] Awarded ${amount} coins to ${winnerId} for ${gameName} (instance: ${gameInstanceId})`);

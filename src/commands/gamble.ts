@@ -103,13 +103,13 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       'Please specify a valid positive amount to gamble.\n' +
       'Examples: `.gamble 500`, `.gamble 10k`, `.gamble 1.5m`, `.gamble all`'
     );
-    return;
+    return; 
   }
 
   // Check if user has enough coins
   if (coinInfo.balance < wager) {
     await message.reply(
-      `You don't have enough Bombo Coins! Your current balance: ${coinInfo.balance.toLocaleString()} <:bombocoin:1545139736312815840>.\n` +
+      `You don't have enough Bombo Coins! Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
       `Tip: use \`.gamble all\` to wager your entire balance.`
     );
     return;
@@ -120,25 +120,6 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
     // Send initial message with spinning animation
     const initialMessage = await message.reply(buildLoadingMessage());
-
-    // Deduct wager amount atomically (no retries needed - transaction system handles this)
-    const deductionResult = await removeCoins(
-      userId,
-      wager,
-      'gamble',
-      {
-        reason: 'Wager deducted for gamble',
-        description: `Gamble wager: ${wager} coins`
-      }
-    );
-
-    if (deductionResult === null) {
-      console.error(`[GAMBLE] Failed to deduct wager for user ${userId}. Amount: ${wager}`);
-      await message.reply('Failed to process your wager. This may be due to a database connection issue. Please try again in a moment.');
-      return;
-    }
-
-    const balanceAfterDeduction = deductionResult;
 
     // Determine result up front (50/50) so the reel animation can land on it.
     const won = Math.random() < 0.5;
@@ -151,24 +132,32 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     const symbol2 = parts[1] || '<:slotsseven:1545161915649753119>';
     const symbol3 = parts[2] || '<:slotsseven:1545161915649753119>';
 
-    // First message: spinning animation only
-    const spinFrames = 3;
-    for (let i = 0; i < spinFrames; i++) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await initialMessage.edit(buildSpinMessage());
+    // Stop reels one by one in the first message
+    // Reel 1 stops after 2 seconds (run database deduction in parallel)
+    const [deductionResult] = await Promise.all([
+      removeCoins(userId, wager, 'gamble', {
+        reason: 'Wager deducted for gamble',
+        description: `Gamble wager: ${wager} coins`
+      }),
+      new Promise(resolve => setTimeout(resolve, 1000))
+    ]);
+
+    if (deductionResult === null) {
+      console.error(`[GAMBLE] Failed to deduct wager for user ${userId}. Amount: ${wager}`);
+      await message.reply('Failed to process your wager. This may be due to a database connection issue. Please try again in a moment.');
+      return;
     }
 
-    // Stop reels one by one in the first message
-    // Reel 1 stops
-    await new Promise(resolve => setTimeout(resolve, 600));
+    const balanceAfterDeduction = deductionResult;
+
     await initialMessage.edit(progressiveReelFrame(symbol1, null, null));
 
-    // Reel 2 stops
-    await new Promise(resolve => setTimeout(resolve, 600));
+    // Reel 2 stops 1 second after reel 1
+    await new Promise(resolve => setTimeout(resolve, 1000));
     await initialMessage.edit(progressiveReelFrame(symbol1, symbol2, null));
 
-    // Reel 3 stops (final result in first message)
-    await new Promise(resolve => setTimeout(resolve, 600));
+    // Reel 3 stops 1 second after reel 2 (final result in first message)
+    await new Promise(resolve => setTimeout(resolve, 1000));
     await initialMessage.edit(progressiveReelFrame(symbol1, symbol2, symbol3));
 
     // Second message: result with details
@@ -213,36 +202,22 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
       const balanceAfter = balanceAfterDeduction + payout;
 
-      // Send second message with win result
+      // Edit message with win result embed
       const winResultEmbed = new EmbedBuilder()
-        .setTitle('<a:win:1545165325614583888> YOU WON!')
-        .setDescription(
-          progressiveReelFrame(symbol1, symbol2, symbol3) + 
-          `\n\n## **SLOTS RESULT**\n\n` +
-          `**BET**      **WIN/LOSS**\n` +
-          `${wager.toLocaleString()}             Y\n\n` +
-          `+${wager.toLocaleString()} <:bombocoin:1545139736312815840>`
-        )
-        .setColor(0x00FF00)
-        .setFooter({ text: 'Bob has temporarily approved your financial decisions.' });
+        .setTitle('The results are...')
+        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n<a:win:1545165325614583888> **YOU WON!!**\n\n**Bet:** ${wager.toLocaleString('en-US')} <:cash:1545149005544165416>\n**Total Payout:** +${payout.toLocaleString('en-US')} <:cash:1545149005544165416>`)
+        .setColor(0x00FF00);
 
-      await message.reply({ embeds: [winResultEmbed] });
+      await initialMessage.edit({ embeds: [winResultEmbed] });
     } else {
       // LOSE: User gets nothing back (wager already deducted)
-      // Send second message with lose result
+      // Edit message with lose result embed
       const loseResultEmbed = new EmbedBuilder()
-        .setTitle('<:lotteryslots:1545161895261241454> YOU LOST')
-        .setDescription(
-          progressiveReelFrame(symbol1, symbol2, symbol3) + 
-          `\n\n## **SLOTS RESULT**\n\n` +
-          `**BET**      **WIN/LOSS**\n` +
-          `${wager.toLocaleString()}             N\n\n` +
-          `-${wager.toLocaleString()} <:bombocoin:1545139736312815840>`
-        )
-        .setColor(0xFF0000)
-        .setFooter({ text: 'Bob recommends pretending this never happened.' });
+        .setTitle('The results are...')
+        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n<:lotteryslots:1545161895261241454> **YOU LOST...**\n\n**Bet:** ${wager.toLocaleString('en-US')} <:cash:1545149005544165416>\n**Total Loss:** -${wager.toLocaleString('en-US')} <:cash:1545149005544165416>`)
+        .setColor(0xFF0000);
 
-      await message.reply({ embeds: [loseResultEmbed] });
+      await initialMessage.edit({ embeds: [loseResultEmbed] });
     }
 
   } catch (error) {

@@ -175,7 +175,7 @@ export class SmashMaxGame {
       .setColor(0xFFD700)
       .setImage('attachment://smashmax-voting.png')
       .setTimestamp()
-      .setFooter({ text: '15 seconds to vote' });
+      .setFooter({ text: '⏱️ 15 seconds to vote' });
 
     return { embed, attachment };
   }
@@ -317,7 +317,7 @@ export class SmashMaxGame {
       .setColor(resultColor)
       .setImage('attachment://smashmax-result.png')
       .setTimestamp()
-      .setFooter({ text: 'Bob Kun 🎳' });
+      .setFooter({ text: '🎮 Bob Kun' });
 
     await this.currentMessage?.edit({
       files: [attachment],

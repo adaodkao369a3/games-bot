@@ -416,7 +416,7 @@ export class QuickDrawMaxGame {
         `💀 **Fallen Cowboy:** <@${this.state.loser}>`
       )
       .setImage(winGif)
-      .setFooter({ text: 'Fastest trigger finger in the server!' });
+      .setFooter({ text: '🔫 Fastest trigger finger in the server!' });
   }
 
   private createTimeoutEmbed() {

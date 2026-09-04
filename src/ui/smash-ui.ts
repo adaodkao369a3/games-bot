@@ -39,7 +39,7 @@ export class SmashUI {
     const embed = new EmbedBuilder()
       .setColor(0xFFD700)
       .setTimestamp()
-      .setFooter({ text: '15 seconds to vote' })
+      .setFooter({ text: '⏱️ 15 seconds to vote' })
       .setAuthor({ 
         name: `${data.player1Name} ⚔️ ${data.player2Name}`, 
         iconURL: player1AvatarLarge 
@@ -125,7 +125,7 @@ export class SmashUI {
       .setThumbnail(winnerAvatarLarge)
       .setColor(0xFFD700)
       .setTimestamp()
-      .setFooter({ text: 'Bob Kun 🎳' });
+      .setFooter({ text: '🎮 Bob Kun' });
 
     return embed;
   }
@@ -192,7 +192,7 @@ export class SmashUI {
       )
       .setColor(0xFFA500)
       .setTimestamp()
-      .setFooter({ text: 'Bob Kun 🎳' });
+      .setFooter({ text: '🎮 Bob Kun' });
 
     return embed;
   }

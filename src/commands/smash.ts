@@ -93,7 +93,7 @@ export async function handleSmashCommand(message: Message, args: string[]): Prom
       .setColor(0xFFD700)
       .setDescription(`<@${user1.id}> vs <@${user2.id}> — here we go!`)
       .setImage('attachment://smash-voting.png')
-      .setFooter({ text: '15 seconds to vote' });
+      .setFooter({ text: '⏱️ 15 seconds to vote' });
 
     const replyMessage = await message.reply({
       files: [attachment],
@@ -197,7 +197,7 @@ export async function handleSmashVote(interaction: MessageComponentInteraction):
             .setColor(0xFFD700)
             .setDescription(`<@${voteData.user1.id}> vs <@${voteData.user2.id}> — here we go!`)
             .setImage('attachment://smash-voting.png')
-            .setFooter({ text: '15 seconds to vote' });
+            .setFooter({ text: '⏱️ 15 seconds to vote' });
 
           await message.edit({
             files: [attachment],
@@ -287,7 +287,7 @@ async function endVotingPeriod(channel: any, eventId: string): Promise<void> {
         .setColor(winner === 'tie' ? 0xFFA500 : 0xFFD700)
         .setDescription(resultDescription)
         .setImage('attachment://smash-result.png')
-        .setFooter({ text: 'Bob Kun 🎳' });
+        .setFooter({ text: '🎮 Bob Kun' });
 
       // Post as reply to the original voting message
       if (channel && 'messages' in channel) {

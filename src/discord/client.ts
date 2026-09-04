@@ -4,11 +4,7 @@ import { BobKunPersonality } from '../services/bob-kun-personality.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { handleSmashCommand, handleSmashVote } from '../commands/smash.js';
 import { handleWordleCommand, handleWordleGuess } from '../commands/wordle.js';
-import { handleFontTestCommand } from '../commands/fontTest.js';
-import { handleSmashTestCommand } from '../commands/smashTest.js';
 import { handleWheelCommand } from '../commands/wheel.js';
-import { handleWheelFontTestCommand } from '../commands/wheelFontTest.js';
-import { handleWheelTestCommand } from '../commands/wheelTest.js';
 import { handleHelpCommand } from '../commands/help.js';
 import { handleBobkunCommand } from '../commands/bobkun.js';
 import { handleQuickDrawCommand, handleQuickDrawInteraction } from '../commands/quickdraw.js';
@@ -22,6 +18,7 @@ import { handleGambleCommand } from '../commands/gamble.js';
 import { handleQuoteCommand } from '../commands/quote.js';
 import { handleWalletCommand } from '../commands/wallet.js';
 import { handleHighscoreCommand } from '../commands/highscore.js';
+import { handleCashCommand } from '../commands/cash.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -87,28 +84,8 @@ export class DiscordClient {
         return;
       }
 
-      if (command === 'fonttest') {
-        await handleFontTestCommand(message, args);
-        return;
-      }
-
-      if (command === 'smashtest') {
-        await handleSmashTestCommand(message);
-        return;
-      }
-
       if (command === 'wheel') {
         await handleWheelCommand(message, args);
-        return;
-      }
-
-      if (command === 'wheeltest') {
-        await handleWheelTestCommand(message);
-        return;
-      }
-
-      if (command === 'wheelfonttest') {
-        await handleWheelFontTestCommand(message);
         return;
       }
 
@@ -168,7 +145,12 @@ export class DiscordClient {
         return;
       }
 
-      if (command === 'highscore' || command === 'leaderboard' || command === 'lb') {
+      if (command === 'cash') {
+        await handleCashCommand(message, args);
+        return;
+      }
+
+      if (command === 'highscore' || command === 'hs') {
         await handleHighscoreCommand(message);
         return;
       }
