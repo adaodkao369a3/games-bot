@@ -17,7 +17,12 @@ export async function handleHelpCommand(message: Message): Promise<void> {
     embed.addFields([
       {
         name: '<:controller:1545149011894210642> **Games**',
-        value: '`.wordle` — Start a multiplayer Wordle game\n`.smash @user1 @user2` — Start a Smash or Pass vote\n`.trial @user [accusation]` — Hold a courtroom trial\n`.roulette @user1 @user2...` — Play Russian Roulette\n`.roulettemax @user` — Play Roulette Max (2 players only)\n`.quickdraw @user` — Start a Quick Draw duel\n`.quickdrawmax @user` — Start a Quick Draw Max duel with distraction\n`.gamble [amount]` — Play Bob\'s slot machine gamble\n`.diceduel @user [amount]` — Challenge someone to a dice duel\n`.hlow [amount]` — Predict if the next card is higher or lower\n`.croulette [amount]` — Draw mystery cards and survive\n`.bomb [amount]` — Defuse the bomb before it explodes\n`.wordbomb` — Fast-paced multiplayer word game\n`.bj [amount]` — Single-player Blackjack vs dealer\n`.bj2 @user [amount]` — 2-player Blackjack vs dealer',
+        value: '`.wordle` — Start a multiplayer Wordle game\n`.smash @user1 @user2` — Start a Smash or Pass vote\n`.trial @user [accusation]` — Hold a courtroom trial\n`.roulette @user1 @user2...` — Play Russian Roulette\n`.roulettemax @user` — Play Roulette Max (2 players only)\n`.quickdraw @user` — Start a Quick Draw duel\n`.quickdrawmax @user` — Start a Quick Draw Max duel with distraction\n`.gamble [amount]` — Play Bob\'s slot machine gamble\n`.diceduel @user [amount]` — Challenge someone to a dice duel\n`.hlow [amount]` — Predict if the next card is higher or lower\n`.croulette [amount]` — Draw mystery cards and survive\n`.bomb [amount]` — Defuse the bomb before it explodes\n`.wordbomb` — Fast-paced multiplayer word game\n`.bj [amount]` — Single-player Blackjack vs dealer\n`.bj2 @user [amount]` — 2-player Blackjack vs dealer\n`.cf [amount]` — Predict coin flips and build streaks\n`.impostor` — Find the Impostor among the crew\n`.numguess` — Guess the hidden number closest\n`.simonsays` — Follow the commands and survive',
+        inline: false,
+      },
+      {
+        name: '👑 **Titles**',
+        value: '`.quiz jjk` — Take the JJK quiz to claim the Lord of the Heian Era title\n`.challenge @user jjk` — Challenge the current title holder for JJK',
         inline: false,
       },
       {

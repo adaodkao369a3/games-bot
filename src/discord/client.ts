@@ -27,6 +27,12 @@ import { handleBombCommand, handleBombInteraction } from '../commands/bomb.js';
 import { handleWordBombCommand, handleWordBombInteraction, handleWordBombMessage } from '../commands/wordbomb.js';
 import { handleBjCommand, handleBjInteraction } from '../commands/bj.js';
 import { handleBj2Command, handleBj2Interaction } from '../commands/bj2.js';
+import { handleCfCommand, handleCfInteraction } from '../commands/cf.js';
+import { handleImpostorCommand, handleImpostorInteraction, handleImpostorMessage } from '../commands/impostor.js';
+import { handleNumGuessCommand, handleNumGuessInteraction, handleNumGuessMessage } from '../commands/numguess.js';
+import { handleSimonSaysCommand, handleSimonSaysInteraction } from '../commands/simonsays.js';
+import { handleQuizCommand, handleQuizInteraction } from '../commands/quiz.js';
+import { handleChallengeCommand, handleChallengeInteraction } from '../commands/challenge.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -203,6 +209,36 @@ export class DiscordClient {
         return;
       }
 
+      if (command === 'cf') {
+        await handleCfCommand(message, args);
+        return;
+      }
+
+      if (command === 'impostor') {
+        await handleImpostorCommand(message);
+        return;
+      }
+
+      if (command === 'numguess') {
+        await handleNumGuessCommand(message);
+        return;
+      }
+
+      if (command === 'simonsays') {
+        await handleSimonSaysCommand(message);
+        return;
+      }
+
+      if (command === 'quiz') {
+        await handleQuizCommand(message, args);
+        return;
+      }
+
+      if (command === 'challenge') {
+        await handleChallengeCommand(message, args);
+        return;
+      }
+
       if (command === 'quote') {
         await handleQuoteCommand(message, args);
         return;
@@ -212,6 +248,12 @@ export class DiscordClient {
 
     // Check for Wordle guesses (only if not a command)
     await handleWordleGuess(message);
+
+    // Check for Impostor clue submissions
+    await handleImpostorMessage(message);
+
+    // Check for NumGuess submissions
+    await handleNumGuessMessage(message);
 
     // Check for Word Bomb word submissions
     await handleWordBombMessage(message);
@@ -304,6 +346,36 @@ export class DiscordClient {
 
     if (customId.startsWith('bj2_')) {
       await handleBj2Interaction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('cf_')) {
+      await handleCfInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('impostor_')) {
+      await handleImpostorInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('numguess_')) {
+      await handleNumGuessInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('simonsays_')) {
+      await handleSimonSaysInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('quiz_')) {
+      await handleQuizInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('duel_')) {
+      await handleChallengeInteraction(interaction);
       return;
     }
 

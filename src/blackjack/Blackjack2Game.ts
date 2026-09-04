@@ -179,6 +179,9 @@ export class Blackjack2Game {
       return;
     }
 
+    // Defer the interaction to avoid timeout
+    await interaction.deferUpdate();
+
     this.clearAcceptTimeout();
 
     // Deduct both bets
@@ -203,7 +206,9 @@ export class Blackjack2Game {
     );
 
     if (p1Deduction === null || p2Deduction === null) {
-      await interaction.reply('Failed to process wagers. Please try again.');
+      await interaction.editReply({
+        content: 'Failed to process wagers. Please try again.',
+      });
       await this.refundBothPlayers();
       return;
     }
@@ -245,7 +250,7 @@ export class Blackjack2Game {
 
     const embed = this.createGameEmbed();
     const row = this.createGameButtons();
-    await interaction.update({
+    await interaction.editReply({
       embeds: [embed],
       components: [row],
     });
@@ -567,7 +572,7 @@ export class Blackjack2Game {
     }
 
     const embed = this.createResultEmbed();
-    await interaction.update({
+    await interaction.editReply({
       embeds: [embed],
       components: [],
     });
