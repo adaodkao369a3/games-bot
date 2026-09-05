@@ -66,3 +66,31 @@ CREATE TRIGGER update_users_updated_at
   BEFORE UPDATE ON users
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+-- Title ownership table for quiz-to-role system
+CREATE TABLE IF NOT EXISTS title_ownership (
+  category_id VARCHAR(255) PRIMARY KEY,
+  holder_id VARCHAR(255),
+  holder_name VARCHAR(255),
+  acquired_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for faster lookups (create if not exists by checking first)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_title_ownership_holder_id') THEN
+        CREATE INDEX idx_title_ownership_holder_id ON title_ownership(holder_id);
+    END IF;
+END
+$$;
+
+-- Drop existing trigger if any
+DROP TRIGGER IF EXISTS update_title_ownership_updated_at ON title_ownership;
+
+-- Trigger to auto-update updated_at
+CREATE TRIGGER update_title_ownership_updated_at
+  BEFORE UPDATE ON title_ownership
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();

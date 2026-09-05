@@ -184,6 +184,46 @@ async function initializeSchema(): Promise<void> {
       } else {
         console.log('✓ fishing_loot table exists');
       }
+
+      // Check if title_ownership table exists
+      const titleCheck = await pool!.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_name = 'title_ownership' 
+        AND table_schema = 'public'
+      `);
+
+      if (titleCheck.rows.length === 0) {
+        console.log('⚠ title_ownership table does not exist, creating...');
+        
+        await pool!.query(`
+          CREATE TABLE IF NOT EXISTS title_ownership (
+            category_id VARCHAR(255) PRIMARY KEY,
+            holder_id VARCHAR(255),
+            holder_name VARCHAR(255),
+            acquired_at TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        
+        // Create index
+        await pool!.query(`
+          CREATE INDEX IF NOT EXISTS idx_title_ownership_holder_id ON title_ownership(holder_id)
+        `);
+        
+        // Create trigger for updated_at
+        await pool!.query(`
+          CREATE TRIGGER update_title_ownership_updated_at
+          BEFORE UPDATE ON title_ownership
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column()
+        `);
+        
+        console.log('✓ title_ownership table created');
+      } else {
+        console.log('✓ title_ownership table exists');
+      }
     }
   } catch (error) {
     console.error('✗ Failed to initialize database schema:', error);
@@ -452,6 +492,13 @@ export interface LeaderboardEntry {
   lifetime_spent: number;
 }
 
+export interface TitleOwnership {
+  category_id: string;
+  holder_id: string | null;
+  holder_name: string | null;
+  acquired_at: Date | null;
+}
+
 /**
  * Get the leaderboard of users sorted by coin balance
  * @param limit Maximum number of users to return
@@ -474,6 +521,96 @@ export async function getLeaderboard(limit: number = 10): Promise<LeaderboardEnt
       lifetime_earned: parseBigInt(row.lifetime_earned),
       lifetime_spent: parseBigInt(row.lifetime_spent)
     }));
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get title ownership for a specific category
+ * @param categoryId The category ID
+ * @returns Title ownership data or null if not found
+ */
+export async function getTitleOwnership(categoryId: string): Promise<TitleOwnership | null> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      'SELECT category_id, holder_id, holder_name, acquired_at FROM title_ownership WHERE category_id = $1',
+      [categoryId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    return {
+      category_id: row.category_id,
+      holder_id: row.holder_id,
+      holder_name: row.holder_name,
+      acquired_at: row.acquired_at
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Set title ownership for a category
+ * @param categoryId The category ID
+ * @param holderId The user ID of the holder (null to clear)
+ * @param holderName The username of the holder (null to clear)
+ * @returns True if successful
+ */
+export async function setTitleOwnership(
+  categoryId: string,
+  holderId: string | null,
+  holderName: string | null
+): Promise<boolean> {
+  const client = await getClient();
+  try {
+    await client.query(
+      `INSERT INTO title_ownership (category_id, holder_id, holder_name, acquired_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (category_id) 
+       DO UPDATE SET 
+         holder_id = EXCLUDED.holder_id,
+         holder_name = EXCLUDED.holder_name,
+         acquired_at = EXCLUDED.acquired_at,
+         updated_at = CURRENT_TIMESTAMP`,
+      [categoryId, holderId, holderName, holderId ? new Date() : null]
+    );
+    return true;
+  } catch (error) {
+    console.error('[TITLE_OWNERSHIP] Failed to set title ownership:', error);
+    return false;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get all title ownerships
+ * @returns Map of category_id to TitleOwnership
+ */
+export async function getAllTitleOwnerships(): Promise<Map<string, TitleOwnership>> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      'SELECT category_id, holder_id, holder_name, acquired_at FROM title_ownership'
+    );
+
+    const ownerships = new Map<string, TitleOwnership>();
+    for (const row of result.rows) {
+      ownerships.set(row.category_id, {
+        category_id: row.category_id,
+        holder_id: row.holder_id,
+        holder_name: row.holder_name,
+        acquired_at: row.acquired_at
+      });
+    }
+
+    return ownerships;
   } finally {
     client.release();
   }

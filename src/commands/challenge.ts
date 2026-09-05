@@ -47,13 +47,13 @@ export async function handleChallengeCommand(message: Message, args: string[]): 
   }
 
   // Check if challenger already holds the title
-  if (TitleSystem.userHoldsTitle(category, challengerId)) {
+  if (await TitleSystem.userHoldsTitle(category, challengerId)) {
     await message.reply('You already hold this title!');
     return;
   }
 
   // Check if holder actually holds the title
-  if (!TitleSystem.userHoldsTitle(category, holderId)) {
+  if (!(await TitleSystem.userHoldsTitle(category, holderId))) {
     await message.reply('That user does not hold this title.');
     return;
   }

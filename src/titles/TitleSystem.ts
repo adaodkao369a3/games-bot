@@ -1,18 +1,53 @@
 import { Guild, Role } from 'discord.js';
 import { TitleCategory, TitleOwnership, TITLE_CATEGORIES } from './TitleData.js';
+import { getTitleOwnership, setTitleOwnership, getAllTitleOwnerships } from '../database/client.js';
 
-// In-memory title ownership storage (could be moved to database later)
-const titleOwnership: Map<string, TitleOwnership> = new Map();
+// In-memory cache for title ownership (synced with database)
+const titleOwnershipCache: Map<string, TitleOwnership> = new Map();
 
-// Initialize title ownership for all categories
-for (const categoryId of Object.keys(TITLE_CATEGORIES)) {
-  if (!titleOwnership.has(categoryId)) {
-    titleOwnership.set(categoryId, {
-      categoryId,
-      holderId: null,
-      holderName: null,
-      acquiredAt: null,
-    });
+/**
+ * Initialize title ownership by loading from database
+ */
+export async function initializeTitleOwnership(): Promise<void> {
+  try {
+    const ownerships = await getAllTitleOwnerships();
+    
+    // Load all ownerships from database into cache
+    for (const [categoryId, ownership] of ownerships) {
+      titleOwnershipCache.set(categoryId, {
+        categoryId: ownership.category_id,
+        holderId: ownership.holder_id,
+        holderName: ownership.holder_name,
+        acquiredAt: ownership.acquired_at,
+      });
+    }
+    
+    // Initialize any missing categories
+    for (const categoryId of Object.keys(TITLE_CATEGORIES)) {
+      if (!titleOwnershipCache.has(categoryId)) {
+        titleOwnershipCache.set(categoryId, {
+          categoryId,
+          holderId: null,
+          holderName: null,
+          acquiredAt: null,
+        });
+      }
+    }
+    
+    console.log('✓ Title ownership initialized from database');
+  } catch (error) {
+    console.error('✗ Failed to initialize title ownership from database:', error);
+    // Initialize with empty state if database fails
+    for (const categoryId of Object.keys(TITLE_CATEGORIES)) {
+      if (!titleOwnershipCache.has(categoryId)) {
+        titleOwnershipCache.set(categoryId, {
+          categoryId,
+          holderId: null,
+          holderName: null,
+          acquiredAt: null,
+        });
+      }
+    }
   }
 }
 
@@ -20,15 +55,36 @@ export class TitleSystem {
   /**
    * Get the current holder of a title category
    */
-  static getTitleHolder(categoryId: string): TitleOwnership | null {
-    return titleOwnership.get(categoryId) || null;
+  static async getTitleHolder(categoryId: string): Promise<TitleOwnership | null> {
+    // Try cache first
+    if (titleOwnershipCache.has(categoryId)) {
+      return titleOwnershipCache.get(categoryId) || null;
+    }
+    
+    // Fallback to database
+    try {
+      const ownership = await getTitleOwnership(categoryId);
+      if (ownership) {
+        titleOwnershipCache.set(categoryId, {
+          categoryId: ownership.category_id,
+          holderId: ownership.holder_id,
+          holderName: ownership.holder_name,
+          acquiredAt: ownership.acquired_at,
+        });
+        return titleOwnershipCache.get(categoryId) || null;
+      }
+    } catch (error) {
+      console.error(`[TitleSystem] Failed to get title ownership for ${categoryId}:`, error);
+    }
+    
+    return null;
   }
 
   /**
    * Check if a user holds a specific title
    */
-  static userHoldsTitle(categoryId: string, userId: string): boolean {
-    const ownership = titleOwnership.get(categoryId);
+  static async userHoldsTitle(categoryId: string, userId: string): Promise<boolean> {
+    const ownership = await this.getTitleHolder(categoryId);
     return ownership?.holderId === userId;
   }
 
@@ -42,7 +98,7 @@ export class TitleSystem {
     }
 
     // Remove title from current holder if exists
-    const currentOwnership = titleOwnership.get(categoryId);
+    const currentOwnership = await this.getTitleHolder(categoryId);
     if (currentOwnership?.holderId) {
       await this.removeTitleFromUser(categoryId, currentOwnership.holderId, guild);
     }
@@ -58,15 +114,19 @@ export class TitleSystem {
       const member = await guild.members.fetch(userId);
       await member.roles.add(role);
 
-      // Update ownership
-      titleOwnership.set(categoryId, {
-        categoryId,
-        holderId: userId,
-        holderName: username,
-        acquiredAt: new Date(),
-      });
+      // Update database
+      const success = await setTitleOwnership(categoryId, userId, username);
+      if (success) {
+        // Update cache
+        titleOwnershipCache.set(categoryId, {
+          categoryId,
+          holderId: userId,
+          holderName: username,
+          acquiredAt: new Date(),
+        });
+      }
 
-      return true;
+      return success;
     } catch (error) {
       console.error(`Failed to award title ${categoryId} to user ${userId}:`, error);
       return false;
@@ -92,14 +152,19 @@ export class TitleSystem {
       await member.roles.remove(role);
 
       // Update ownership if this was the holder
-      const ownership = titleOwnership.get(categoryId);
+      const ownership = await this.getTitleHolder(categoryId);
       if (ownership?.holderId === userId) {
-        titleOwnership.set(categoryId, {
-          categoryId,
-          holderId: null,
-          holderName: null,
-          acquiredAt: null,
-        });
+        const success = await setTitleOwnership(categoryId, null, null);
+        if (success) {
+          // Update cache
+          titleOwnershipCache.set(categoryId, {
+            categoryId,
+            holderId: null,
+            holderName: null,
+            acquiredAt: null,
+          });
+        }
+        return success;
       }
 
       return true;

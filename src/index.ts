@@ -1,11 +1,15 @@
 import { DiscordClient } from './discord/client.js';
 import { config } from './config/index.js';
 import { connect, disconnect } from './database/client.js';
+import { initializeTitleOwnership } from './titles/TitleSystem.js';
 
 async function main(): Promise<void> {
   try {
     // Connect to database
     await connect();
+
+    // Initialize title ownership from database
+    await initializeTitleOwnership();
 
     const client = new DiscordClient();
     await client.login();

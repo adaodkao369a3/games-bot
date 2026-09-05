@@ -54,7 +54,7 @@ export class QuizGame {
    */
   async start(message: Message, guild: Guild): Promise<void> {
     // Check if title is already owned
-    const ownership = TitleSystem.getTitleHolder(this.data.categoryId);
+    const ownership = await TitleSystem.getTitleHolder(this.data.categoryId);
     if (ownership && ownership.holderId && ownership.holderId !== this.data.userId) {
       await message.reply(
         `The title is currently held by **${ownership.holderName}**.\n\n` +

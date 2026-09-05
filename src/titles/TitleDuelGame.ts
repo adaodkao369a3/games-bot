@@ -66,7 +66,7 @@ export class TitleDuelGame {
    */
   async start(message: Message): Promise<void> {
     // Verify holder still holds the title
-    const ownership = TitleSystem.getTitleHolder(this.data.categoryId);
+    const ownership = await TitleSystem.getTitleHolder(this.data.categoryId);
     if (!ownership || ownership.holderId !== this.data.holderId) {
       await message.reply('The title holder has changed. Please try again.');
       return;
