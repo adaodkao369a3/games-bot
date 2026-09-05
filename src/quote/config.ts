@@ -1,32 +1,60 @@
 export const LAYOUT = {
-  // 1260x630 card: the PFP owns exactly the left 50% (630px) and the
-  // quote/content owns the right 50% (630px).
+  // 1575x630 card: the PFP owns exactly the left 40% (630px) and the
+  // quote/content owns the right 60% (945px).
   H: 630,
-  W: 630 * 2,
+  W: 1575,
 
-  // Left edge of the full-width colour layer. The colour layer is ABOVE the
-  // PFP, so this curve intentionally overlaps the PFP near the top/bottom and
-  // meets the 50% boundary around the vertical centre.
-  // Curve endpoints are positions INSIDE the 630px PFP.
-  CURVE_TOP_X: 504, // ← CHANGE: top starts at ~80% of the PFP width
-  CURVE_BOTTOM_X: 567, // ← CHANGE: bottom ends at ~90% of the PFP width
+  // Curve position as fractions of PFP width
+  CURVE_TOP_FRACTION: 0.50,    // curve x at top = 50% of pfp width
+  CURVE_BOTTOM_FRACTION: 0.95, // curve x at bottom = 95% of pfp width
 
-  // ← CHANGE: pushes ONLY the middle of the curve to the RIGHT.
-  // 0 = no centre shift; 20–40 = increasingly rightward centre.
-  CURVE_CENTER_SHIFT_X: 45,
+  // Base alpha for the fade - ensures the curve is visible (non-zero start)
+  CURVE_BASE_ALPHA: 0.18,
 
-  // ← CHANGE: controls the FULL fade distance from PFP toward the text.
-  // This is intentionally large so the colour is fading throughout the
-  // transition, not just at the final edge.
-  CURVE_FADE_START_AFTER_PFP: 0.30, // ← CHANGE: 0.30 = start the fade 30% of the PFP width past the PFP edge
+  // Right column layout (945px wide for 60% of card)
+  // Quote text safe area (fractions of right column width and card height)
+  QUOTE_SAFE_LEFT_INSET: 0.06,   // ~6% of column width
+  QUOTE_SAFE_RIGHT_INSET: 0.045, // ~4.5% of column width
+  QUOTE_SAFE_TOP_INSET: 0.05,    // ~5% of card height
+  QUOTE_SAFE_BOTTOM_INSET: 0.81, // ~81% of card height
 
-  // Quote stays in the right half. The existing quote sizing is retained.
-  TEXT_X: 700,
+  // Nickname/username block position (fractions of right column width)
+  NICKNAME_LEFT_FRACTION: 0.32,  // ~32% of column width
+  NICKNAME_RIGHT_FRACTION: 0.66,  // ~66% of column width
+
+  // Watermark position (absolute pixels from edges)
+  WATERMARK_RIGHT_MARGIN: 17,
+  WATERMARK_BOTTOM_MARGIN: 18,
+
+  // Text sizing
   MAX_FONT_SIZE: 54,
-  MAX_TEXT_BLOCK_WIDTH: 620,
+
+  // Sticker-only quotes (no text): sticker is centered in the quote area
+  // rather than anchored to a side, sized to just under half the quote
+  // area's width so a lone sticker doesn't dominate the whole card.
+  STICKER_STANDALONE_WIDTH_FRACTION: 0.49,
+
+  // Sticker + text quotes: stacked layout. Text keeps the full quote-area
+  // width up top; the sticker sits centered in a band below it, capped to
+  // these fractions of the quote area's width/height so it reads as a
+  // supporting element rather than competing with the text for space.
+  STICKER_STACK_WIDTH_FRACTION: 0.5,
+  STICKER_STACK_HEIGHT_FRACTION: 0.38,
+  STICKER_STACK_GAP: 24, // px gap between the text block and the sticker band
+
+  // Same idea as the STICKER_* constants above, but for a quoted message's
+  // image attachment instead of a sticker. Seeded at the same values but
+  // kept separate so the two can be tuned independently later (attachments
+  // tend to matter more to the quote than a sticker does, and cover a much
+  // wider range of aspect ratios).
+  IMAGE_STANDALONE_WIDTH_FRACTION: 0.49,
+  IMAGE_STACK_WIDTH_FRACTION: 0.5,
+  IMAGE_STACK_HEIGHT_FRACTION: 0.38,
+  IMAGE_STACK_GAP: 24,
 } as const;
 
 export const FONT_FALLBACK = 'Butler, Georgia, serif';
+export const EMOJI_FONT = 'NotoEmoji';
 
 export const THEME_SELECT_EXPIRY_MS = 5 * 60 * 1000;
 

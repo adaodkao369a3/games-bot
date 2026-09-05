@@ -4,6 +4,7 @@ import {
   StringSelectMenuBuilder,
   ActionRowBuilder,
   ComponentType,
+  StickerFormatType,
 } from 'discord.js';
 import { renderQuoteCard } from '../quote/renderer.js';
 import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS } from '../quote/config.js';
@@ -40,13 +41,41 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
     // High-quality avatar (was 256px)
     const avatarUrl = target.author.displayAvatarURL({ extension: 'png', size: 1024 });
 
-    // Get quote text (handle empty content)
-    const quoteText = target.content || '[no text content]';
+    // A replied-to message can carry a sticker. Lottie stickers are vector
+    // animations, not raster images — they can't be loaded onto the canvas,
+    // so those are skipped and treated as if no sticker were attached.
+    const sticker = target.stickers.first();
+    const stickerUrl =
+      sticker && sticker.format !== StickerFormatType.Lottie ? sticker.url : undefined;
+
+    // If there's no sticker, fall back to the first image attachment on the
+    // message (ignoring any additional images, and non-image attachments
+    // like videos/files/audio that the canvas can't render).
+    const imageAttachment = stickerUrl
+      ? undefined
+      : target.attachments.find((a) => a.contentType?.startsWith('image/'));
+    const imageUrl = imageAttachment?.url;
+
+    // Get quote text (handle empty content). If a sticker or image is
+    // present, an empty message is expected, so skip the "[no text
+    // content]" placeholder in that case — the media fills the quote area
+    // on its own instead.
+    const hasRealText = Boolean(target.content && target.content.trim().length > 0);
+    const quoteText =
+      hasRealText ? target.content : stickerUrl || imageUrl ? '' : '[no text content]';
 
     let preset: PresetName = 'classic';
 
     const renderCard = async (chosenPreset: PresetName) =>
-      renderQuoteCard({ avatarUrl, quoteText, nickname, username, preset: chosenPreset });
+      renderQuoteCard({
+        avatarUrl,
+        quoteText,
+        nickname,
+        username,
+        preset: chosenPreset,
+        stickerUrl,
+        imageUrl,
+      });
 
     const buildSelectRow = (disabled = false) => {
       const select = new StringSelectMenuBuilder()
@@ -74,11 +103,12 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       components: buildSelectRow(),
     });
 
-    // Send copy to redirect channel
+    // Send copy to redirect channel (only once)
+    let redirectMessage: Message | null = null;
     try {
       const redirectChannel = await message.guild?.channels.fetch(QUOTE_REDIRECT_CHANNEL_ID);
       if (redirectChannel && redirectChannel.isTextBased()) {
-        await redirectChannel.send({
+        redirectMessage = await redirectChannel.send({
           content: `<:link:1545149023701180566> [Jump to original message](${target.url})`,
           files: [attachment],
           components: buildSelectRow(),
@@ -111,18 +141,16 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
         components: buildSelectRow(),
       });
 
-      // Send updated copy to redirect channel
-      try {
-        const redirectChannel = await message.guild?.channels.fetch(QUOTE_REDIRECT_CHANNEL_ID);
-        if (redirectChannel && redirectChannel.isTextBased()) {
-          await redirectChannel.send({
-            content: `<:link:1545149023701180566> [Jump to original message](${target.url})`,
+      // Update existing redirect message instead of sending a new one
+      if (redirectMessage) {
+        try {
+          await redirectMessage.edit({
             files: [newAttachment],
             components: buildSelectRow(),
           });
+        } catch (redirectError) {
+          console.error('[QUOTE] Failed to update quote in redirect channel:', redirectError);
         }
-      } catch (redirectError) {
-        console.error('[QUOTE] Failed to send updated quote to redirect channel:', redirectError);
       }
     });
 
@@ -130,6 +158,11 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       // After expiry the card is done changing — disable/remove the select
       // menu so no more edits can be made.
       await sent.edit({ components: buildSelectRow(true) }).catch(() => {});
+      
+      // Also disable the redirect message if it exists
+      if (redirectMessage) {
+        await redirectMessage.edit({ components: buildSelectRow(true) }).catch(() => {});
+      }
     });
 
   } catch (error) {
