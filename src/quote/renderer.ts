@@ -254,7 +254,7 @@ function drawWatermarkBadge(ctx: SKRSContext2D, centerX: number, centerY: number
 /** Returns a new canvas with `source` flipped horizontally. Used to mirror
  * the avatar-side curve mask onto the opposite edge without recomputing
  * its boundary math from scratch. */
-function flipHorizontal(source: ReturnType<typeof createCanvas>, w: number, h: number) {
+function flipHorizontal(source: any, w: number, h: number) {
   const out = createCanvas(w, h);
   const octx = out.getContext('2d');
   octx.translate(w, 0);
