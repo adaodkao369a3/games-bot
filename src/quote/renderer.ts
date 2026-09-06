@@ -85,18 +85,109 @@ export async function renderQuoteCard(opts: QuoteCardOptions): Promise<Buffer> {
   return canvas.toBuffer('image/png');
 }
 
+/**
+ * Stacks 2+ quote cards vertically — oldest/topmost message first, most
+ * recent last — into a single image. Each card keeps its normal full
+ * H-tall layout (avatar, curve, text, nickname strip, its own watermark)
+ * untouched; total canvas height is always an exact multiple of H, never
+ * compressed to make room for the seam.
+ *
+ * All cards must share one preset (opts.preset on cards[0] is treated as
+ * the composite's theme). Where two cards touch, each card's shared edge
+ * fades to transparent over LAYOUT.STACK_EDGE_FADE px, revealing a
+ * same-coloured backdrop underneath — since that backdrop matches each
+ * card's own background exactly, the seam reads as a soft melt rather
+ * than a hard cut.
+ */
+export async function renderStackedQuoteCard(cards: QuoteCardOptions[]): Promise<Buffer> {
+  if (cards.length === 0) {
+    throw new Error('renderStackedQuoteCard requires at least one card');
+  }
+  if (cards.length === 1) {
+    return renderQuoteCard(cards[0]);
+  }
+
+  const { W, H, STACK_EDGE_FADE } = LAYOUT;
+  const N = cards.length;
+  const preset = GRADIENT_PRESETS[cards[0].preset ?? 'classic'];
+
+  // Each card is rendered independently first via the untouched single-card
+  // path, then composited — so the per-card layout logic never has to know
+  // it's part of a stack.
+  const cardBuffers = await Promise.all(cards.map((opts) => renderQuoteCard(opts)));
+  const cardImages = await Promise.all(cardBuffers.map((buf) => loadImage(buf)));
+
+  const SCALE = 2;
+  const compH = H * N; // exact multiple of the single-card height — no compression
+  const canvas = createCanvas(W * SCALE, compH * SCALE);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+
+  fillPreset(ctx, preset, W, compH);
+
+  for (let i = 0; i < N; i++) {
+    const yOffset = i * H;
+    const fadeTop = i > 0;       // shares an edge with the card above
+    const fadeBottom = i < N - 1; // shares an edge with the card below
+
+    if (!fadeTop && !fadeBottom) {
+      // Only possible when N === 1, already short-circuited above, but
+      // kept as a safe no-mask fallback.
+      ctx.drawImage(cardImages[i], 0, yOffset, W, H);
+      continue;
+    }
+
+    const layer = createCanvas(W, H);
+    const lctx = layer.getContext('2d');
+    lctx.drawImage(cardImages[i], 0, 0, W, H);
+    lctx.globalCompositeOperation = 'destination-in';
+    lctx.drawImage(edgeFadeMask(W, H, STACK_EDGE_FADE, fadeTop, fadeBottom), 0, 0);
+
+    ctx.drawImage(layer, 0, yOffset);
+  }
+
+  return canvas.toBuffer('image/png');
+}
+
+/**
+ * White mask the size of one card: fully opaque through the middle,
+ * ramping to transparent over `fade` px at the top (if fadeTop) and/or
+ * bottom (if fadeBottom). Used with destination-in to fade a card's
+ * shared edges into the backdrop behind it.
+ */
+function edgeFadeMask(w: number, h: number, fade: number, fadeTop: boolean, fadeBottom: boolean) {
+  const mask = createCanvas(w, h);
+  const mctx = mask.getContext('2d');
+  const grad = mctx.createLinearGradient(0, 0, 0, h);
+
+  grad.addColorStop(0, fadeTop ? 'rgba(255,255,255,0)' : 'rgba(255,255,255,1)');
+  if (fadeTop) grad.addColorStop(fade / h, 'rgba(255,255,255,1)');
+  if (fadeBottom) grad.addColorStop(1 - fade / h, 'rgba(255,255,255,1)');
+  grad.addColorStop(1, fadeBottom ? 'rgba(255,255,255,0)' : 'rgba(255,255,255,1)');
+
+  mctx.fillStyle = grad;
+  mctx.fillRect(0, 0, w, h);
+  return mask;
+}
+
 function drawBackground(ctx: SKRSContext2D, preset: (typeof GRADIENT_PRESETS)[PresetName]) {
   const { W, H } = LAYOUT;
+  fillPreset(ctx, preset, W, H);
+}
+
+/** Shared fill logic so the single-card background and the multi-quote
+ * backdrop (which spans a taller canvas) always match pixel-for-pixel. */
+function fillPreset(ctx: SKRSContext2D, preset: (typeof GRADIENT_PRESETS)[PresetName], w: number, h: number) {
   if (preset.type === 'solid') {
     ctx.fillStyle = rgb(preset.colors[0]);
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, w, h);
     return;
   }
 
-  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  const grad = ctx.createLinearGradient(0, 0, w, 0);
   preset.colors.forEach((c, i) => grad.addColorStop(i / (preset.colors.length - 1), rgb(c)));
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, w, h);
 }
 
 function createCurveMask() {

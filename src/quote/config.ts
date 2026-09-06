@@ -51,6 +51,14 @@ export const LAYOUT = {
   IMAGE_STACK_WIDTH_FRACTION: 0.5,
   IMAGE_STACK_HEIGHT_FRACTION: 0.38,
   IMAGE_STACK_GAP: 24,
+
+  // Multi-quote stacking (.quote 2, and later .quote 3/4/...): each card
+  // keeps its own full H-tall slot (no compression — total height is
+  // always an exact multiple of H), but the edge each card shares with a
+  // neighbour fades to transparent over this many px, revealing a
+  // same-coloured backdrop underneath so adjacent cards melt together at
+  // the seam instead of butting against a hard line.
+  STACK_EDGE_FADE: 70,
 } as const;
 
 export const FONT_FALLBACK = 'Butler, Georgia, serif';

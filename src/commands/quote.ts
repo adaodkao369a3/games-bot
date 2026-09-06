@@ -6,12 +6,61 @@ import {
   ComponentType,
   StickerFormatType,
 } from 'discord.js';
-import { renderQuoteCard } from '../quote/renderer.js';
+import { renderQuoteCard, renderStackedQuoteCard, QuoteCardOptions } from '../quote/renderer.js';
 import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS } from '../quote/config.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
 const THEME_NAMES: PresetName[] = ['classic', 'sunset', 'ocean', 'purple'];
 const QUOTE_REDIRECT_CHANNEL_ID = '1526869451834654821';
+
+/** Everything renderQuoteCard needs for one message, minus the shared theme. */
+type QuoteSourceOpts = Omit<QuoteCardOptions, 'preset'>;
+
+interface QuoteSource {
+  opts: QuoteSourceOpts;
+  url: string;
+}
+
+/** Extracts avatar/nickname/text/sticker/image from a single target message. */
+async function buildQuoteSource(message: Message, target: Message): Promise<QuoteSource> {
+  // Server nickname (falling back to username) — never the account's
+  // global display name, which resolves to the account-wide profile name
+  // rather than anything server-specific when no nickname is set.
+  const member = await message.guild?.members.fetch(target.author.id).catch(() => null);
+  const nickname = member?.nickname ?? target.author.username;
+  const username = target.author.username;
+
+  // High-quality avatar (was 256px)
+  const avatarUrl = target.author.displayAvatarURL({ extension: 'png', size: 1024 });
+
+  // A replied-to message can carry a sticker. Lottie stickers are vector
+  // animations, not raster images — they can't be loaded onto the canvas,
+  // so those are skipped and treated as if no sticker were attached.
+  const sticker = target.stickers.first();
+  const stickerUrl =
+    sticker && sticker.format !== StickerFormatType.Lottie ? sticker.url : undefined;
+
+  // If there's no sticker, fall back to the first image attachment on the
+  // message (ignoring any additional images, and non-image attachments
+  // like videos/files/audio that the canvas can't render).
+  const imageAttachment = stickerUrl
+    ? undefined
+    : target.attachments.find((a) => a.contentType?.startsWith('image/'));
+  const imageUrl = imageAttachment?.url;
+
+  // Get quote text (handle empty content). If a sticker or image is
+  // present, an empty message is expected, so skip the "[no text
+  // content]" placeholder in that case — the media fills the quote area
+  // on its own instead.
+  const hasRealText = Boolean(target.content && target.content.trim().length > 0);
+  const quoteText =
+    hasRealText ? target.content : stickerUrl || imageUrl ? '' : '[no text content]';
+
+  return {
+    opts: { avatarUrl, quoteText, nickname, username, stickerUrl, imageUrl },
+    url: target.url,
+  };
+}
 
 export async function handleQuoteCommand(message: Message, args: string[]): Promise<void> {
   // Check if this is a reply to another message
@@ -23,59 +72,46 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
   }
 
   try {
-    // Fetch the referenced message
-    const target = await message.channel.messages.fetch(message.reference.messageId);
+    // Fetch the referenced (bottom-most) message
+    const bottomTarget = await message.channel.messages.fetch(message.reference.messageId);
 
-    if (!target) {
+    if (!bottomTarget) {
       await message.reply('Could not find the referenced message.');
       return;
     }
 
-    // Server nickname (falling back to username) — never the account's
-    // global display name, which resolves to the account-wide profile name
-    // rather than anything server-specific when no nickname is set.
-    const member = await message.guild?.members.fetch(target.author.id).catch(() => null);
-    const nickname = member?.nickname ?? target.author.username;
-    const username = target.author.username;
+    // `.quote 2` stacks the replied-to message together with whatever IT
+    // was replying to — oldest on top, newest on bottom. (`.quote 3`,
+    // `.quote 4`, etc. can extend this later by walking further up the
+    // reply chain the same way.) If the replied-to message isn't itself a
+    // reply, there's nothing to stack with, so this silently falls back
+    // to a normal single quote card instead of erroring.
+    const requestedStack = args[0] === '2';
+    let topTarget: Message | null = null;
 
-    // High-quality avatar (was 256px)
-    const avatarUrl = target.author.displayAvatarURL({ extension: 'png', size: 1024 });
+    if (requestedStack && bottomTarget.reference?.messageId) {
+      topTarget = await message.channel.messages
+        .fetch(bottomTarget.reference.messageId)
+        .catch(() => null);
+    }
 
-    // A replied-to message can carry a sticker. Lottie stickers are vector
-    // animations, not raster images — they can't be loaded onto the canvas,
-    // so those are skipped and treated as if no sticker were attached.
-    const sticker = target.stickers.first();
-    const stickerUrl =
-      sticker && sticker.format !== StickerFormatType.Lottie ? sticker.url : undefined;
+    const isStacked = requestedStack && topTarget !== null;
 
-    // If there's no sticker, fall back to the first image attachment on the
-    // message (ignoring any additional images, and non-image attachments
-    // like videos/files/audio that the canvas can't render).
-    const imageAttachment = stickerUrl
-      ? undefined
-      : target.attachments.find((a) => a.contentType?.startsWith('image/'));
-    const imageUrl = imageAttachment?.url;
-
-    // Get quote text (handle empty content). If a sticker or image is
-    // present, an empty message is expected, so skip the "[no text
-    // content]" placeholder in that case — the media fills the quote area
-    // on its own instead.
-    const hasRealText = Boolean(target.content && target.content.trim().length > 0);
-    const quoteText =
-      hasRealText ? target.content : stickerUrl || imageUrl ? '' : '[no text content]';
+    const sources: QuoteSource[] = isStacked
+      ? [await buildQuoteSource(message, topTarget!), await buildQuoteSource(message, bottomTarget)]
+      : [await buildQuoteSource(message, bottomTarget)];
 
     let preset: PresetName = 'classic';
 
-    const renderCard = async (chosenPreset: PresetName) =>
-      renderQuoteCard({
-        avatarUrl,
-        quoteText,
-        nickname,
-        username,
+    // Shared theme across every card in the stack — one select-menu
+    // controls all of them.
+    const renderCard = async (chosenPreset: PresetName) => {
+      const cardsWithTheme: QuoteCardOptions[] = sources.map((s) => ({
+        ...s.opts,
         preset: chosenPreset,
-        stickerUrl,
-        imageUrl,
-      });
+      }));
+      return isStacked ? renderStackedQuoteCard(cardsWithTheme) : renderQuoteCard(cardsWithTheme[0]);
+    };
 
     const buildSelectRow = (disabled = false) => {
       const select = new StringSelectMenuBuilder()
@@ -95,10 +131,15 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
     const buffer = await renderCard(preset);
     const attachment = new AttachmentBuilder(buffer, { name: 'quote.png' });
 
-    // Jump-to-original link goes above the image, as message content —
-    // Discord renders content above attachments, unlike an embed.
+    // One jump link per quoted message, oldest first. Jump-to-original
+    // link(s) go above the image, as message content — Discord renders
+    // content above attachments, unlike an embed.
+    const content = sources
+      .map((s) => `<:link:1545149023701180566> [Jump to original message](${s.url})`)
+      .join('\n');
+
     const sent = await message.reply({
-      content: `<:link:1545149023701180566> [Jump to original message](${target.url})`,
+      content,
       files: [attachment],
       components: buildSelectRow(),
     });
@@ -109,7 +150,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       const redirectChannel = await message.guild?.channels.fetch(QUOTE_REDIRECT_CHANNEL_ID);
       if (redirectChannel && redirectChannel.isTextBased()) {
         redirectMessage = await redirectChannel.send({
-          content: `<:link:1545149023701180566> [Jump to original message](${target.url})`,
+          content,
           files: [attachment],
           components: buildSelectRow(),
         });
@@ -158,7 +199,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       // After expiry the card is done changing — disable/remove the select
       // menu so no more edits can be made.
       await sent.edit({ components: buildSelectRow(true) }).catch(() => {});
-      
+
       // Also disable the redirect message if it exists
       if (redirectMessage) {
         await redirectMessage.edit({ components: buildSelectRow(true) }).catch(() => {});
