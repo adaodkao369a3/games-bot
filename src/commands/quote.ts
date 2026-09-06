@@ -135,7 +135,10 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
     // link(s) go above the image, as message content — Discord renders
     // content above attachments, unlike an embed.
     const content = sources
-      .map((s) => `<:link:1545149023701180566> [Jump to original message](${s.url})`)
+      .map((s, i) => {
+        const label = i === 0 ? 'Jump to original message' : 'Jump to reply';
+        return `__**${i + 1}.**__ <:link:1545149023701180566> [${label}](${s.url})`;
+      })
       .join('\n');
 
     const sent = await message.reply({
@@ -171,13 +174,28 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
         return;
       }
 
+      // Acknowledge the interaction immediately — Discord invalidates a
+      // component interaction's token after 3s, and renderCard() (image
+      // fetch + canvas draw, doubled for a stacked quote) routinely takes
+      // longer than that. deferUpdate() extends the window to 15 minutes,
+      // during which the deferred response is edited via editReply()
+      // instead of the (no-longer-first) i.update() call this replaced.
+      await i.deferUpdate();
+
       const chosen = i.values[0] as PresetName;
       preset = chosen;
 
-      const newBuffer = await renderCard(preset);
-      const newAttachment = new AttachmentBuilder(newBuffer, { name: 'quote.png' });
+      let newAttachment: AttachmentBuilder;
+      try {
+        const newBuffer = await renderCard(preset);
+        newAttachment = new AttachmentBuilder(newBuffer, { name: 'quote.png' });
+      } catch (renderError) {
+        console.error('[QUOTE] Failed to re-render quote card on theme change:', renderError);
+        await i.followUp({ content: 'Failed to apply that theme. Please try again.', ephemeral: true }).catch(() => {});
+        return;
+      }
 
-      await i.update({
+      await i.editReply({
         files: [newAttachment],
         components: buildSelectRow(),
       });

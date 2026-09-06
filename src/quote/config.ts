@@ -4,12 +4,18 @@ export const LAYOUT = {
   H: 630,
   W: 1575,
 
-  // Curve position as fractions of PFP width
-  CURVE_TOP_FRACTION: 0.50,    // curve x at top = 50% of pfp width
-  CURVE_BOTTOM_FRACTION: 0.95, // curve x at bottom = 95% of pfp width
+  // Curve position as fractions of PFP width. Top stays close to full width
+  // (minimal cut into the avatar); bottom recedes further (the pronounced
+  // curve). Paired with the ease-in curve in renderer.ts so the actual
+  // curving motion is concentrated near the bottom, not the top.
+  CURVE_TOP_FRACTION: 0.95,    // curve x at top = 95% of pfp width
+  CURVE_BOTTOM_FRACTION: 0.50, // curve x at bottom = 50% of pfp width
 
-  // Base alpha for the fade - ensures the curve is visible (non-zero start)
-  CURVE_BASE_ALPHA: 0.18,
+  // Base alpha for the fade. Lowered from 0.18 — at that level the avatar
+  // sat under a flat tint even outside the fade zone, reading as a visible
+  // border/frame. Near-zero means the avatar starts fully clean and only
+  // the actual fade zone darkens it.
+  CURVE_BASE_ALPHA: 0.04,
 
   // Right column layout (945px wide for 60% of card)
   // Quote text safe area (fractions of right column width and card height)
@@ -59,6 +65,11 @@ export const LAYOUT = {
   // same-coloured backdrop underneath so adjacent cards melt together at
   // the seam instead of butting against a hard line.
   STACK_EDGE_FADE: 70,
+
+  // Stacked cards get a wider quote/text column than a single card (the
+  // avatar itself stays the same H x H square either way) — this
+  // multiplies the standard (W - H) quote-column width.
+  STACK_QUOTE_WIDTH_MULTIPLIER: 1.2,
 } as const;
 
 export const FONT_FALLBACK = 'Butler, Georgia, serif';
