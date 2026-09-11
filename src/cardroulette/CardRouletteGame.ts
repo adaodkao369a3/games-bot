@@ -462,7 +462,8 @@ export class CardRouletteGame {
   private createGameEmbed(statusMessage: string = ''): EmbedBuilder {
     const multiplier = getMultiplier(this.data.drawsSurvived);
     
-    let description = `Draw a mystery card.\nSurvive longer to increase your payout...\nbut one card can eliminate you.\n\n`;
+    let description = `━━━━━━━━━━━━━━\n\n`;
+    description += `Draw a mystery card.\nSurvive longer to increase your payout...\nbut one card can eliminate you.\n\n`;
     description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
     description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
     description += `**CARDS DRAWN**\n${this.data.drawsSurvived}\n\n`;
@@ -477,6 +478,8 @@ export class CardRouletteGame {
     if (statusMessage) {
       description += `**${statusMessage}**\n\n`;
     }
+
+    description += `━━━━━━━━━━━━━━`;
 
     return new EmbedBuilder()
       .setTitle('🃏🔫 CARD ROULETTE')
@@ -524,7 +527,7 @@ export class CardRouletteGame {
     return new EmbedBuilder()
       .setTitle('🃏🔫 CARD ROULETTE')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Game timed out.\n\n` +
+        `**Game timed out.**\n\n` +
         `Your bet has been refunded.\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);

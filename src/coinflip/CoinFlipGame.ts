@@ -270,10 +270,12 @@ export class CoinFlipGame {
 
     const embed = new EmbedBuilder()
       .setTitle('💥 WRONG!')
-      .setDescription(`You called **${this.data.lastCall}**.\nThe coin landed on **${this.data.lastFlip}**.\n\n` +
+      .setDescription(`━━━━━━━━━━━━━━\n\n` +
+        `You called **${this.data.lastCall}**.\nThe coin landed on **${this.data.lastFlip}**.\n\n` +
         `**Streak:** ${this.data.streak}\n\n` +
         `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>`)
+        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);
 
     await interaction.update({
@@ -336,7 +338,8 @@ export class CoinFlipGame {
   private createGameEmbed(statusMessage: string = '', resultMessage: string = ''): EmbedBuilder {
     const multiplier = getMultiplier(this.data.streak);
     
-    let description = `**STREAK**\n${this.data.streak}\n\n`;
+    let description = `━━━━━━━━━━━━━━\n\n`;
+    description += `**STREAK**\n${this.data.streak}\n\n`;
     description += `**CURRENT POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
 
     if (this.data.lastFlip !== null) {
@@ -350,7 +353,8 @@ export class CoinFlipGame {
       description += `> Call it.\n\n`;
     }
 
-    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>`;
+    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+    description += `━━━━━━━━━━━━━━`;
 
     return new EmbedBuilder()
       .setTitle('🪙 COIN FLIP')
@@ -364,10 +368,12 @@ export class CoinFlipGame {
     
     return new EmbedBuilder()
       .setTitle('💰 CASHED OUT!')
-      .setDescription(`**STREAK**\n${this.data.streak}\n\n` +
+      .setDescription(`━━━━━━━━━━━━━━\n\n` +
+        `**STREAK**\n${this.data.streak}\n\n` +
         `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
         `**PAYOUT**\n${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**NET PROFIT**\n${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:cash:1545149005544165416>`)
+        `**NET PROFIT**\n${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `━━━━━━━━━━━━━━`)
       .setColor(0xFFD700);
   }
 

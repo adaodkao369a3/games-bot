@@ -1,6 +1,7 @@
 import { Message, EmbedBuilder } from 'discord.js';
 import { getCoinBalanceInfo, removeCoins, awardCoins } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { parseWagerAmount } from '../utils/wager-parser.js';
 
 const SLOT_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>', '<:slotsstrawberry:1545161917834993804>'];
 const WIN_SYMBOL = '<:slotsseven:1545161915649753119>';
@@ -34,37 +35,6 @@ function finalReelFrame(won: boolean): string {
   const b = randomSymbol(a);
   const c = randomSymbol(b);
   return `${a} ${b} ${c}`;
-}
-
-/**
- * Parses a wager string that supports:
- *   - Plain numbers, with or without commas: "500", "1,500"
- *   - Shorthand suffixes: "10k" -> 10,000, "2.5m" -> 2,500,000
- *   - "all" / "max": wagers the player's entire current balance
- */
-function parseWagerAmount(raw: string, balance: number): number | null {
-  const input = raw.trim().toLowerCase().replace(/,/g, '');
-
-  if (!input) return null;
-
-  if (input === 'all' || input === 'max') {
-    return balance > 0 ? balance : null;
-  }
-
-  const match = input.match(/^(\d+(?:\.\d+)?)([km]?)$/);
-  if (!match) return null;
-
-  let value = parseFloat(match[1]);
-  if (!Number.isFinite(value)) return null;
-
-  if (match[2] === 'k') value *= 1_000;
-  else if (match[2] === 'm') value *= 1_000_000;
-
-  value = Math.floor(value);
-
-  if (value <= 0) return null;
-
-  return value;
 }
 
 function buildLoadingMessage(): string {

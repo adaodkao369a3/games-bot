@@ -419,7 +419,8 @@ export class HigherLowerGame {
     const cardDisplay = this.formatCard(this.data.currentCard!);
     const multiplier = getMultiplier(this.data.streak);
     
-    let description = `Predict the next card.\n\n`;
+    let description = `━━━━━━━━━━━━━━\n\n`;
+    description += `Predict the next card.\n\n`;
     description += `**CURRENT CARD**\n${cardDisplay}\n\n`;
     description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
     description += `**STREAK**\n${this.data.streak}\n\n`;
@@ -433,6 +434,8 @@ export class HigherLowerGame {
     if (statusMessage) {
       description += `**${statusMessage}**\n\n`;
     }
+
+    description += `━━━━━━━━━━━━━━`;
 
     return new EmbedBuilder()
       .setTitle('🃏 HIGHER OR LOWER')
@@ -471,7 +474,7 @@ export class HigherLowerGame {
     return new EmbedBuilder()
       .setTitle('🃏 HIGHER OR LOWER')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Game timed out.\n\n` +
+        `**Game timed out.**\n\n` +
         `Your bet has been refunded.\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);

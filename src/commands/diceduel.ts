@@ -2,6 +2,7 @@ import { Message, MessageComponentInteraction } from 'discord.js';
 import { DiceDuelGame } from '../diceduel/DiceDuelGame.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { parseWagerAmount } from '../utils/wager-parser.js';
 
 // Active games keyed by player IDs (both players map to the same game)
 const activeGames = new Map<string, DiceDuelGame>();
@@ -38,32 +39,36 @@ export async function handleDiceDuelCommand(message: Message, args: string[]): P
     return;
   }
 
-  // Parse bet amount
-  const betArg = args[1];
-  const betAmount = parseInt(betArg, 10);
-
-  if (isNaN(betAmount) || betAmount <= 0) {
-    await message.reply('Invalid bet amount. Please enter a positive number.');
-    return;
-  }
-
   // Check if either player already has an active game
   if (activeGames.has(userId) || activeGames.has(opponentId)) {
     await message.reply('One of the players already has an active dice duel in progress!');
     return;
   }
 
-  // Check if challenger has enough coins
+  // Check if challenger has enough coins (needed for "all"/"max" parsing)
   const coinInfo = await getCoinBalanceInfo(userId);
   if (!coinInfo) {
     await message.reply('Unable to retrieve your Bombo Coin balance. Please try again later.');
     return;
   }
 
-  if (coinInfo.balance < betAmount) {
+  // Parse bet amount
+  const betArg = args[1];
+  const wager = parseWagerAmount(betArg, coinInfo.balance);
+
+  if (wager === null || isNaN(wager) || wager <= 0) {
     await message.reply(
-      `You don't have enough Bombo Coins for this bet! You need ${betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
-      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`
+      'Invalid bet amount. Please enter a positive number.\n' +
+      'Examples: `.diceduel @user 500`, `.diceduel @user 10k`, `.diceduel @user 1.5m`, `.diceduel @user all`'
+    );
+    return;
+  }
+
+  if (coinInfo.balance < wager) {
+    await message.reply(
+      `You don't have enough Bombo Coins for this bet! You need ${wager.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
+      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>\n` +
+      `Tip: use \`.diceduel @user all\` to bet your entire balance.`
     );
     return;
   }
@@ -77,7 +82,7 @@ export async function handleDiceDuelCommand(message: Message, args: string[]): P
     const player2Name = mentionedUser.username;
 
     // Create new game instance
-    const game = new DiceDuelGame(userId, opponentId, betAmount, channelId, guildId, player1Name, player2Name);
+    const game = new DiceDuelGame(userId, opponentId, wager, channelId, guildId, player1Name, player2Name);
     
     // Store in active games for both players
     activeGames.set(userId, game);

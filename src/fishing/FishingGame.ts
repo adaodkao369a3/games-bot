@@ -31,6 +31,7 @@ export class FishingGame {
   private readonly REEL_GRACE_PERIOD_MS = 4000; // 4 seconds grace period before decay starts
   private readonly ENTRY_FEE = 500;
   private readonly DEPTH_INCREMENT = 25;
+  private readonly MAX_DEPTH = 300; // Maximum depth limit
 
   constructor(userId: string, channelId: string, guildId: string | undefined) {
     this.data = {
@@ -162,6 +163,15 @@ export class FishingGame {
     if (this.state !== 'fishing') {
       await interaction.reply({
         content: 'Invalid action for current state.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Check if maximum depth reached
+    if (this.data.depth >= this.MAX_DEPTH) {
+      await interaction.reply({
+        content: `You've reached the maximum depth of ${this.MAX_DEPTH}m! Time to reel in your catch.`,
         ephemeral: true,
       });
       return;
@@ -413,12 +423,13 @@ export class FishingGame {
 
   private createFishingEmbed(): EmbedBuilder {
     const depthEmoji = this.getDepthEmoji(this.data.depth);
+    const depthProgress = `${this.data.depth}/${this.MAX_DEPTH}m`;
     return new EmbedBuilder()
       .setTitle('🌊 FISHING')
       .setDescription(`*You are fishing at ${this.data.depth}m deep...*`)
       .setColor(0x3498db)
       .addFields(
-        { name: 'Depth', value: `${depthEmoji} ${this.data.depth}m`, inline: true },
+        { name: 'Depth', value: `${depthEmoji} ${depthProgress}`, inline: true },
         { name: 'Potential', value: this.getPotentialDescription(), inline: true }
       );
   }

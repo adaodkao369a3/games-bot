@@ -2,6 +2,7 @@ import { Message, MessageComponentInteraction } from 'discord.js';
 import { BlackjackGame } from '../blackjack/BlackjackGame.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { parseWagerAmount } from '../utils/wager-parser.js';
 
 // Active games keyed by user ID
 const activeGames = new Map<string, BlackjackGame>();
@@ -14,15 +15,29 @@ export async function handleBjCommand(message: Message, args: string[]): Promise
 
   // Parse bet amount
   if (args.length < 1) {
-    await message.reply('Usage: `.bj <bet>`');
+    await message.reply(
+      'Please specify an amount to bet. Usage: `.bj [amount]`\n' +
+      'Examples: `.bj 500`, `.bj 10k`, `.bj 1.5m`, `.bj all`'
+    );
+    return;
+  }
+
+  // Get user's current balance first, since "all"/"max" depend on it.
+  const coinInfo = await getCoinBalanceInfo(userId);
+  if (!coinInfo) {
+    await message.reply('Unable to retrieve your Bombo Coin balance. Please try again later.');
     return;
   }
 
   const betArg = args[0];
-  const betAmount = parseInt(betArg, 10);
+  const wager = parseWagerAmount(betArg, coinInfo.balance);
 
-  if (isNaN(betAmount) || betAmount <= 0) {
-    await message.reply('Invalid bet amount. Please enter a positive number.');
+  // Validate wager is a valid positive number
+  if (wager === null || isNaN(wager) || wager <= 0) {
+    await message.reply(
+      'Please specify a valid positive amount to bet.\n' +
+      'Examples: `.bj 500`, `.bj 10k`, `.bj 1.5m`, `.bj all`'
+    );
     return;
   }
 
@@ -32,17 +47,11 @@ export async function handleBjCommand(message: Message, args: string[]): Promise
     return;
   }
 
-  // Check if user has enough coins
-  const coinInfo = await getCoinBalanceInfo(userId);
-  if (!coinInfo) {
-    await message.reply('Unable to retrieve your Bombo Coin balance. Please try again later.');
-    return;
-  }
-
-  if (coinInfo.balance < betAmount) {
+  if (coinInfo.balance < wager) {
     await message.reply(
-      `You don't have enough Bombo Coins for this bet! You need ${betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
-      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`
+      `You don't have enough Bombo Coins for this bet! You need ${wager.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
+      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>\n` +
+      `Tip: use \`.bj all\` to bet your entire balance.`
     );
     return;
   }
@@ -53,7 +62,7 @@ export async function handleBjCommand(message: Message, args: string[]): Promise
     const username = message.author.username;
 
     // Create new game instance
-    const game = new BlackjackGame(userId, username, betAmount, channelId, guildId);
+    const game = new BlackjackGame(userId, username, wager, channelId, guildId);
     
     // Store in active games
     activeGames.set(userId, game);
