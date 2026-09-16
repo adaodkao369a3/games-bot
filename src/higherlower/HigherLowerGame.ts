@@ -156,7 +156,7 @@ export class HigherLowerGame {
     }
 
     if (coinInfo.balance < this.data.betAmount) {
-      const coinEmoji = getEmoji(this.data.client, 'bombocoin');
+      const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
       await message.reply(
         `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}.\n` +
         `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} ${coinEmoji}`
@@ -187,7 +187,7 @@ export class HigherLowerGame {
     // Draw first card
     this.data.currentCard = this.data.deck.pop()!;
 
-    const initialEmbed = this.createGameEmbed('', this.data.client);
+    const initialEmbed = await this.createGameEmbed('', this.data.client);
     const row = this.createGameButtons();
 
     const sentMessage = await message.reply({
@@ -267,7 +267,7 @@ export class HigherLowerGame {
 
     // Check for push (same rank)
     if (result === 'push') {
-      const embed = this.createGameEmbed('Push! Same rank - continue with new card', this.data.client);
+      const embed = await this.createGameEmbed('Push! Same rank - continue with new card', this.data.client);
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -285,7 +285,7 @@ export class HigherLowerGame {
       this.data.streak++;
       this.data.currentPayout = calculatePayout(this.data.betAmount, this.data.streak);
 
-      const embed = this.createGameEmbed('Correct!', this.data.client);
+      const embed = await this.createGameEmbed('Correct!', this.data.client);
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -341,7 +341,7 @@ export class HigherLowerGame {
       return;
     }
 
-    const embed = this.createCashoutEmbed(this.data.client);
+    const embed = await this.createCashoutEmbed(this.data.client);
 
     await interaction.update({
       embeds: [embed],
@@ -357,7 +357,7 @@ export class HigherLowerGame {
     this.clearTimeout();
 
     if (!won) {
-      const embed = this.createLossEmbed(this.data.client);
+      const embed = await this.createLossEmbed(this.data.client);
 
       await interaction.update({
         embeds: [embed],
@@ -419,17 +419,17 @@ export class HigherLowerGame {
 
   // Embed creation methods
 
-  private createGameEmbed(statusMessage: string = '', client: Client | null = null): EmbedBuilder {
-    const cardDisplay = this.formatCard(this.data.currentCard!, client);
+  private async createGameEmbed(statusMessage: string = '', client: Client | null = null): Promise<EmbedBuilder> {
+    const cardDisplay = await this.formatCard(this.data.currentCard!, client);
     const multiplier = getMultiplier(this.data.streak);
-    const coinEmoji = getEmoji(client, 'bombocoin');
+    const coinEmoji = await getEmoji(client, 'bombocoin');
     
     let description = `${cardDisplay}\n`;
     description += `**BET ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}** • **STREAK ${this.data.streak}** • **x${multiplier.toFixed(1)}**\n`;
     description += `Potential win: ${this.data.currentPayout.toLocaleString('en-US')} ${coinEmoji}`;
 
     if (this.data.previousCard) {
-      description += `\n\nPrevious: ${this.formatCard(this.data.previousCard, client)}`;
+      description += `\n\nPrevious: ${await this.formatCard(this.data.previousCard, client)}`;
     }
 
     if (statusMessage) {
@@ -442,9 +442,9 @@ export class HigherLowerGame {
       .setColor(0x3498db);
   }
 
-  private createCashoutEmbed(client: Client | null = null): EmbedBuilder {
+  private async createCashoutEmbed(client: Client | null = null): Promise<EmbedBuilder> {
     const netProfit = this.data.currentPayout - this.data.betAmount;
-    const coinEmoji = getEmoji(client, 'bombocoin');
+    const coinEmoji = await getEmoji(client, 'bombocoin');
     
     return new EmbedBuilder()
       .setTitle('💰 CASHED OUT!')
@@ -455,9 +455,9 @@ export class HigherLowerGame {
       .setColor(0xFFD700);
   }
 
-  private createLossEmbed(client: Client | null = null): EmbedBuilder {
-    const cardDisplay = this.formatCard(this.data.currentCard!, client);
-    const coinEmoji = getEmoji(client, 'bombocoin');
+  private async createLossEmbed(client: Client | null = null): Promise<EmbedBuilder> {
+    const cardDisplay = await this.formatCard(this.data.currentCard!, client);
+    const coinEmoji = await getEmoji(client, 'bombocoin');
     
     return new EmbedBuilder()
       .setTitle('💥 YOU LOST!')
@@ -477,8 +477,8 @@ export class HigherLowerGame {
   /**
    * Format a card for display
    */
-  private formatCard(card: Card, client: Client | null = null): string {
-    const emoji = getEmoji(client, card.emojiName);
+  private async formatCard(card: Card, client: Client | null = null): Promise<string> {
+    const emoji = await getEmoji(client, card.emojiName);
     return emoji ? `${emoji}\n**${card.rank}** of ${card.suit}` : `**${card.rank}** of ${card.suit}`;
   }
 

@@ -104,19 +104,20 @@ export function isBust(cards: Card[]): boolean {
 /**
  * Format a card for display
  */
-export function formatCard(card: Card, client: Client | Guild | null = null): string {
-  const emoji = getEmoji(client, card.emojiName);
+export async function formatCard(card: Card, client: Client | Guild | null = null): Promise<string> {
+  const emoji = await getEmoji(client, card.emojiName);
   return emoji ? `${emoji} ${card.rank}` : `${card.rank}`;
 }
 
 /**
  * Format a hand for display
  */
-export function formatHand(cards: Card[], hideSecond: boolean = false, client: Client | Guild | null = null): string {
+export async function formatHand(cards: Card[], hideSecond: boolean = false, client: Client | Guild | null = null): Promise<string> {
   if (hideSecond && cards.length > 1) {
-    const firstCard = formatCard(cards[0], client);
-    const cardBack = getCardBackEmoji(client);
+    const firstCard = await formatCard(cards[0], client);
+    const cardBack = await getCardBackEmoji(client);
     return `${firstCard} ${cardBack || '❓'}`;
   }
-  return cards.map(card => formatCard(card, client)).join(' ');
+  const formattedCards = await Promise.all(cards.map(card => formatCard(card, client)));
+  return formattedCards.join(' ');
 }

@@ -65,7 +65,7 @@ export class BlackjackGame {
     }
 
     if (coinInfo.balance < this.data.betAmount) {
-      const coinEmoji = getEmoji(this.data.client, 'bombocoin');
+      const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
       await message.reply(
         `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}.\n` +
         `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} ${coinEmoji}`
@@ -105,7 +105,7 @@ export class BlackjackGame {
       return;
     }
 
-    const initialEmbed = this.createGameEmbed();
+    const initialEmbed = await this.createGameEmbed();
     const row = this.createGameButtons();
 
     const sentMessage = await message.reply({
@@ -174,7 +174,7 @@ export class BlackjackGame {
     if (isBust(this.data.playerHand)) {
       this.state = 'complete';
       this.clearTimeout();
-      const embed = this.createBustEmbed(this.data.client);
+      const embed = await this.createBustEmbed(this.data.client);
       await interaction.update({
         embeds: [embed],
         components: [],
@@ -189,7 +189,7 @@ export class BlackjackGame {
     }
 
     // Continue playing
-    const embed = this.createGameEmbed(this.data.client);
+    const embed = await this.createGameEmbed(this.data.client);
     const row = this.createGameButtons();
     await interaction.update({
       embeds: [embed],
@@ -273,7 +273,7 @@ export class BlackjackGame {
     if (isBust(this.data.playerHand)) {
       this.state = 'complete';
       this.clearTimeout();
-      const embed = this.createBustEmbed(this.data.client);
+      const embed = await this.createBustEmbed(this.data.client);
       await interaction.update({
         embeds: [embed],
         components: [],
@@ -346,7 +346,7 @@ export class BlackjackGame {
       );
     }
 
-    const embed = this.createResultEmbed(result, payout, playerTotal, dealerTotal, this.data.client);
+    const embed = await this.createResultEmbed(result, payout, playerTotal, dealerTotal, this.data.client);
     await interaction.update({
       embeds: [embed],
       components: [],
@@ -382,7 +382,7 @@ export class BlackjackGame {
       }
     );
 
-    const embed = this.createResultEmbed(result, payout, calculateHandTotal(this.data.playerHand), calculateHandTotal(this.data.dealerHand), this.data.client);
+    const embed = await this.createResultEmbed(result, payout, calculateHandTotal(this.data.playerHand), calculateHandTotal(this.data.dealerHand), this.data.client);
     await this.data.message?.edit({
       embeds: [embed],
       components: [],
@@ -440,44 +440,44 @@ export class BlackjackGame {
 
   // Embed creation methods
 
-  private createGameEmbed(client: Client | null = null): EmbedBuilder {
+  private async createGameEmbed(client: Client | null = null): Promise<EmbedBuilder> {
     const playerTotal = calculateHandTotal(this.data.playerHand);
     const dealerShowing = this.data.dealerHand[0].value;
-    const coinEmoji = getEmoji(client, 'bombocoin');
+    const coinEmoji = await getEmoji(client, 'bombocoin');
 
     return new EmbedBuilder()
       .setTitle('🃏 BLACKJACK')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**YOUR HAND**\n${formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
-        `**DEALER**\n${formatHand(this.data.dealerHand, true, client)}\n**SHOWING: ${dealerShowing}**\n\n` +
+        `**YOUR HAND**\n${await formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
+        `**DEALER**\n${await formatHand(this.data.dealerHand, true, client)}\n**SHOWING: ${dealerShowing}**\n\n` +
         `**BET**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0x3498db);
   }
 
-  private createBustEmbed(client: Client | null = null): EmbedBuilder {
+  private async createBustEmbed(client: Client | null = null): Promise<EmbedBuilder> {
     const playerTotal = calculateHandTotal(this.data.playerHand);
     const dealerTotal = calculateHandTotal(this.data.dealerHand);
-    const coinEmoji = getEmoji(client, 'bombocoin');
+    const coinEmoji = await getEmoji(client, 'bombocoin');
 
     return new EmbedBuilder()
       .setTitle('💥 BUST')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**YOUR HAND**\n${formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
-        `**DEALER**\n${formatHand(this.data.dealerHand, false, client)}\n**TOTAL: ${dealerTotal}**\n\n` +
+        `**YOUR HAND**\n${await formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
+        `**DEALER**\n${await formatHand(this.data.dealerHand, false, client)}\n**TOTAL: ${dealerTotal}**\n\n` +
         `**BET LOST**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);
   }
 
-  private createResultEmbed(result: 'win' | 'lose' | 'push', payout: number, playerTotal: number, dealerTotal: number, client: Client | null = null): EmbedBuilder {
+  private async createResultEmbed(result: 'win' | 'lose' | 'push', payout: number, playerTotal: number, dealerTotal: number, client: Client | null = null): Promise<EmbedBuilder> {
     const title = result === 'win' ? '🎉 YOU WIN!' : result === 'lose' ? '💀 YOU LOSE' : '🤝 PUSH';
     const color = result === 'win' ? 0x00ff00 : result === 'lose' ? 0xe74c3c : 0xFFD700;
-    const coinEmoji = getEmoji(client, 'bombocoin');
+    const coinEmoji = await getEmoji(client, 'bombocoin');
 
     let description = `━━━━━━━━━━━━━━\n\n` +
-      `**YOUR HAND**\n${formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
-      `**DEALER**\n${formatHand(this.data.dealerHand, false, client)}\n**TOTAL: ${dealerTotal}**\n\n` +
+      `**YOUR HAND**\n${await formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
+      `**DEALER**\n${await formatHand(this.data.dealerHand, false, client)}\n**TOTAL: ${dealerTotal}**\n\n` +
       `**BET**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
 
     if (result === 'win') {
