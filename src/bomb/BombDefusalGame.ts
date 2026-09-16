@@ -193,8 +193,8 @@ export class BombDefusalGame {
 
     if (coinInfo.balance < this.data.betAmount) {
       await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`
+        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
+        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
       );
       return;
     }
@@ -372,8 +372,8 @@ export class BombDefusalGame {
         `**Correct:** ${correctOption}\n\n` +
         `**Stage Reached:** ${this.data.currentStage}\n\n` +
         `**Stages Defused:** ${this.data.stagesDefused}\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);
 
@@ -439,8 +439,8 @@ export class BombDefusalGame {
     const multiplier = getMultiplier(this.data.stagesDefused);
     
     let description = `**STAGE**\n${this.data.currentStage}\n\n`;
-    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
-    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
     description += `**DEFUSED**\n${this.data.stagesDefused}\n\n`;
     description += `**MULTIPLIER**\nx${multiplier.toFixed(2)}\n\n`;
     description += `**${challenge.description}**\n\n`;
@@ -464,9 +464,9 @@ export class BombDefusalGame {
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Stages Defused:** ${this.data.stagesDefused}\n\n` +
         `**Final Multiplier:** x${multiplier.toFixed(2)}\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xFFD700);
   }

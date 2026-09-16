@@ -30,8 +30,9 @@ async function buildQuoteSource(message: Message, target: Message): Promise<Quot
   const nickname = member?.nickname ?? target.author.username;
   const username = target.author.username;
 
-  // High-quality avatar (was 256px)
-  const avatarUrl = target.author.displayAvatarURL({ extension: 'png', size: 1024 });
+  // High-quality avatar (was 256px) — prefer server-specific avatar if set
+  const avatarUrl = member?.displayAvatarURL({ extension: 'png', size: 1024 })
+    ?? target.author.displayAvatarURL({ extension: 'png', size: 1024 });
 
   // A replied-to message can carry a sticker. Lottie stickers are vector
   // animations, not raster images — they can't be loaded onto the canvas,

@@ -63,8 +63,8 @@ export class BlackjackGame {
 
     if (coinInfo.balance < this.data.betAmount) {
       await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`
+        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
+        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
       );
       return;
     }
@@ -445,7 +445,7 @@ export class BlackjackGame {
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**YOUR HAND**\n${formatHand(this.data.playerHand)}\n**TOTAL: ${playerTotal}**\n\n` +
         `**DEALER**\n${formatHand(this.data.dealerHand, true)}\n**SHOWING: ${dealerShowing}**\n\n` +
-        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0x3498db);
   }
@@ -459,7 +459,7 @@ export class BlackjackGame {
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**YOUR HAND**\n${formatHand(this.data.playerHand)}\n**TOTAL: ${playerTotal}**\n\n` +
         `**DEALER**\n${formatHand(this.data.dealerHand)}\n**TOTAL: ${dealerTotal}**\n\n` +
-        `**BET LOST**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `**BET LOST**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);
   }
@@ -471,16 +471,16 @@ export class BlackjackGame {
     let description = `━━━━━━━━━━━━━━\n\n` +
       `**YOUR HAND**\n${formatHand(this.data.playerHand)}\n**TOTAL: ${playerTotal}**\n\n` +
       `**DEALER**\n${formatHand(this.data.dealerHand)}\n**TOTAL: ${dealerTotal}**\n\n` +
-      `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+      `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
 
     if (result === 'win') {
       const netProfit = payout - this.data.betAmount;
-      description += `**PAYOUT**\n+${payout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**NET PROFIT**\n+${netProfit.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+      description += `**PAYOUT**\n+${payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**NET PROFIT**\n+${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
     } else if (result === 'lose') {
-      description += `**AMOUNT LOST**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+      description += `**AMOUNT LOST**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
     } else {
-      description += `**RETURNED**\n${payout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+      description += `**RETURNED**\n${payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
     }
 
     description += `━━━━━━━━━━━━━━`;

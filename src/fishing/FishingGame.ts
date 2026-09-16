@@ -452,7 +452,7 @@ export class FishingGame {
         .setDescription('*You were so close...*')
         .setColor(0xe74c3c)
         .addFields(
-          { name: 'Reward', value: `0 <:cash:1545149005544165416>`, inline: true }
+          { name: 'Reward', value: `0 <:bombocoin:1545139736312815840>`, inline: true }
         );
     }
 
@@ -462,10 +462,10 @@ export class FishingGame {
 
     return new EmbedBuilder()
       .setTitle(title)
-      .setDescription(`━━━━━━━━━━━━━━\n\n${loot.emoji} **${loot.name}**\n*${loot.description || ''}*\n\n**Depth:** ${this.data.depth}m\n\n**Reward:** **${success ? '+' : '-'}${reward.toLocaleString('en-US')} <:cash:1545149005544165416>**\n\n━━━━━━━━━━━━━━`)
+      .setDescription(`━━━━━━━━━━━━━━\n\n${loot.emoji} **${loot.name}**\n*${loot.description || ''}*\n\n**Depth:** ${this.data.depth}m\n\n**Reward:** **${success ? '+' : '-'}${reward.toLocaleString('en-US')} <:bombocoin:1545139736312815840>**\n\n━━━━━━━━━━━━━━`)
       .setColor(color)
       .addFields(
-        { name: '💰 Total earned', value: `${success ? '+' : '-'}${reward.toLocaleString('en-US')} <:cash:1545149005544165416>`, inline: false }
+        { name: '💰 Total earned', value: `${success ? '+' : '-'}${reward.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`, inline: false }
       );
   }
 

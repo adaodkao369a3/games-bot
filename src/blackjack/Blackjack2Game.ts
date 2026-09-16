@@ -100,9 +100,9 @@ export class Blackjack2Game {
 
     if (p1Balance.balance < this.data.betAmount || p2Balance.balance < this.data.betAmount) {
       await message.reply(
-        `Both players need at least ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416> to play.\n` +
-        `${this.data.player1Name}: ${p1Balance.balance.toLocaleString('en-US')} <:cash:1545149005544165416>\n` +
-        `${this.data.player2Name}: ${p2Balance.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`
+        `Both players need at least ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840> to play.\n` +
+        `${this.data.player1Name}: ${p1Balance.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n` +
+        `${this.data.player2Name}: ${p2Balance.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
       );
       return;
     }
@@ -666,7 +666,7 @@ export class Blackjack2Game {
     return new EmbedBuilder()
       .setTitle('🃏 2-PLAYER BLACKJACK')
       .setDescription(`**${this.data.player1Name}**\nvs\n**${this.data.player2Name}**\n\n` +
-        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416> each\n\n` +
+        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840> each\n\n` +
         `*${this.data.player2Name} has been challenged to Blackjack.*`)
       .setColor(0x3498db);
   }
@@ -679,11 +679,11 @@ export class Blackjack2Game {
     let description = `**DEALER**\n${formatHand(this.data.dealerHand, true)}\n**SHOWING: ${dealerShowing}**\n\n`;
     description += `━━━━━━━━━━━━━━\n\n`;
     description += `**${this.data.player1Name}**\n${formatHand(this.data.player1Hand.hand)}\n**TOTAL: ${p1Total}**\n\n`;
-    description += `**BET**\n${this.data.player1Hand.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+    description += `**BET**\n${this.data.player1Hand.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
     description += `**STATUS**\n${this.data.currentPlayer === 'player1' ? 'Your turn' : this.data.player1Hand.finished ? 'Finished' : 'Waiting for ' + this.data.player2Name}\n\n`;
     description += `━━━━━━━━━━━━━━\n\n`;
     description += `**${this.data.player2Name}**\n${formatHand(this.data.player2Hand.hand)}\n**TOTAL: ${p2Total}**\n\n`;
-    description += `**BET**\n${this.data.player2Hand.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+    description += `**BET**\n${this.data.player2Hand.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
     description += `**STATUS**\n${this.data.currentPlayer === 'player2' ? 'Your turn' : this.data.player2Hand.finished ? 'Finished' : 'Waiting for ' + this.data.player1Name}`;
 
     return new EmbedBuilder()
@@ -708,7 +708,7 @@ export class Blackjack2Game {
     description += `**${this.data.player1Name}**\n${formatHand(this.data.player1Hand.hand)}\n**${this.data.player1Hand.result === 'bust' ? 'BUST' : p1Total}**\n`;
     description += `${p1Emoji} **${p1Result?.toUpperCase()}**\n`;
     if (p1Payout > 0) {
-      description += `+${p1Payout.toLocaleString('en-US')} <:cash:1545149005544165416>\n`;
+      description += `+${p1Payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n`;
     }
     description += `\n`;
 
@@ -722,7 +722,7 @@ export class Blackjack2Game {
     description += `**${this.data.player2Name}**\n${formatHand(this.data.player2Hand.hand)}\n**${this.data.player2Hand.result === 'bust' ? 'BUST' : p2Total}**\n`;
     description += `${p2Emoji} **${p2Result?.toUpperCase()}**\n`;
     if (p2Payout > 0) {
-      description += `+${p2Payout.toLocaleString('en-US')} <:cash:1545149005544165416>\n`;
+      description += `+${p2Payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n`;
     }
 
     return new EmbedBuilder()

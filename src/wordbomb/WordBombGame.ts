@@ -400,7 +400,7 @@ export class WordBombGame {
           `**Players Eliminated:** ${this.data.eliminatedPlayers.size}\n\n` +
           `**Total Rounds:** ${this.data.currentRound}\n\n` +
           `**Words Played:** ${this.data.usedWords.size}\n\n` +
-          `**Reward:** +${GAME_CONFIG.winnerReward} <:cash:1545149005544165416>\n\n` +
+          `**Reward:** +${GAME_CONFIG.winnerReward} <:bombocoin:1545139736312815840>\n\n` +
           `━━━━━━━━━━━━━━`)
         .setColor(0xFFD700);
 

@@ -15,13 +15,11 @@ export async function handleWalletCommand(message: Message): Promise<void> {
 
   // Create wallet embed
   const walletEmbed = new EmbedBuilder()
-    .setTitle('<:cash:1545149005544165416> YOUR WALLET')
+    .setTitle('<:moneybag:1545149026528268308> YOUR WALLET')
     .setDescription('Current Bombo Coin balance')
     .setColor(0x00BFFF)
     .addFields(
-      { name: 'Balance', value: `${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`, inline: true },
-      { name: 'Lifetime Earned', value: `${coinInfo.lifetime_earned.toLocaleString('en-US')} <:cash:1545149005544165416>`, inline: true },
-      { name: 'Lifetime Gambled', value: `${coinInfo.lifetime_gambled.toLocaleString('en-US')} <:cash:1545149005544165416>`, inline: true }
+      { name: 'Balance', value: `${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`, inline: true }
     )
     .setFooter({ text: '💵 Bombo Coins are the currency of the realm.' });
 

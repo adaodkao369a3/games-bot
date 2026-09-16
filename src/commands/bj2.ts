@@ -1,6 +1,8 @@
 import { Message, MessageComponentInteraction } from 'discord.js';
 import { Blackjack2Game } from '../blackjack/Blackjack2Game.js';
+import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { parseWagerAmount } from '../utils/wager-parser.js';
 
 // Active games keyed by user ID (both players map to the same game)
 const activeGames = new Map<string, Blackjack2Game>();
@@ -27,15 +29,37 @@ export async function handleBj2Command(message: Message, args: string[]): Promis
 
   // Parse bet amount
   if (args.length < 2) {
-    await message.reply('Usage: `.bj2 @user <bet>`');
+    await message.reply(
+      'Please specify an amount to bet. Usage: `.bj2 @user [amount]`\n' +
+      'Examples: `.bj2 @user 500`, `.bj2 @user 10k`, `.bj2 @user 1.5m`, `.bj2 @user all`'
+    );
+    return;
+  }
+
+  // Get user's current balance first, since "all"/"max" depend on it.
+  const coinInfo = await getCoinBalanceInfo(userId);
+  if (!coinInfo) {
+    await message.reply('Unable to retrieve your Bombo Coin balance. Please try again later.');
     return;
   }
 
   const betArg = args[1];
-  const betAmount = parseInt(betArg, 10);
+  const betAmount = parseWagerAmount(betArg, coinInfo.balance);
 
-  if (isNaN(betAmount) || betAmount <= 0) {
-    await message.reply('Invalid bet amount. Please enter a positive number.');
+  if (betAmount === null || isNaN(betAmount) || betAmount <= 0) {
+    await message.reply(
+      'Please specify a valid positive amount to bet.\n' +
+      'Examples: `.bj2 @user 500`, `.bj2 @user 10k`, `.bj2 @user 1.5m`, `.bj2 @user all`'
+    );
+    return;
+  }
+
+  if (coinInfo.balance < betAmount) {
+    await message.reply(
+      `You don't have enough Bombo Coins for this bet! You need ${betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
+      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n` +
+      `Tip: use \`.bj2 @user all\` to bet your entire balance.`
+    );
     return;
   }
 

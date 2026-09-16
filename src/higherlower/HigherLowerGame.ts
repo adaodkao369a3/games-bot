@@ -154,8 +154,8 @@ export class HigherLowerGame {
 
     if (coinInfo.balance < this.data.betAmount) {
       await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`
+        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
+        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
       );
       return;
     }
@@ -422,10 +422,10 @@ export class HigherLowerGame {
     let description = `━━━━━━━━━━━━━━\n\n`;
     description += `Predict the next card.\n\n`;
     description += `**CURRENT CARD**\n${cardDisplay}\n\n`;
-    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
     description += `**STREAK**\n${this.data.streak}\n\n`;
     description += `**MULTIPLIER**\nx${multiplier.toFixed(1)}\n\n`;
-    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
 
     if (this.data.previousCard) {
       description += `**PREVIOUS CARD**\n${this.formatCard(this.data.previousCard)}\n\n`;
@@ -450,9 +450,9 @@ export class HigherLowerGame {
       .setTitle('💰 CASHED OUT!')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Final Streak:** ${this.data.streak}\n\n` +
-        `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xFFD700);
   }
@@ -465,7 +465,7 @@ export class HigherLowerGame {
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Card that caused the loss:**\n${cardDisplay}\n\n` +
         `**Streak:** ${this.data.streak}\n\n` +
-        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);
   }

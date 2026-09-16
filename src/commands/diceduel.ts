@@ -66,8 +66,8 @@ export async function handleDiceDuelCommand(message: Message, args: string[]): P
 
   if (coinInfo.balance < wager) {
     await message.reply(
-      `You don't have enough Bombo Coins for this bet! You need ${wager.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
-      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>\n` +
+      `You don't have enough Bombo Coins for this bet! You need ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
+      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n` +
       `Tip: use \`.diceduel @user all\` to bet your entire balance.`
     );
     return;

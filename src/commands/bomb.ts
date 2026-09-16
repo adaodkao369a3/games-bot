@@ -2,6 +2,7 @@ import { Message, MessageComponentInteraction } from 'discord.js';
 import { BombDefusalGame } from '../bomb/BombDefusalGame.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { parseWagerAmount } from '../utils/wager-parser.js';
 
 // Active games keyed by user ID
 const activeGames = new Map<string, BombDefusalGame>();
@@ -14,15 +15,28 @@ export async function handleBombCommand(message: Message, args: string[]): Promi
 
   // Parse bet amount
   if (args.length < 1) {
-    await message.reply('Usage: `.bomb <bet>`');
+    await message.reply(
+      'Please specify an amount to bet. Usage: `.bomb [amount]`\n' +
+      'Examples: `.bomb 500`, `.bomb 10k`, `.bomb 1.5m`, `.bomb all`'
+    );
+    return;
+  }
+
+  // Get user's current balance first, since "all"/"max" depend on it.
+  const coinInfo = await getCoinBalanceInfo(userId);
+  if (!coinInfo) {
+    await message.reply('Unable to retrieve your Bombo Coin balance. Please try again later.');
     return;
   }
 
   const betArg = args[0];
-  const betAmount = parseInt(betArg, 10);
+  const betAmount = parseWagerAmount(betArg, coinInfo.balance);
 
-  if (isNaN(betAmount) || betAmount <= 0) {
-    await message.reply('Invalid bet amount. Please enter a positive number.');
+  if (betAmount === null || isNaN(betAmount) || betAmount <= 0) {
+    await message.reply(
+      'Please specify a valid positive amount to bet.\n' +
+      'Examples: `.bomb 500`, `.bomb 10k`, `.bomb 1.5m`, `.bomb all`'
+    );
     return;
   }
 
@@ -32,17 +46,11 @@ export async function handleBombCommand(message: Message, args: string[]): Promi
     return;
   }
 
-  // Check if user has enough coins
-  const coinInfo = await getCoinBalanceInfo(userId);
-  if (!coinInfo) {
-    await message.reply('Unable to retrieve your Bombo Coin balance. Please try again later.');
-    return;
-  }
-
   if (coinInfo.balance < betAmount) {
     await message.reply(
-      `You don't have enough Bombo Coins for this bet! You need ${betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
-      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`
+      `You don't have enough Bombo Coins for this bet! You need ${betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
+      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n` +
+      `Tip: use \`.bomb all\` to bet your entire balance.`
     );
     return;
   }

@@ -177,8 +177,8 @@ export class CardRouletteGame {
 
     if (coinInfo.balance < this.data.betAmount) {
       await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`
+        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
+        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
       );
       return;
     }
@@ -464,8 +464,8 @@ export class CardRouletteGame {
     
     let description = `━━━━━━━━━━━━━━\n\n`;
     description += `Draw a mystery card.\nSurvive longer to increase your payout...\nbut one card can eliminate you.\n\n`;
-    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
-    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
     description += `**CARDS DRAWN**\n${this.data.drawsSurvived}\n\n`;
     description += `**MULTIPLIER**\nx${multiplier.toFixed(2)}\n\n`;
 
@@ -498,9 +498,9 @@ export class CardRouletteGame {
       description += `${card.emoji} ${card.name}\n`;
     });
     description += `\n**Final Multiplier:** x${multiplier.toFixed(2)}\n\n`;
-    description += `**Amount Wagered:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
-    description += `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
-    description += `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+    description += `**Amount Wagered:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
     description += `━━━━━━━━━━━━━━`;
 
     return new EmbedBuilder()
@@ -517,8 +517,8 @@ export class CardRouletteGame {
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Elimination Card:**\n${card.emoji} **${card.name}**\n${card.description}\n\n` +
         `**Draws Survived:** ${this.data.drawsSurvived}\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);
   }

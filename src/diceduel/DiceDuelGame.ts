@@ -482,7 +482,7 @@ export class DiceDuelGame {
       .setDescription('━━━━━━━━━━━━━━\n\n' +
         `**${this.data.player1Name}**\n` +
         `**${this.data.player2Name}**\n\n` +
-        `**Wager:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `**Wager:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         '*You\'ve been challenged to a Dice Duel.*')
       .setColor(0x3498db)
       .setFooter({ text: 'First to 3 round wins!' });
@@ -523,7 +523,7 @@ export class DiceDuelGame {
         `${waitingText}\n\n` +
         '━━━━━━━━━━━━━━\n\n' +
         `${historyText}` +
-        `**Wager:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>`)
+        `**Wager:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`)
       .setColor(0x3498db);
 
     return embed;
@@ -549,11 +549,11 @@ export class DiceDuelGame {
         `**Final Score**\n\n` +
         `**${this.data.player1Name}** — ${this.data.player1Score}\n` +
         `**${this.data.player2Name}** — ${this.data.player2Score}\n\n` +
-        `💰 **Winnings:** +${winnings.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `💰 **Winnings:** +${winnings.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `*Bob has decided that ${winnerName} is legally better at rolling cubes.*\n\n` +
         '━━━━━━━━━━━━━━\n\n' +
         `${historyText}` +
-        `**Wager:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>`)
+        `**Wager:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`)
       .setColor(0xFFD700);
   }
 
@@ -564,7 +564,7 @@ export class DiceDuelGame {
         `**${this.data.player2Name} declined the challenge.\n\n` +
         `Both players have been refunded their wagers.\n\n` +
         '━━━━━━━━━━━━━━\n\n' +
-        `**Wager:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>`)
+        `**Wager:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`)
       .setColor(0xe74c3c);
   }
 
@@ -575,7 +575,7 @@ export class DiceDuelGame {
         `**Challenge expired.\n\n` +
         `Both players have been refunded their wagers.\n\n` +
         '━━━━━━━━━━━━━━\n\n' +
-        `**Wager:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>`)
+        `**Wager:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`)
       .setColor(0xe74c3c);
   }
 

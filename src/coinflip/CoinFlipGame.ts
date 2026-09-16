@@ -103,8 +103,8 @@ export class CoinFlipGame {
 
     if (coinInfo.balance < this.data.betAmount) {
       await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`
+        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
+        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
       );
       return;
     }
@@ -273,8 +273,8 @@ export class CoinFlipGame {
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `You called **${this.data.lastCall}**.\nThe coin landed on **${this.data.lastFlip}**.\n\n` +
         `**Streak:** ${this.data.streak}\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);
 
@@ -340,7 +340,7 @@ export class CoinFlipGame {
     
     let description = `━━━━━━━━━━━━━━\n\n`;
     description += `**STREAK**\n${this.data.streak}\n\n`;
-    description += `**CURRENT POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+    description += `**CURRENT POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
 
     if (this.data.lastFlip !== null) {
       description += `**LAST FLIP**\n🪙 → ${this.data.lastFlip}\n\n`;
@@ -353,7 +353,7 @@ export class CoinFlipGame {
       description += `> Call it.\n\n`;
     }
 
-    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n`;
+    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
     description += `━━━━━━━━━━━━━━`;
 
     return new EmbedBuilder()
@@ -370,9 +370,9 @@ export class CoinFlipGame {
       .setTitle('💰 CASHED OUT!')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**STREAK**\n${this.data.streak}\n\n` +
-        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**PAYOUT**\n${this.data.currentPayout.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
-        `**NET PROFIT**\n${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:cash:1545149005544165416>\n\n` +
+        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**PAYOUT**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**NET PROFIT**\n${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xFFD700);
   }

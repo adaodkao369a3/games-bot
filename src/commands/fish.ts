@@ -30,8 +30,8 @@ export async function handleFishCommand(message: Message): Promise<void> {
   const ENTRY_FEE = 500;
   if (coinInfo.balance < ENTRY_FEE) {
     await message.reply(
-      `You don't have enough Bombo Coins to go fishing! You need ${ENTRY_FEE.toLocaleString('en-US')} <:cash:1545149005544165416>.\n` +
-      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:cash:1545149005544165416>`
+      `You don't have enough Bombo Coins to go fishing! You need ${ENTRY_FEE.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
+      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
     );
     return;
   }

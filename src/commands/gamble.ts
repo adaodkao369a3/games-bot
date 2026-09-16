@@ -175,7 +175,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       // Edit message with win result embed
       const winResultEmbed = new EmbedBuilder()
         .setTitle('The results are...')
-        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n<a:win:1545165325614583888> **YOU WON!!**\n\n**Bet:** ${wager.toLocaleString('en-US')} <:cash:1545149005544165416>\n**Total Payout:** +${payout.toLocaleString('en-US')} <:cash:1545149005544165416>`)
+        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n<a:win:1545165325614583888> **YOU WON!!**\n\n**Bet:** ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n**Total Payout:** +${payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`)
         .setColor(0x00FF00);
 
       await initialMessage.edit({ embeds: [winResultEmbed] });
@@ -184,7 +184,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       // Edit message with lose result embed
       const loseResultEmbed = new EmbedBuilder()
         .setTitle('The results are...')
-        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n<:lotteryslots:1545161895261241454> **YOU LOST...**\n\n**Bet:** ${wager.toLocaleString('en-US')} <:cash:1545149005544165416>\n**Total Loss:** -${wager.toLocaleString('en-US')} <:cash:1545149005544165416>`)
+        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n<:lotteryslots:1545161895261241454> **YOU LOST...**\n\n**Bet:** ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n**Total Loss:** -${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`)
         .setColor(0xFF0000);
 
       await initialMessage.edit({ embeds: [loseResultEmbed] });

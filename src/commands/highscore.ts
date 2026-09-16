@@ -10,8 +10,8 @@ export async function handleHighscoreCommand(message: Message): Promise<void> {
 
     if (leaderboard.length === 0) {
       const emptyEmbed = new EmbedBuilder()
-        .setTitle('<:cash:1545149005544165416> Bombo Coin Leaderboard')
-        .setDescription('__No players yet!__ Be the first to earn some <:cash:1545149005544165416>!')
+        .setTitle('<:bombocoin:1545139736312815840> Bombo Coin Leaderboard')
+        .setDescription('__No players yet!__ Be the first to earn some <:bombocoin:1545139736312815840>!')
         .setColor(0xFFD700)
         .setFooter({ text: 'Start gambling to make your mark!' });
 
@@ -49,7 +49,7 @@ export async function handleHighscoreCommand(message: Message): Promise<void> {
     }
 
     const leaderboardEmbed = new EmbedBuilder()
-      .setTitle('<:cash:1545149005544165416> Bombo Coin Leaderboard')
+      .setTitle('<:bombocoin:1545139736312815840> Bombo Coin Leaderboard')
       .setDescription(description)
       .setColor(0xFFD700)
       .setThumbnail('https://cdn.discordapp.com/emojis/1545139736312815840.webp?size=96&quality=lossless')
