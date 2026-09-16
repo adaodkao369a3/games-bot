@@ -106,7 +106,7 @@ export function isBust(cards: Card[]): boolean {
  */
 export async function formatCard(card: Card, client: Client | Guild | null = null): Promise<string> {
   const emoji = await getEmoji(client, card.emojiName);
-  return emoji ? `${emoji} ${card.rank}` : `${card.rank}`;
+  return emoji ? emoji : `${card.rank}`;
 }
 
 /**
@@ -119,5 +119,5 @@ export async function formatHand(cards: Card[], hideSecond: boolean = false, cli
     return `${firstCard} ${cardBack || '❓'}`;
   }
   const formattedCards = await Promise.all(cards.map(card => formatCard(card, client)));
-  return formattedCards.join(' ');
+  return formattedCards.join('');
 }

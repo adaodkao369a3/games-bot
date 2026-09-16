@@ -447,11 +447,9 @@ export class BlackjackGame {
 
     return new EmbedBuilder()
       .setTitle('🃏 BLACKJACK')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**YOUR HAND**\n${await formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
-        `**DEALER**\n${await formatHand(this.data.dealerHand, true, client)}\n**SHOWING: ${dealerShowing}**\n\n` +
-        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n` +
-        `━━━━━━━━━━━━━━`)
+      .setDescription(`${await formatHand(this.data.playerHand, false, client)} **${playerTotal}**\n\n` +
+        `${await formatHand(this.data.dealerHand, true, client)} **${dealerShowing}**\n\n` +
+        `**${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}`)
       .setColor(0x3498db);
   }
 
@@ -462,11 +460,9 @@ export class BlackjackGame {
 
     return new EmbedBuilder()
       .setTitle('💥 BUST')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**YOUR HAND**\n${await formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
-        `**DEALER**\n${await formatHand(this.data.dealerHand, false, client)}\n**TOTAL: ${dealerTotal}**\n\n` +
-        `**BET LOST**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n` +
-        `━━━━━━━━━━━━━━`)
+      .setDescription(`${await formatHand(this.data.playerHand, false, client)} **${playerTotal}**\n\n` +
+        `${await formatHand(this.data.dealerHand, false, client)} **${dealerTotal}**\n\n` +
+        `Lost: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}`)
       .setColor(0xe74c3c);
   }
 
@@ -475,22 +471,18 @@ export class BlackjackGame {
     const color = result === 'win' ? 0x00ff00 : result === 'lose' ? 0xe74c3c : 0xFFD700;
     const coinEmoji = await getEmoji(client, 'bombocoin');
 
-    let description = `━━━━━━━━━━━━━━\n\n` +
-      `**YOUR HAND**\n${await formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
-      `**DEALER**\n${await formatHand(this.data.dealerHand, false, client)}\n**TOTAL: ${dealerTotal}**\n\n` +
-      `**BET**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
+    let description = `${await formatHand(this.data.playerHand, false, client)} **${playerTotal}**\n\n` +
+      `${await formatHand(this.data.dealerHand, false, client)} **${dealerTotal}**\n\n`;
 
     if (result === 'win') {
       const netProfit = payout - this.data.betAmount;
-      description += `**PAYOUT**\n+${payout.toLocaleString('en-US')} ${coinEmoji}\n\n` +
-        `**NET PROFIT**\n+${netProfit.toLocaleString('en-US')} ${coinEmoji}\n\n`;
+      description += `+${payout.toLocaleString('en-US')} ${coinEmoji}\n` +
+        `Profit: +${netProfit.toLocaleString('en-US')} ${coinEmoji}`;
     } else if (result === 'lose') {
-      description += `**AMOUNT LOST**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
+      description += `Lost: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}`;
     } else {
-      description += `**RETURNED**\n${payout.toLocaleString('en-US')} ${coinEmoji}\n\n`;
+      description += `Returned: **${payout.toLocaleString('en-US')}** ${coinEmoji}`;
     }
-
-    description += `━━━━━━━━━━━━━━`;
 
     return new EmbedBuilder()
       .setTitle(title)

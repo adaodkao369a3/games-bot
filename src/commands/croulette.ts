@@ -1,8 +1,9 @@
-import { Message, MessageComponentInteraction } from 'discord.js';
+import { Message, MessageComponentInteraction, Client } from 'discord.js';
 import { CardRouletteGame } from '../cardroulette/CardRouletteGame.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { parseWagerAmount } from '../utils/wager-parser.js';
+import { getEmoji } from '../utils/emoji-resolver.js';
 
 // Active games keyed by user ID
 const activeGames = new Map<string, CardRouletteGame>();
@@ -10,7 +11,7 @@ const activeGames = new Map<string, CardRouletteGame>();
 /**
  * Handle the croulette command
  */
-export async function handleCardRouletteCommand(message: Message, args: string[]): Promise<void> {
+export async function handleCardRouletteCommand(message: Message, args: string[], client: Client): Promise<void> {
   const userId = message.author.id;
 
   // Parse bet amount
@@ -48,9 +49,10 @@ export async function handleCardRouletteCommand(message: Message, args: string[]
   }
 
   if (coinInfo.balance < wager) {
+    const coinEmoji = await getEmoji(client, 'bombocoin');
     await message.reply(
-      `You don't have enough Bombo Coins for this bet! You need ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
-      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n` +
+      `You don't have enough Bombo Coins for this bet! You need ${wager.toLocaleString('en-US')} ${coinEmoji}.\n` +
+      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} ${coinEmoji}\n` +
       `Tip: use \`.croulette all\` to bet your entire balance.`
     );
     return;
@@ -62,7 +64,7 @@ export async function handleCardRouletteCommand(message: Message, args: string[]
     const username = message.author.username;
 
     // Create new game instance
-    const game = new CardRouletteGame(userId, username, wager, channelId, guildId);
+    const game = new CardRouletteGame(userId, username, wager, channelId, guildId, message.client);
     
     // Store in active games
     activeGames.set(userId, game);

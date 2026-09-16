@@ -1,6 +1,7 @@
-import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Client } from 'discord.js';
 import { awardCoins, removeCoins } from '../services/coins.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
+import { getEmoji } from '../utils/emoji-resolver.js';
 
 type CardRouletteState = 'idle' | 'playing' | 'complete' | 'cashout' | 'timeout';
 
@@ -31,6 +32,7 @@ interface CardRouletteGameData {
   gameInstanceId: string;
   skipNextDraw: boolean;
   extraDraw: boolean;
+  client: Client | null;
 }
 
 // Game configuration
@@ -144,7 +146,7 @@ export class CardRouletteGame {
   private data: CardRouletteGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
 
-  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined) {
+  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
     this.data = {
       userId,
       username,
@@ -161,6 +163,7 @@ export class CardRouletteGame {
       gameInstanceId: `croulette_${userId}_${Date.now()}`,
       skipNextDraw: false,
       extraDraw: false,
+      client,
     };
   }
 
@@ -176,9 +179,10 @@ export class CardRouletteGame {
     }
 
     if (coinInfo.balance < this.data.betAmount) {
+      const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
       await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
+        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}.\n` +
+        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} ${coinEmoji}`
       );
       return;
     }
@@ -203,7 +207,7 @@ export class CardRouletteGame {
     this.data.messageId = message.id;
     this.data.message = message;
 
-    const initialEmbed = this.createGameEmbed();
+    const initialEmbed = await this.createGameEmbed();
     const row = this.createGameButtons();
 
     const sentMessage = await message.reply({
@@ -266,7 +270,7 @@ export class CardRouletteGame {
     if (this.data.skipNextDraw) {
       this.data.skipNextDraw = false;
       
-      const embed = this.createGameEmbed('⏭️ Turn skipped! Draw again.');
+      const embed = await this.createGameEmbed('⏭️ Turn skipped! Draw again.');
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -310,7 +314,7 @@ export class CardRouletteGame {
 
     if (card.type === 'lose_turn') {
       this.data.skipNextDraw = true;
-      const embed = this.createGameEmbed(`${card.emoji} ${card.name}: ${card.description}`);
+      const embed = await this.createGameEmbed(`${card.emoji} ${card.name}: ${card.description}`);
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -319,7 +323,7 @@ export class CardRouletteGame {
       });
     } else if (card.type === 'double_turn') {
       this.data.extraDraw = true;
-      const embed = this.createGameEmbed(`${card.emoji} ${card.name}: ${card.description}`);
+      const embed = await this.createGameEmbed(`${card.emoji} ${card.name}: ${card.description}`);
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -336,7 +340,7 @@ export class CardRouletteGame {
       }, 1000);
     } else {
       // Safe card
-      const embed = this.createGameEmbed(`${card.emoji} ${card.name}: ${card.description}`);
+      const embed = await this.createGameEmbed(`${card.emoji} ${card.name}: ${card.description}`);
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -389,7 +393,7 @@ export class CardRouletteGame {
       return;
     }
 
-    const embed = this.createCashoutEmbed();
+    const embed = await this.createCashoutEmbed();
 
     await interaction.update({
       embeds: [embed],
@@ -405,7 +409,7 @@ export class CardRouletteGame {
     this.clearTimeout();
 
     if (!won) {
-      const embed = this.createEliminationEmbed();
+      const embed = await this.createEliminationEmbed();
 
       await interaction.update({
         embeds: [embed],
@@ -432,7 +436,7 @@ export class CardRouletteGame {
       }
     );
 
-    const embed = this.createTimeoutEmbed();
+    const embed = await this.createTimeoutEmbed();
 
     await message.edit({
       embeds: [embed],
@@ -459,27 +463,23 @@ export class CardRouletteGame {
 
   // Embed creation methods
 
-  private createGameEmbed(statusMessage: string = ''): EmbedBuilder {
+  private async createGameEmbed(statusMessage: string = ''): Promise<EmbedBuilder> {
     const multiplier = getMultiplier(this.data.drawsSurvived);
+    const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
     
-    let description = `━━━━━━━━━━━━━━\n\n`;
-    description += `Draw a mystery card.\nSurvive longer to increase your payout...\nbut one card can eliminate you.\n\n`;
-    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `**CARDS DRAWN**\n${this.data.drawsSurvived}\n\n`;
-    description += `**MULTIPLIER**\nx${multiplier.toFixed(2)}\n\n`;
+    let description = `**${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji} • **${this.data.drawsSurvived}** cards • **x${multiplier.toFixed(2)}**\n`;
+    description += `Win: **${this.data.currentPayout.toLocaleString('en-US')}** ${coinEmoji}\n\n`;
 
     if (this.data.currentCard) {
-      description += `**🃏 CARD DRAWN**\n\n`;
-      description += `${this.data.currentCard.emoji} **${this.data.currentCard.name}**\n`;
-      description += `${this.data.currentCard.description}\n\n`;
+      description += `${this.data.currentCard.emoji}\n\n`;
+      description += `**${this.data.currentCard.name}**\n${this.data.currentCard.description}\n\n`;
+    } else {
+      description += `🎲 Draw a card\n\n`;
     }
 
     if (statusMessage) {
-      description += `**${statusMessage}**\n\n`;
+      description += `${statusMessage}\n\n`;
     }
-
-    description += `━━━━━━━━━━━━━━`;
 
     return new EmbedBuilder()
       .setTitle('🃏🔫 CARD ROULETTE')
@@ -487,21 +487,16 @@ export class CardRouletteGame {
       .setColor(0x3498db);
   }
 
-  private createCashoutEmbed(): EmbedBuilder {
+  private async createCashoutEmbed(): Promise<EmbedBuilder> {
     const netProfit = this.data.currentPayout - this.data.betAmount;
     const multiplier = getMultiplier(this.data.drawsSurvived);
+    const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
     
-    let description = `━━━━━━━━━━━━━━\n\n`;
-    description += `**Draws Survived:** ${this.data.drawsSurvived}\n\n`;
-    description += `**Cards Drawn:**\n`;
-    this.data.cardsDrawn.forEach(card => {
-      description += `${card.emoji} ${card.name}\n`;
-    });
-    description += `\n**Final Multiplier:** x${multiplier.toFixed(2)}\n\n`;
-    description += `**Amount Wagered:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `━━━━━━━━━━━━━━`;
+    let description = `**${this.data.drawsSurvived}** cards survived • **x${multiplier.toFixed(2)}**\n\n`;
+    description += `Cards: ${this.data.cardsDrawn.map(card => card.emoji).join(' ')}\n\n`;
+    description += `Won: **${this.data.currentPayout.toLocaleString('en-US')}** ${coinEmoji}\n`;
+    description += `Bet: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}\n`;
+    description += `Profit: **${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')}** ${coinEmoji}`;
 
     return new EmbedBuilder()
       .setTitle('💰 CASHED OUT!')
@@ -509,27 +504,23 @@ export class CardRouletteGame {
       .setColor(0xFFD700);
   }
 
-  private createEliminationEmbed(): EmbedBuilder {
+  private async createEliminationEmbed(): Promise<EmbedBuilder> {
     const card = this.data.currentCard!;
+    const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
     
     return new EmbedBuilder()
       .setTitle('💀 ELIMINATED')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Elimination Card:**\n${card.emoji} **${card.name}**\n${card.description}\n\n` +
-        `**Draws Survived:** ${this.data.drawsSurvived}\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `━━━━━━━━━━━━━━`)
+      .setDescription(`${card.emoji}\n\n` +
+        `**${card.name}**\n${card.description}\n\n` +
+        `**${this.data.drawsSurvived}** cards survived\n` +
+        `Lost: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}`)
       .setColor(0xe74c3c);
   }
 
-  private createTimeoutEmbed(): EmbedBuilder {
+  private async createTimeoutEmbed(): Promise<EmbedBuilder> {
     return new EmbedBuilder()
       .setTitle('🃏🔫 CARD ROULETTE')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Game timed out.**\n\n` +
-        `Your bet has been refunded.\n\n` +
-        `━━━━━━━━━━━━━━`)
+      .setDescription(`Game timed out. Your bet has been refunded.`)
       .setColor(0xe74c3c);
   }
 

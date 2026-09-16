@@ -185,7 +185,7 @@ export class DiscordClient {
       }
 
       if (command === 'croulette') {
-        await handleCardRouletteCommand(message, args);
+        await handleCardRouletteCommand(message, args, this.client);
         return;
       }
 

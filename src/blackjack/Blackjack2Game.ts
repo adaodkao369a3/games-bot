@@ -682,15 +682,13 @@ export class Blackjack2Game {
     const p2Total = calculateHandTotal(this.data.player2Hand.hand);
     const coinEmoji = await getEmoji(client, 'bombocoin');
 
-    let description = `**DEALER**\n${await formatHand(this.data.dealerHand, true, client)}\n**SHOWING: ${dealerShowing}**\n\n`;
+    let description = `${await formatHand(this.data.dealerHand, true, client)} **${dealerShowing}**\n\n`;
     description += `━━━━━━━━━━━━━━\n\n`;
-    description += `**${this.data.player1Name}**\n${await formatHand(this.data.player1Hand.hand, false, client)}\n**TOTAL: ${p1Total}**\n\n`;
-    description += `**BET**\n${this.data.player1Hand.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
-    description += `**STATUS**\n${this.data.currentPlayer === 'player1' ? 'Your turn' : this.data.player1Hand.finished ? 'Finished' : 'Waiting for ' + this.data.player2Name}\n\n`;
+    description += `**${this.data.player1Name}**\n${await formatHand(this.data.player1Hand.hand, false, client)} **${p1Total}**\n`;
+    description += `**${this.data.player1Hand.betAmount.toLocaleString('en-US')}** ${coinEmoji} • ${this.data.currentPlayer === 'player1' ? 'Your turn' : this.data.player1Hand.finished ? 'Finished' : 'Waiting'}\n\n`;
     description += `━━━━━━━━━━━━━━\n\n`;
-    description += `**${this.data.player2Name}**\n${await formatHand(this.data.player2Hand.hand, false, client)}\n**TOTAL: ${p2Total}**\n\n`;
-    description += `**BET**\n${this.data.player2Hand.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
-    description += `**STATUS**\n${this.data.currentPlayer === 'player2' ? 'Your turn' : this.data.player2Hand.finished ? 'Finished' : 'Waiting for ' + this.data.player1Name}`;
+    description += `**${this.data.player2Name}**\n${await formatHand(this.data.player2Hand.hand, false, client)} **${p2Total}**\n`;
+    description += `**${this.data.player2Hand.betAmount.toLocaleString('en-US')}** ${coinEmoji} • ${this.data.currentPlayer === 'player2' ? 'Your turn' : this.data.player2Hand.finished ? 'Finished' : 'Waiting'}`;
 
     return new EmbedBuilder()
       .setTitle('🃏 2-PLAYER BLACKJACK')
@@ -704,7 +702,7 @@ export class Blackjack2Game {
     const p2Total = calculateHandTotal(this.data.player2Hand.hand);
     const coinEmoji = await getEmoji(client, 'bombocoin');
 
-    let description = `**DEALER**\n${await formatHand(this.data.dealerHand, false, client)}\n**${dealerTotal}**\n\n`;
+    let description = `${await formatHand(this.data.dealerHand, false, client)} **${dealerTotal}**\n\n`;
     description += `━━━━━━━━━━━━━━\n\n`;
 
     // Player 1 result
@@ -712,7 +710,7 @@ export class Blackjack2Game {
     const p1Emoji = p1Result === 'win' ? '🎉' : p1Result === 'lose' ? '💀' : p1Result === 'push' ? '🤝' : '💥';
     const p1Payout = p1Result === 'win' ? (isBlackjack(this.data.player1Hand.hand) ? Math.floor(this.data.player1Hand.betAmount * GAME_CONFIG.blackjackMultiplier) : this.data.player1Hand.betAmount * 2) : p1Result === 'push' ? this.data.player1Hand.betAmount : 0;
     
-    description += `**${this.data.player1Name}**\n${await formatHand(this.data.player1Hand.hand, false, client)}\n**${this.data.player1Hand.result === 'bust' ? 'BUST' : p1Total}**\n`;
+    description += `**${this.data.player1Name}**\n${await formatHand(this.data.player1Hand.hand, false, client)} **${this.data.player1Hand.result === 'bust' ? 'BUST' : p1Total}**\n`;
     description += `${p1Emoji} **${p1Result?.toUpperCase()}**\n`;
     if (p1Payout > 0) {
       description += `+${p1Payout.toLocaleString('en-US')} ${coinEmoji}\n`;
@@ -726,7 +724,7 @@ export class Blackjack2Game {
     const p2Emoji = p2Result === 'win' ? '🎉' : p2Result === 'lose' ? '💀' : p2Result === 'push' ? '🤝' : '💥';
     const p2Payout = p2Result === 'win' ? (isBlackjack(this.data.player2Hand.hand) ? Math.floor(this.data.player2Hand.betAmount * GAME_CONFIG.blackjackMultiplier) : this.data.player2Hand.betAmount * 2) : p2Result === 'push' ? this.data.player2Hand.betAmount : 0;
     
-    description += `**${this.data.player2Name}**\n${await formatHand(this.data.player2Hand.hand, false, client)}\n**${this.data.player2Hand.result === 'bust' ? 'BUST' : p2Total}**\n`;
+    description += `**${this.data.player2Name}**\n${await formatHand(this.data.player2Hand.hand, false, client)} **${this.data.player2Hand.result === 'bust' ? 'BUST' : p2Total}**\n`;
     description += `${p2Emoji} **${p2Result?.toUpperCase()}**\n`;
     if (p2Payout > 0) {
       description += `+${p2Payout.toLocaleString('en-US')} ${coinEmoji}\n`;

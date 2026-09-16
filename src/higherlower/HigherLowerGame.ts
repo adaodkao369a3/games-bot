@@ -420,16 +420,17 @@ export class HigherLowerGame {
   // Embed creation methods
 
   private async createGameEmbed(statusMessage: string = '', client: Client | null = null): Promise<EmbedBuilder> {
-    const cardDisplay = await this.formatCard(this.data.currentCard!, client);
+    const cardEmoji = await getEmoji(client, this.data.currentCard!.emojiName);
     const multiplier = getMultiplier(this.data.streak);
     const coinEmoji = await getEmoji(client, 'bombocoin');
     
-    let description = `${cardDisplay}\n`;
-    description += `**BET ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}** • **STREAK ${this.data.streak}** • **x${multiplier.toFixed(1)}**\n`;
-    description += `Potential win: ${this.data.currentPayout.toLocaleString('en-US')} ${coinEmoji}`;
+    let description = `${cardEmoji}\n\n`;
+    description += `**${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji} • **Streak ${this.data.streak}** • **x${multiplier.toFixed(1)}**\n`;
+    description += `Win: **${this.data.currentPayout.toLocaleString('en-US')}** ${coinEmoji}`;
 
     if (this.data.previousCard) {
-      description += `\n\nPrevious: ${await this.formatCard(this.data.previousCard, client)}`;
+      const prevEmoji = await getEmoji(client, this.data.previousCard.emojiName);
+      description += `\n\n${prevEmoji}`;
     }
 
     if (statusMessage) {
@@ -448,22 +449,22 @@ export class HigherLowerGame {
     
     return new EmbedBuilder()
       .setTitle('💰 CASHED OUT!')
-      .setDescription(`Final Streak: ${this.data.streak}\n` +
-        `Amount Won: ${this.data.currentPayout.toLocaleString('en-US')} ${coinEmoji}\n` +
-        `Original Bet: ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n` +
-        `Net Profit: ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} ${coinEmoji}`)
+      .setDescription(`**Streak ${this.data.streak}**\n` +
+        `Won: **${this.data.currentPayout.toLocaleString('en-US')}** ${coinEmoji}\n` +
+        `Bet: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}\n` +
+        `Profit: **${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')}** ${coinEmoji}`)
       .setColor(0xFFD700);
   }
 
   private async createLossEmbed(client: Client | null = null): Promise<EmbedBuilder> {
-    const cardDisplay = await this.formatCard(this.data.currentCard!, client);
+    const cardEmoji = await getEmoji(client, this.data.currentCard!.emojiName);
     const coinEmoji = await getEmoji(client, 'bombocoin');
     
     return new EmbedBuilder()
       .setTitle('💥 YOU LOST!')
-      .setDescription(`${cardDisplay}\n` +
-        `Streak: ${this.data.streak}\n` +
-        `Amount Lost: ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}`)
+      .setDescription(`${cardEmoji}\n\n` +
+        `**Streak ${this.data.streak}**\n` +
+        `Lost: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}`)
       .setColor(0xe74c3c);
   }
 
@@ -472,14 +473,6 @@ export class HigherLowerGame {
       .setTitle('🃏 HIGHER OR LOWER')
       .setDescription(`Game timed out. Your bet has been refunded.`)
       .setColor(0xe74c3c);
-  }
-
-  /**
-   * Format a card for display
-   */
-  private async formatCard(card: Card, client: Client | null = null): Promise<string> {
-    const emoji = await getEmoji(client, card.emojiName);
-    return emoji ? `${emoji}\n**${card.rank}** of ${card.suit}` : `**${card.rank}** of ${card.suit}`;
   }
 
   // Button creation methods
