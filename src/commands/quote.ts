@@ -10,7 +10,7 @@ import { renderQuoteCard, renderStackedQuoteCard, QuoteCardOptions } from '../qu
 import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS } from '../quote/config.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
-const THEME_NAMES: PresetName[] = ['classic', 'white', 'sunset', 'ocean', 'purple', 'aurora', 'gold', 'cherry', 'midnight', 'plasma'];
+const THEME_NAMES: PresetName[] = ['classic', 'white', 'sunset', 'ocean', 'purple', 'aurora', 'gold', 'cherry', 'midnight', 'plasma', 'emerald', 'rose', 'ember', 'cyan', 'sapphire', 'coral', 'lime', 'lavender', 'toxic', 'amethyst'];
 const QUOTE_REDIRECT_CHANNEL_ID = '1526869451834654821';
 
 /** Everything renderQuoteCard needs for one message, minus the shared theme. */
@@ -115,6 +115,29 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
     };
 
     const buildSelectRow = (disabled = false) => {
+      const emojiMap: Record<PresetName, string> = {
+        classic: '🖤',
+        white: '🤍',
+        sunset: '🌅',
+        ocean: '🌊',
+        purple: '💜',
+        aurora: '🌲',
+        gold: '🌟',
+        cherry: '🍒',
+        midnight: '🌑',
+        plasma: '🔮',
+        emerald: '💚',
+        rose: '🌹',
+        ember: '🔥',
+        cyan: '💠',
+        sapphire: '💎',
+        coral: '🪸',
+        lime: '🍋',
+        lavender: '🪻',
+        toxic: '☢️',
+        amethyst: '🔶',
+      };
+
       const select = new StringSelectMenuBuilder()
         .setCustomId('quote-theme-select')
         .setPlaceholder('Choose a theme…')
@@ -123,6 +146,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
           THEME_NAMES.map((name) => ({
             label: GRADIENT_PRESETS[name].label,
             value: name,
+            emoji: emojiMap[name],
             default: name === preset,
           }))
         );

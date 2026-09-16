@@ -87,7 +87,17 @@ export type PresetName =
   | 'gold'
   | 'cherry'
   | 'midnight'
-  | 'plasma';
+  | 'plasma'
+  | 'emerald'
+  | 'rose'
+  | 'ember'
+  | 'cyan'
+  | 'sapphire'
+  | 'coral'
+  | 'lime'
+  | 'lavender'
+  | 'toxic'
+  | 'amethyst';
 
 export interface GradientPreset {
   type: 'solid' | 'linear';
@@ -96,14 +106,24 @@ export interface GradientPreset {
 }
 
 export const GRADIENT_PRESETS: Record<PresetName, GradientPreset> = {
-  classic: { type: 'solid',  colors: [[0, 0, 0]], label: 'Classic' },
-  white:   { type: 'solid',  colors: [[255, 255, 255]], label: 'White' },
-  sunset:  { type: 'linear', colors: [[255,244,214],[255,183,120],[237,85,45],[168,26,20],[59,9,9]], label: 'Sunset' },
-  ocean:   { type: 'linear', colors: [[214,244,255],[120,200,255],[45,120,237],[20,60,168],[9,20,59]], label: 'Ocean' },
-  purple:  { type: 'linear', colors: [[244,214,255],[200,120,255],[130,45,237],[70,20,168],[25,9,59]], label: 'Purple' },
-  aurora:  { type: 'linear', colors: [[220,255,232],[110,245,220],[40,205,220],[75,110,220],[35,20,90]], label: 'Aurora' },
-  gold:    { type: 'linear', colors: [[255,248,220],[255,220,110],[235,175,45],[160,105,25],[70,40,10]], label: 'Gold' },
-  cherry:  { type: 'linear', colors: [[255,220,225],[245,100,120],[210,35,65],[125,15,40],[55,5,20]], label: 'Cherry' },
-  midnight:{ type: 'linear', colors: [[210,220,235],[110,130,160],[60,70,130],[25,35,85],[5,8,25]], label: 'Midnight' },
-  plasma:  { type: 'linear', colors: [[255,210,240],[245,80,190],[190,35,210],[90,45,190],[25,10,80]], label: 'Plasma' },
+  classic:  { type: 'solid',  colors: [[0, 0, 0]], label: 'Classic' },
+  white:    { type: 'solid',  colors: [[255, 255, 255]], label: 'White' },
+  sunset:   { type: 'linear', colors: [[255,244,214],[255,183,120],[237,85,45],[168,26,20],[59,9,9]], label: 'Sunset' },
+  ocean:    { type: 'linear', colors: [[214,244,255],[120,200,255],[45,120,237],[20,60,168],[9,20,59]], label: 'Ocean' },
+  purple:   { type: 'linear', colors: [[244,214,255],[200,120,255],[130,45,237],[70,20,168],[25,9,59]], label: 'Purple' },
+  aurora:   { type: 'linear', colors: [[220,255,232],[110,245,220],[40,205,220],[75,110,220],[35,20,90]], label: 'Aurora' },
+  gold:     { type: 'linear', colors: [[255,248,220],[255,220,110],[235,175,45],[160,105,25],[70,40,10]], label: 'Gold' },
+  cherry:   { type: 'linear', colors: [[255,220,225],[245,100,120],[210,35,65],[125,15,40],[55,5,20]], label: 'Cherry' },
+  midnight: { type: 'linear', colors: [[210,220,235],[110,130,160],[60,70,130],[25,35,85],[5,8,25]], label: 'Midnight' },
+  plasma:   { type: 'linear', colors: [[255,210,240],[245,80,190],[190,35,210],[90,45,190],[25,10,80]], label: 'Plasma' },
+  emerald:  { type: 'linear', colors: [[220,252,231],[110,231,183],[16,185,129],[5,120,87],[2,44,34]], label: 'Emerald' },
+  rose:     { type: 'linear', colors: [[255,228,235],[253,164,190],[244,63,125],[190,24,93],[76,5,35]], label: 'Rose' },
+  ember:    { type: 'linear', colors: [[255,237,213],[251,146,60],[234,88,12],[154,52,18],[67,20,7]], label: 'Ember' },
+  cyan:     { type: 'linear', colors: [[207,250,254],[103,232,249],[6,182,212],[14,116,144],[8,47,73]], label: 'Cyan' },
+  sapphire:{ type: 'linear', colors: [[220,240,255],[110,180,255],[30,110,230],[20,55,160],[8,20,65]], label: 'Sapphire' },
+  coral:    { type: 'linear', colors: [[255,225,215],[255,160,135],[251,105,90],[205,55,60],[90,20,30]], label: 'Coral' },
+  lime:     { type: 'linear', colors: [[245,255,205],[190,245,90],[120,220,35],[45,145,35],[12,65,25]], label: 'Lime' },
+  lavender: { type: 'linear', colors: [[245,238,255],[215,190,250],[175,125,235],[115,70,175],[50,25,85]], label: 'Lavender' },
+  toxic:    { type: 'linear', colors: [[255,255,180],[220,245,50],[145,220,20],[65,145,25],[15,55,15]], label: 'Toxic' },
+  amethyst: { type: 'linear', colors: [[245,230,255],[205,160,255],[145,75,240],[85,30,175],[35,10,75]], label: 'Amethyst' },
 };
