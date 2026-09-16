@@ -1,9 +1,12 @@
-// Card suits and emojis
+import { Client, Guild } from 'discord.js';
+import { getEmoji, getCardBackEmoji } from '../utils/emoji-resolver.js';
+
+// Card suits and emoji names
 const SUITS = [
-  { name: 'Hearts', emoji: '♥️' },
-  { name: 'Diamonds', emoji: '♦️' },
-  { name: 'Clubs', emoji: '♣️' },
-  { name: 'Spades', emoji: '♠️' },
+  { name: 'Hearts', emojiName: 'hearts' },
+  { name: 'Diamonds', emojiName: 'diamonds' },
+  { name: 'Clubs', emojiName: 'clubs' },
+  { name: 'Spades', emojiName: 'spades' },
 ];
 
 // Card ranks and values
@@ -27,7 +30,7 @@ export interface Card {
   rank: string;
   suit: string;
   value: number;
-  emoji: string;
+  emojiName: string;
 }
 
 /**
@@ -42,7 +45,7 @@ export function createDeck(): Card[] {
         rank: rank.name,
         suit: suit.name,
         value: rank.value,
-        emoji: suit.emoji,
+        emojiName: `${suit.emojiName}_${rank.name.toLowerCase()}`,
       });
     }
   }
@@ -101,16 +104,19 @@ export function isBust(cards: Card[]): boolean {
 /**
  * Format a card for display
  */
-export function formatCard(card: Card): string {
-  return `${card.emoji} ${card.rank}`;
+export function formatCard(card: Card, client: Client | Guild | null = null): string {
+  const emoji = getEmoji(client, card.emojiName);
+  return emoji ? `${emoji} ${card.rank}` : `${card.rank}`;
 }
 
 /**
  * Format a hand for display
  */
-export function formatHand(cards: Card[], hideSecond: boolean = false): string {
+export function formatHand(cards: Card[], hideSecond: boolean = false, client: Client | Guild | null = null): string {
   if (hideSecond && cards.length > 1) {
-    return `${formatCard(cards[0])} ❓`;
+    const firstCard = formatCard(cards[0], client);
+    const cardBack = getCardBackEmoji(client);
+    return `${firstCard} ${cardBack || '❓'}`;
   }
-  return cards.map(formatCard).join(' ');
+  return cards.map(card => formatCard(card, client)).join(' ');
 }

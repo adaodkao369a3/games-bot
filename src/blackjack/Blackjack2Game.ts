@@ -1,7 +1,8 @@
-import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Guild, Client } from 'discord.js';
 import { awardCoins, removeCoins } from '../services/coins.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { Card, createDeck, calculateHandTotal, isBlackjack, isBust, formatCard, formatHand } from './CardDeck.js';
+import { getEmoji } from '../utils/emoji-resolver.js';
 
 type Blackjack2State = 'idle' | 'challenging' | 'playing' | 'dealer_turn' | 'complete' | 'declined' | 'timeout';
 
@@ -31,6 +32,7 @@ interface Blackjack2GameData {
   messageId: string | null;
   message: Message | null;
   gameInstanceId: string;
+  client: Client | null;
 }
 
 // Game configuration
@@ -49,7 +51,7 @@ export class Blackjack2Game {
   private gameTimeout: NodeJS.Timeout | null = null;
   private acceptTimeout: NodeJS.Timeout | null = null;
 
-  constructor(player1Id: string, player2Id: string, player1Name: string, player2Name: string, betAmount: number, channelId: string, guildId: string | undefined) {
+  constructor(player1Id: string, player2Id: string, player1Name: string, player2Name: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
     this.data = {
       player1Id,
       player2Id,
@@ -82,6 +84,7 @@ export class Blackjack2Game {
       messageId: null,
       message: null,
       gameInstanceId: `bj2_${player1Id}_${player2Id}_${Date.now()}`,
+      client,
     };
   }
 
@@ -99,10 +102,11 @@ export class Blackjack2Game {
     }
 
     if (p1Balance.balance < this.data.betAmount || p2Balance.balance < this.data.betAmount) {
+      const coinEmoji = getEmoji(this.data.client, 'bombocoin');
       await message.reply(
-        `Both players need at least ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840> to play.\n` +
-        `${this.data.player1Name}: ${p1Balance.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n` +
-        `${this.data.player2Name}: ${p2Balance.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
+        `Both players need at least ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji} to play.\n` +
+        `${this.data.player1Name}: ${p1Balance.balance.toLocaleString('en-US')} ${coinEmoji}\n` +
+        `${this.data.player2Name}: ${p2Balance.balance.toLocaleString('en-US')} ${coinEmoji}`
       );
       return;
     }
@@ -111,7 +115,7 @@ export class Blackjack2Game {
     this.data.messageId = message.id;
     this.data.message = message;
 
-    const initialEmbed = this.createChallengeEmbed();
+    const initialEmbed = this.createChallengeEmbed(this.data.client);
     const row = this.createChallengeButtons();
 
     const sentMessage = await message.reply({
@@ -248,7 +252,7 @@ export class Blackjack2Game {
       this.data.currentPlayer = 'player2';
     }
 
-    const embed = this.createGameEmbed();
+    const embed = this.createGameEmbed(this.data.client);
     const row = this.createGameButtons();
     await interaction.editReply({
       embeds: [embed],
@@ -350,7 +354,7 @@ export class Blackjack2Game {
     }
 
     // Continue playing
-    const embed = this.createGameEmbed();
+    const embed = this.createGameEmbed(this.data.client);
     const row = this.createGameButtons();
     await interaction.update({
       embeds: [embed],
@@ -486,7 +490,7 @@ export class Blackjack2Game {
       return;
     }
 
-    const embed = this.createGameEmbed();
+    const embed = this.createGameEmbed(this.data.client);
     const row = this.createGameButtons();
     await interaction.update({
       embeds: [embed],
@@ -571,7 +575,7 @@ export class Blackjack2Game {
       }
     }
 
-    const embed = this.createResultEmbed();
+    const embed = this.createResultEmbed(this.data.client);
     await interaction.editReply({
       embeds: [embed],
       components: [],
@@ -662,28 +666,30 @@ export class Blackjack2Game {
 
   // Embed creation methods
 
-  private createChallengeEmbed(): EmbedBuilder {
+  private createChallengeEmbed(client: Client | null = null): EmbedBuilder {
+    const coinEmoji = getEmoji(client, 'bombocoin');
     return new EmbedBuilder()
       .setTitle('🃏 2-PLAYER BLACKJACK')
       .setDescription(`**${this.data.player1Name}**\nvs\n**${this.data.player2Name}**\n\n` +
-        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840> each\n\n` +
+        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji} each\n\n` +
         `*${this.data.player2Name} has been challenged to Blackjack.*`)
       .setColor(0x3498db);
   }
 
-  private createGameEmbed(): EmbedBuilder {
+  private createGameEmbed(client: Client | null = null): EmbedBuilder {
     const dealerShowing = this.data.dealerHand[0].value;
     const p1Total = calculateHandTotal(this.data.player1Hand.hand);
     const p2Total = calculateHandTotal(this.data.player2Hand.hand);
+    const coinEmoji = getEmoji(client, 'bombocoin');
 
-    let description = `**DEALER**\n${formatHand(this.data.dealerHand, true)}\n**SHOWING: ${dealerShowing}**\n\n`;
+    let description = `**DEALER**\n${formatHand(this.data.dealerHand, true, client)}\n**SHOWING: ${dealerShowing}**\n\n`;
     description += `━━━━━━━━━━━━━━\n\n`;
-    description += `**${this.data.player1Name}**\n${formatHand(this.data.player1Hand.hand)}\n**TOTAL: ${p1Total}**\n\n`;
-    description += `**BET**\n${this.data.player1Hand.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**${this.data.player1Name}**\n${formatHand(this.data.player1Hand.hand, false, client)}\n**TOTAL: ${p1Total}**\n\n`;
+    description += `**BET**\n${this.data.player1Hand.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
     description += `**STATUS**\n${this.data.currentPlayer === 'player1' ? 'Your turn' : this.data.player1Hand.finished ? 'Finished' : 'Waiting for ' + this.data.player2Name}\n\n`;
     description += `━━━━━━━━━━━━━━\n\n`;
-    description += `**${this.data.player2Name}**\n${formatHand(this.data.player2Hand.hand)}\n**TOTAL: ${p2Total}**\n\n`;
-    description += `**BET**\n${this.data.player2Hand.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**${this.data.player2Name}**\n${formatHand(this.data.player2Hand.hand, false, client)}\n**TOTAL: ${p2Total}**\n\n`;
+    description += `**BET**\n${this.data.player2Hand.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
     description += `**STATUS**\n${this.data.currentPlayer === 'player2' ? 'Your turn' : this.data.player2Hand.finished ? 'Finished' : 'Waiting for ' + this.data.player1Name}`;
 
     return new EmbedBuilder()
@@ -692,12 +698,13 @@ export class Blackjack2Game {
       .setColor(0x3498db);
   }
 
-  private createResultEmbed(): EmbedBuilder {
+  private createResultEmbed(client: Client | null = null): EmbedBuilder {
     const dealerTotal = calculateHandTotal(this.data.dealerHand);
     const p1Total = calculateHandTotal(this.data.player1Hand.hand);
     const p2Total = calculateHandTotal(this.data.player2Hand.hand);
+    const coinEmoji = getEmoji(client, 'bombocoin');
 
-    let description = `**DEALER**\n${formatHand(this.data.dealerHand)}\n**${dealerTotal}**\n\n`;
+    let description = `**DEALER**\n${formatHand(this.data.dealerHand, false, client)}\n**${dealerTotal}**\n\n`;
     description += `━━━━━━━━━━━━━━\n\n`;
 
     // Player 1 result
@@ -705,10 +712,10 @@ export class Blackjack2Game {
     const p1Emoji = p1Result === 'win' ? '🎉' : p1Result === 'lose' ? '💀' : p1Result === 'push' ? '🤝' : '💥';
     const p1Payout = p1Result === 'win' ? (isBlackjack(this.data.player1Hand.hand) ? Math.floor(this.data.player1Hand.betAmount * GAME_CONFIG.blackjackMultiplier) : this.data.player1Hand.betAmount * 2) : p1Result === 'push' ? this.data.player1Hand.betAmount : 0;
     
-    description += `**${this.data.player1Name}**\n${formatHand(this.data.player1Hand.hand)}\n**${this.data.player1Hand.result === 'bust' ? 'BUST' : p1Total}**\n`;
+    description += `**${this.data.player1Name}**\n${formatHand(this.data.player1Hand.hand, false, client)}\n**${this.data.player1Hand.result === 'bust' ? 'BUST' : p1Total}**\n`;
     description += `${p1Emoji} **${p1Result?.toUpperCase()}**\n`;
     if (p1Payout > 0) {
-      description += `+${p1Payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n`;
+      description += `+${p1Payout.toLocaleString('en-US')} ${coinEmoji}\n`;
     }
     description += `\n`;
 
@@ -719,10 +726,10 @@ export class Blackjack2Game {
     const p2Emoji = p2Result === 'win' ? '🎉' : p2Result === 'lose' ? '💀' : p2Result === 'push' ? '🤝' : '💥';
     const p2Payout = p2Result === 'win' ? (isBlackjack(this.data.player2Hand.hand) ? Math.floor(this.data.player2Hand.betAmount * GAME_CONFIG.blackjackMultiplier) : this.data.player2Hand.betAmount * 2) : p2Result === 'push' ? this.data.player2Hand.betAmount : 0;
     
-    description += `**${this.data.player2Name}**\n${formatHand(this.data.player2Hand.hand)}\n**${this.data.player2Hand.result === 'bust' ? 'BUST' : p2Total}**\n`;
+    description += `**${this.data.player2Name}**\n${formatHand(this.data.player2Hand.hand, false, client)}\n**${this.data.player2Hand.result === 'bust' ? 'BUST' : p2Total}**\n`;
     description += `${p2Emoji} **${p2Result?.toUpperCase()}**\n`;
     if (p2Payout > 0) {
-      description += `+${p2Payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n`;
+      description += `+${p2Payout.toLocaleString('en-US')} ${coinEmoji}\n`;
     }
 
     return new EmbedBuilder()

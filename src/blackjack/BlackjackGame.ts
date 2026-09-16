@@ -1,7 +1,8 @@
-import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Client } from 'discord.js';
 import { awardCoins, removeCoins } from '../services/coins.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { Card, createDeck, calculateHandTotal, isBlackjack, isBust, formatCard, formatHand } from './CardDeck.js';
+import { getEmoji } from '../utils/emoji-resolver.js';
 
 type BlackjackState = 'idle' | 'playing' | 'dealer_turn' | 'complete' | 'timeout';
 
@@ -18,6 +19,7 @@ interface BlackjackGameData {
   message: Message | null;
   gameInstanceId: string;
   doubled: boolean;
+  client: Client | null;
 }
 
 // Game configuration
@@ -33,7 +35,7 @@ export class BlackjackGame {
   private data: BlackjackGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
 
-  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined) {
+  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
     this.data = {
       userId,
       username,
@@ -47,6 +49,7 @@ export class BlackjackGame {
       message: null,
       gameInstanceId: `bj_${userId}_${Date.now()}`,
       doubled: false,
+      client,
     };
   }
 
@@ -62,9 +65,10 @@ export class BlackjackGame {
     }
 
     if (coinInfo.balance < this.data.betAmount) {
+      const coinEmoji = getEmoji(this.data.client, 'bombocoin');
       await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
+        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}.\n` +
+        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} ${coinEmoji}`
       );
       return;
     }
@@ -170,7 +174,7 @@ export class BlackjackGame {
     if (isBust(this.data.playerHand)) {
       this.state = 'complete';
       this.clearTimeout();
-      const embed = this.createBustEmbed();
+      const embed = this.createBustEmbed(this.data.client);
       await interaction.update({
         embeds: [embed],
         components: [],
@@ -185,7 +189,7 @@ export class BlackjackGame {
     }
 
     // Continue playing
-    const embed = this.createGameEmbed();
+    const embed = this.createGameEmbed(this.data.client);
     const row = this.createGameButtons();
     await interaction.update({
       embeds: [embed],
@@ -269,7 +273,7 @@ export class BlackjackGame {
     if (isBust(this.data.playerHand)) {
       this.state = 'complete';
       this.clearTimeout();
-      const embed = this.createBustEmbed();
+      const embed = this.createBustEmbed(this.data.client);
       await interaction.update({
         embeds: [embed],
         components: [],
@@ -342,7 +346,7 @@ export class BlackjackGame {
       );
     }
 
-    const embed = this.createResultEmbed(result, payout, playerTotal, dealerTotal);
+    const embed = this.createResultEmbed(result, payout, playerTotal, dealerTotal, this.data.client);
     await interaction.update({
       embeds: [embed],
       components: [],
@@ -378,7 +382,7 @@ export class BlackjackGame {
       }
     );
 
-    const embed = this.createResultEmbed(result, payout, calculateHandTotal(this.data.playerHand), calculateHandTotal(this.data.dealerHand));
+    const embed = this.createResultEmbed(result, payout, calculateHandTotal(this.data.playerHand), calculateHandTotal(this.data.dealerHand), this.data.client);
     await this.data.message?.edit({
       embeds: [embed],
       components: [],
@@ -436,51 +440,54 @@ export class BlackjackGame {
 
   // Embed creation methods
 
-  private createGameEmbed(): EmbedBuilder {
+  private createGameEmbed(client: Client | null = null): EmbedBuilder {
     const playerTotal = calculateHandTotal(this.data.playerHand);
     const dealerShowing = this.data.dealerHand[0].value;
+    const coinEmoji = getEmoji(client, 'bombocoin');
 
     return new EmbedBuilder()
       .setTitle('🃏 BLACKJACK')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**YOUR HAND**\n${formatHand(this.data.playerHand)}\n**TOTAL: ${playerTotal}**\n\n` +
-        `**DEALER**\n${formatHand(this.data.dealerHand, true)}\n**SHOWING: ${dealerShowing}**\n\n` +
-        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**YOUR HAND**\n${formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
+        `**DEALER**\n${formatHand(this.data.dealerHand, true, client)}\n**SHOWING: ${dealerShowing}**\n\n` +
+        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0x3498db);
   }
 
-  private createBustEmbed(): EmbedBuilder {
+  private createBustEmbed(client: Client | null = null): EmbedBuilder {
     const playerTotal = calculateHandTotal(this.data.playerHand);
     const dealerTotal = calculateHandTotal(this.data.dealerHand);
+    const coinEmoji = getEmoji(client, 'bombocoin');
 
     return new EmbedBuilder()
       .setTitle('💥 BUST')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**YOUR HAND**\n${formatHand(this.data.playerHand)}\n**TOTAL: ${playerTotal}**\n\n` +
-        `**DEALER**\n${formatHand(this.data.dealerHand)}\n**TOTAL: ${dealerTotal}**\n\n` +
-        `**BET LOST**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**YOUR HAND**\n${formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
+        `**DEALER**\n${formatHand(this.data.dealerHand, false, client)}\n**TOTAL: ${dealerTotal}**\n\n` +
+        `**BET LOST**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);
   }
 
-  private createResultEmbed(result: 'win' | 'lose' | 'push', payout: number, playerTotal: number, dealerTotal: number): EmbedBuilder {
+  private createResultEmbed(result: 'win' | 'lose' | 'push', payout: number, playerTotal: number, dealerTotal: number, client: Client | null = null): EmbedBuilder {
     const title = result === 'win' ? '🎉 YOU WIN!' : result === 'lose' ? '💀 YOU LOSE' : '🤝 PUSH';
     const color = result === 'win' ? 0x00ff00 : result === 'lose' ? 0xe74c3c : 0xFFD700;
+    const coinEmoji = getEmoji(client, 'bombocoin');
 
     let description = `━━━━━━━━━━━━━━\n\n` +
-      `**YOUR HAND**\n${formatHand(this.data.playerHand)}\n**TOTAL: ${playerTotal}**\n\n` +
-      `**DEALER**\n${formatHand(this.data.dealerHand)}\n**TOTAL: ${dealerTotal}**\n\n` +
-      `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+      `**YOUR HAND**\n${formatHand(this.data.playerHand, false, client)}\n**TOTAL: ${playerTotal}**\n\n` +
+      `**DEALER**\n${formatHand(this.data.dealerHand, false, client)}\n**TOTAL: ${dealerTotal}**\n\n` +
+      `**BET**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
 
     if (result === 'win') {
       const netProfit = payout - this.data.betAmount;
-      description += `**PAYOUT**\n+${payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `**NET PROFIT**\n+${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+      description += `**PAYOUT**\n+${payout.toLocaleString('en-US')} ${coinEmoji}\n\n` +
+        `**NET PROFIT**\n+${netProfit.toLocaleString('en-US')} ${coinEmoji}\n\n`;
     } else if (result === 'lose') {
-      description += `**AMOUNT LOST**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+      description += `**AMOUNT LOST**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
     } else {
-      description += `**RETURNED**\n${payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+      description += `**RETURNED**\n${payout.toLocaleString('en-US')} ${coinEmoji}\n\n`;
     }
 
     description += `━━━━━━━━━━━━━━`;

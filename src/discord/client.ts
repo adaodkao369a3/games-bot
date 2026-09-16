@@ -180,7 +180,7 @@ export class DiscordClient {
       }
 
       if (command === 'hlow') {
-        await handleHigherLowerCommand(message, args);
+        await handleHigherLowerCommand(message, args, this.client);
         return;
       }
 
@@ -200,12 +200,12 @@ export class DiscordClient {
       }
 
       if (command === 'bj') {
-        await handleBjCommand(message, args);
+        await handleBjCommand(message, args, this.client);
         return;
       }
 
       if (command === 'bj2') {
-        await handleBj2Command(message, args);
+        await handleBj2Command(message, args, this.client);
         return;
       }
 

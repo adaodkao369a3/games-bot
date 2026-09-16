@@ -1,4 +1,4 @@
-import { Message, MessageComponentInteraction } from 'discord.js';
+import { Message, MessageComponentInteraction, Client } from 'discord.js';
 import { HigherLowerGame } from '../higherlower/HigherLowerGame.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
@@ -10,7 +10,7 @@ const activeGames = new Map<string, HigherLowerGame>();
 /**
  * Handle the higherlower command
  */
-export async function handleHigherLowerCommand(message: Message, args: string[]): Promise<void> {
+export async function handleHigherLowerCommand(message: Message, args: string[], client: Client): Promise<void> {
   const userId = message.author.id;
 
   // Parse bet amount
@@ -62,7 +62,7 @@ export async function handleHigherLowerCommand(message: Message, args: string[])
     const username = message.author.username;
 
     // Create new game instance
-    const game = new HigherLowerGame(userId, username, wager, channelId, guildId);
+    const game = new HigherLowerGame(userId, username, wager, channelId, guildId, client);
     
     // Store in active games
     activeGames.set(userId, game);

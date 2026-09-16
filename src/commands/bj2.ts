@@ -1,4 +1,4 @@
-import { Message, MessageComponentInteraction } from 'discord.js';
+import { Message, MessageComponentInteraction, Client } from 'discord.js';
 import { Blackjack2Game } from '../blackjack/Blackjack2Game.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
@@ -10,7 +10,7 @@ const activeGames = new Map<string, Blackjack2Game>();
 /**
  * Handle the bj2 command
  */
-export async function handleBj2Command(message: Message, args: string[]): Promise<void> {
+export async function handleBj2Command(message: Message, args: string[], client: Client): Promise<void> {
   const userId = message.author.id;
 
   // Parse mentioned user
@@ -88,7 +88,7 @@ export async function handleBj2Command(message: Message, args: string[]): Promis
     const player2Name = mentionedUser.username;
 
     // Create new game instance
-    const game = new Blackjack2Game(userId, opponentId, player1Name, player2Name, betAmount, channelId, guildId);
+    const game = new Blackjack2Game(userId, opponentId, player1Name, player2Name, betAmount, channelId, guildId, client);
     
     // Store in active games for both players
     activeGames.set(userId, game);

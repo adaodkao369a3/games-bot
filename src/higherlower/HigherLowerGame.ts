@@ -1,6 +1,7 @@
-import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Guild, Client } from 'discord.js';
 import { awardCoins, removeCoins } from '../services/coins.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
+import { getEmoji } from '../utils/emoji-resolver.js';
 
 type HigherLowerState = 'idle' | 'playing' | 'complete' | 'cashout' | 'timeout';
 
@@ -8,7 +9,7 @@ interface Card {
   rank: string;
   suit: string;
   value: number;
-  emoji: string;
+  emojiName: string;
 }
 
 interface HigherLowerGameData {
@@ -25,6 +26,7 @@ interface HigherLowerGameData {
   messageId: string | null;
   message: Message | null;
   gameInstanceId: string;
+  client: Client | null;
 }
 
 // Game configuration
@@ -48,12 +50,12 @@ const GAME_CONFIG = {
   timeoutMs: 5 * 60 * 1000, // 5 minutes
 };
 
-// Card suits and emojis
+// Card suits and emoji names
 const SUITS = [
-  { name: 'Hearts', emoji: '♥️' },
-  { name: 'Diamonds', emoji: '♦️' },
-  { name: 'Clubs', emoji: '♣️' },
-  { name: 'Spades', emoji: '♠️' },
+  { name: 'Hearts', emojiName: 'hearts' },
+  { name: 'Diamonds', emojiName: 'diamonds' },
+  { name: 'Clubs', emojiName: 'clubs' },
+  { name: 'Spades', emojiName: 'spades' },
 ];
 
 // Card ranks and values
@@ -85,7 +87,7 @@ function createDeck(): Card[] {
         rank: rank.name,
         suit: suit.name,
         value: rank.value,
-        emoji: suit.emoji,
+        emojiName: `${suit.emojiName}_${rank.name.toLowerCase()}`,
       });
     }
   }
@@ -123,7 +125,7 @@ export class HigherLowerGame {
   private data: HigherLowerGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
 
-  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined) {
+  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
     this.data = {
       userId,
       username,
@@ -138,6 +140,7 @@ export class HigherLowerGame {
       messageId: null,
       message: null,
       gameInstanceId: `higherlower_${userId}_${Date.now()}`,
+      client,
     };
   }
 
@@ -153,9 +156,10 @@ export class HigherLowerGame {
     }
 
     if (coinInfo.balance < this.data.betAmount) {
+      const coinEmoji = getEmoji(this.data.client, 'bombocoin');
       await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
+        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}.\n` +
+        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} ${coinEmoji}`
       );
       return;
     }
@@ -183,7 +187,7 @@ export class HigherLowerGame {
     // Draw first card
     this.data.currentCard = this.data.deck.pop()!;
 
-    const initialEmbed = this.createGameEmbed();
+    const initialEmbed = this.createGameEmbed('', this.data.client);
     const row = this.createGameButtons();
 
     const sentMessage = await message.reply({
@@ -263,7 +267,7 @@ export class HigherLowerGame {
 
     // Check for push (same rank)
     if (result === 'push') {
-      const embed = this.createGameEmbed('PUSH! Same rank - continue with new card');
+      const embed = this.createGameEmbed('PUSH! Same rank - continue with new card', this.data.client);
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -281,7 +285,7 @@ export class HigherLowerGame {
       this.data.streak++;
       this.data.currentPayout = calculatePayout(this.data.betAmount, this.data.streak);
 
-      const embed = this.createGameEmbed('✅ CORRECT!');
+      const embed = this.createGameEmbed('✅ CORRECT!', this.data.client);
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -337,7 +341,7 @@ export class HigherLowerGame {
       return;
     }
 
-    const embed = this.createCashoutEmbed();
+    const embed = this.createCashoutEmbed(this.data.client);
 
     await interaction.update({
       embeds: [embed],
@@ -353,7 +357,7 @@ export class HigherLowerGame {
     this.clearTimeout();
 
     if (!won) {
-      const embed = this.createLossEmbed();
+      const embed = this.createLossEmbed(this.data.client);
 
       await interaction.update({
         embeds: [embed],
@@ -415,20 +419,21 @@ export class HigherLowerGame {
 
   // Embed creation methods
 
-  private createGameEmbed(statusMessage: string = ''): EmbedBuilder {
-    const cardDisplay = this.formatCard(this.data.currentCard!);
+  private createGameEmbed(statusMessage: string = '', client: Client | null = null): EmbedBuilder {
+    const cardDisplay = this.formatCard(this.data.currentCard!, client);
     const multiplier = getMultiplier(this.data.streak);
+    const coinEmoji = getEmoji(client, 'bombocoin');
     
     let description = `━━━━━━━━━━━━━━\n\n`;
     description += `Predict the next card.\n\n`;
     description += `**CURRENT CARD**\n${cardDisplay}\n\n`;
-    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
     description += `**STREAK**\n${this.data.streak}\n\n`;
     description += `**MULTIPLIER**\nx${multiplier.toFixed(1)}\n\n`;
-    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} ${coinEmoji}\n\n`;
 
     if (this.data.previousCard) {
-      description += `**PREVIOUS CARD**\n${this.formatCard(this.data.previousCard)}\n\n`;
+      description += `**PREVIOUS CARD**\n${this.formatCard(this.data.previousCard, client)}\n\n`;
     }
 
     if (statusMessage) {
@@ -443,29 +448,31 @@ export class HigherLowerGame {
       .setColor(0x3498db);
   }
 
-  private createCashoutEmbed(): EmbedBuilder {
+  private createCashoutEmbed(client: Client | null = null): EmbedBuilder {
     const netProfit = this.data.currentPayout - this.data.betAmount;
+    const coinEmoji = getEmoji(client, 'bombocoin');
     
     return new EmbedBuilder()
       .setTitle('💰 CASHED OUT!')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Final Streak:** ${this.data.streak}\n\n` +
-        `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} ${coinEmoji}\n\n` +
+        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n` +
+        `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} ${coinEmoji}\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xFFD700);
   }
 
-  private createLossEmbed(): EmbedBuilder {
-    const cardDisplay = this.formatCard(this.data.currentCard!);
+  private createLossEmbed(client: Client | null = null): EmbedBuilder {
+    const cardDisplay = this.formatCard(this.data.currentCard!, client);
+    const coinEmoji = getEmoji(client, 'bombocoin');
     
     return new EmbedBuilder()
       .setTitle('💥 YOU LOST!')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Card that caused the loss:**\n${cardDisplay}\n\n` +
         `**Streak:** ${this.data.streak}\n\n` +
-        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
+        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n` +
         `━━━━━━━━━━━━━━`)
       .setColor(0xe74c3c);
   }
@@ -483,8 +490,9 @@ export class HigherLowerGame {
   /**
    * Format a card for display
    */
-  private formatCard(card: Card): string {
-    return `${card.emoji} **${card.rank}** of ${card.suit}`;
+  private formatCard(card: Card, client: Client | null = null): string {
+    const emoji = getEmoji(client, card.emojiName);
+    return emoji ? `${emoji} **${card.rank}** of ${card.suit}` : `**${card.rank}** of ${card.suit}`;
   }
 
   // Button creation methods
