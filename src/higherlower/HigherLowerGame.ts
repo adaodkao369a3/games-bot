@@ -267,7 +267,7 @@ export class HigherLowerGame {
 
     // Check for push (same rank)
     if (result === 'push') {
-      const embed = this.createGameEmbed('PUSH! Same rank - continue with new card', this.data.client);
+      const embed = this.createGameEmbed('Push! Same rank - continue with new card', this.data.client);
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -285,7 +285,7 @@ export class HigherLowerGame {
       this.data.streak++;
       this.data.currentPayout = calculatePayout(this.data.betAmount, this.data.streak);
 
-      const embed = this.createGameEmbed('✅ CORRECT!', this.data.client);
+      const embed = this.createGameEmbed('Correct!', this.data.client);
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -424,23 +424,17 @@ export class HigherLowerGame {
     const multiplier = getMultiplier(this.data.streak);
     const coinEmoji = getEmoji(client, 'bombocoin');
     
-    let description = `━━━━━━━━━━━━━━\n\n`;
-    description += `Predict the next card.\n\n`;
-    description += `**CURRENT CARD**\n${cardDisplay}\n\n`;
-    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n`;
-    description += `**STREAK**\n${this.data.streak}\n\n`;
-    description += `**MULTIPLIER**\nx${multiplier.toFixed(1)}\n\n`;
-    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} ${coinEmoji}\n\n`;
+    let description = `${cardDisplay}\n`;
+    description += `**BET ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}** • **STREAK ${this.data.streak}** • **x${multiplier.toFixed(1)}**\n`;
+    description += `Potential win: ${this.data.currentPayout.toLocaleString('en-US')} ${coinEmoji}`;
 
     if (this.data.previousCard) {
-      description += `**PREVIOUS CARD**\n${this.formatCard(this.data.previousCard, client)}\n\n`;
+      description += `\n\nPrevious: ${this.formatCard(this.data.previousCard, client)}`;
     }
 
     if (statusMessage) {
-      description += `**${statusMessage}**\n\n`;
+      description += `\n\n${statusMessage}`;
     }
-
-    description += `━━━━━━━━━━━━━━`;
 
     return new EmbedBuilder()
       .setTitle('🃏 HIGHER OR LOWER')
@@ -454,12 +448,10 @@ export class HigherLowerGame {
     
     return new EmbedBuilder()
       .setTitle('💰 CASHED OUT!')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Final Streak:** ${this.data.streak}\n\n` +
-        `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} ${coinEmoji}\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n` +
-        `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} ${coinEmoji}\n\n` +
-        `━━━━━━━━━━━━━━`)
+      .setDescription(`Final Streak: ${this.data.streak}\n` +
+        `Amount Won: ${this.data.currentPayout.toLocaleString('en-US')} ${coinEmoji}\n` +
+        `Original Bet: ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n` +
+        `Net Profit: ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} ${coinEmoji}`)
       .setColor(0xFFD700);
   }
 
@@ -469,21 +461,16 @@ export class HigherLowerGame {
     
     return new EmbedBuilder()
       .setTitle('💥 YOU LOST!')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Card that caused the loss:**\n${cardDisplay}\n\n` +
-        `**Streak:** ${this.data.streak}\n\n` +
-        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}\n\n` +
-        `━━━━━━━━━━━━━━`)
+      .setDescription(`${cardDisplay}\n` +
+        `Streak: ${this.data.streak}\n` +
+        `Amount Lost: ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}`)
       .setColor(0xe74c3c);
   }
 
   private createTimeoutEmbed(): EmbedBuilder {
     return new EmbedBuilder()
       .setTitle('🃏 HIGHER OR LOWER')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Game timed out.**\n\n` +
-        `Your bet has been refunded.\n\n` +
-        `━━━━━━━━━━━━━━`)
+      .setDescription(`Game timed out. Your bet has been refunded.`)
       .setColor(0xe74c3c);
   }
 
@@ -492,7 +479,7 @@ export class HigherLowerGame {
    */
   private formatCard(card: Card, client: Client | null = null): string {
     const emoji = getEmoji(client, card.emojiName);
-    return emoji ? `${emoji} **${card.rank}** of ${card.suit}` : `**${card.rank}** of ${card.suit}`;
+    return emoji ? `${emoji}\n**${card.rank}** of ${card.suit}` : `**${card.rank}** of ${card.suit}`;
   }
 
   // Button creation methods
@@ -503,14 +490,14 @@ export class HigherLowerGame {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('higherlower_higher')
-        .setLabel('⬆️ HIGHER')
+        .setLabel('HIGHER')
         .setStyle(ButtonStyle.Primary)
     );
     
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('higherlower_lower')
-        .setLabel('⬇️ LOWER')
+        .setLabel('LOWER')
         .setStyle(ButtonStyle.Primary)
     );
 
@@ -519,7 +506,7 @@ export class HigherLowerGame {
       row.addComponents(
         new ButtonBuilder()
           .setCustomId('higherlower_cashout')
-          .setLabel('💰 CASH OUT')
+          .setLabel('CASH OUT')
           .setStyle(ButtonStyle.Success)
       );
     }
