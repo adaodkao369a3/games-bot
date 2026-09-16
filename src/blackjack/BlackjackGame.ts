@@ -99,12 +99,6 @@ export class BlackjackGame {
     this.data.dealerHand.push(this.data.deck.pop()!);
     this.data.dealerHand.push(this.data.deck.pop()!);
 
-    // Check for natural blackjack
-    if (isBlackjack(this.data.playerHand)) {
-      await this.handleNaturalBlackjack();
-      return;
-    }
-
     const initialEmbed = await this.createGameEmbed();
     const row = this.createGameButtons();
 
@@ -120,6 +114,12 @@ export class BlackjackGame {
     this.gameTimeout = setTimeout(() => {
       this.timeoutGame(sentMessage);
     }, GAME_CONFIG.timeoutMs);
+
+    // Check for natural blackjack
+    if (isBlackjack(this.data.playerHand)) {
+      await this.handleNaturalBlackjack();
+      return;
+    }
   }
 
   /**
