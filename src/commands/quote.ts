@@ -10,7 +10,7 @@ import { renderQuoteCard, renderStackedQuoteCard, QuoteCardOptions } from '../qu
 import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS } from '../quote/config.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
-const THEME_NAMES: PresetName[] = ['classic', 'sunset', 'ocean', 'purple'];
+const THEME_NAMES: PresetName[] = ['classic', 'white', 'sunset', 'ocean', 'purple', 'aurora', 'gold', 'cherry', 'midnight', 'plasma'];
 const QUOTE_REDIRECT_CHANNEL_ID = '1526869451834654821';
 
 /** Everything renderQuoteCard needs for one message, minus the shared theme. */
