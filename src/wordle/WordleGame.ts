@@ -32,6 +32,8 @@ export class WordleGame {
   private wordProvider: WordProvider;
   private currentMessage?: Message;
   private updateLock: Promise<any> = Promise.resolve();
+  private gameTimeout?: NodeJS.Timeout;
+  private static readonly GAME_EXPIRATION_MS = 30 * 60 * 1000; // 30 minutes
   
   constructor(
     channelId: string,
@@ -63,6 +65,32 @@ export class WordleGame {
   async initialize(): Promise<void> {
     this.state.secretWord = await this.wordProvider.getRandomWord(this.state.wordLength);
     console.log(`[WordleGame] Game initialized for channel ${this.state.channelId} with word length ${this.state.wordLength}`);
+    
+    // Start game expiration timer
+    this.startExpirationTimer();
+  }
+  
+  /**
+   * Start the game expiration timer
+   */
+  private startExpirationTimer(): void {
+    this.gameTimeout = setTimeout(() => {
+      if (!this.state.isGameOver) {
+        this.state.isGameOver = true;
+        console.log(`[WordleGame] Game expired for channel ${this.state.channelId}`);
+        // The game will be cleaned up by the command handler
+      }
+    }, WordleGame.GAME_EXPIRATION_MS);
+  }
+  
+  /**
+   * Clear the expiration timer
+   */
+  private clearExpirationTimer(): void {
+    if (this.gameTimeout) {
+      clearTimeout(this.gameTimeout);
+      this.gameTimeout = undefined;
+    }
   }
   
   /**
@@ -155,11 +183,13 @@ export class WordleGame {
     if (result.isCorrect) {
       this.state.isGameOver = true;
       this.state.winner = username;
+      this.clearExpirationTimer();
     }
 
     // Check for loss (max guesses reached)
     if (this.state.guesses.length >= this.state.maxGuesses && !result.isCorrect) {
       this.state.isGameOver = true;
+      this.clearExpirationTimer();
     }
 
     return { isValid: true };

@@ -66,7 +66,7 @@ export class FishingGame {
     );
 
     if (deductionResult === null) {
-      await message.reply('Failed to process the fishing fee. Please try again.');
+      await message.edit('Failed to process the fishing fee. Please try again.');
       return;
     }
 
@@ -78,7 +78,8 @@ export class FishingGame {
     const initialEmbed = this.createCastingEmbed();
     const row = this.createCastingButtons();
 
-    const sentMessage = await message.reply({
+    const sentMessage = await message.edit({
+      content: null,
       embeds: [initialEmbed],
       components: [row],
     });

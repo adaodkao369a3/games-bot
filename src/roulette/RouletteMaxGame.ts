@@ -69,6 +69,8 @@ export class RouletteMaxGame {
   private currentMessage?: Message;
   private timers: NodeJS.Timeout[] = [];
   private onGameEnd?: () => void;
+  private gameTimeout?: NodeJS.Timeout;
+  private static readonly GAME_EXPIRATION_MS = 5 * 60 * 1000; // 5 minutes
 
   // GIF URLs
   private static readonly STARTING_PLAYER_GIF = 'https://c.tenor.com/sjaTtq5lHVwAAAAd/tenor.gif';
@@ -146,8 +148,37 @@ export class RouletteMaxGame {
   async start(message: Message): Promise<void> {
     this.currentMessage = message;
     
+    // Start game expiration timer
+    this.startExpirationTimer();
+    
     // Show starting player selection GIF
     await this.showStartingPlayerSelection();
+  }
+  
+  /**
+   * Start the game expiration timer
+   */
+  private startExpirationTimer(): void {
+    this.gameTimeout = setTimeout(() => {
+      if (!this.state.isGameOver) {
+        this.state.isGameOver = true;
+        console.log(`[RouletteMax] Game expired for channel ${this.state.channelId}`);
+        this.clearTimers();
+        if (this.onGameEnd) {
+          this.onGameEnd();
+        }
+      }
+    }, RouletteMaxGame.GAME_EXPIRATION_MS);
+  }
+  
+  /**
+   * Clear the expiration timer
+   */
+  private clearExpirationTimer(): void {
+    if (this.gameTimeout) {
+      clearTimeout(this.gameTimeout);
+      this.gameTimeout = undefined;
+    }
   }
 
   /**
@@ -1325,6 +1356,7 @@ export class RouletteMaxGame {
     this.state.currentPhase = RouletteMaxPhase.FINISHED;
     this.state.isGameOver = true;
     this.clearTimers();
+    this.clearExpirationTimer();
 
     let winner: RouletteMaxPlayer;
     let resultGif: string;

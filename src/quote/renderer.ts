@@ -241,7 +241,7 @@ function edgeFadeMask(w: number, h: number, fade: number, fadeTop: boolean, fade
 function drawWatermarkBadge(ctx: SKRSContext2D, centerX: number, centerY: number) {
   const label = 'BOMBO PRODUCTIONS';
 
-  ctx.font = 'bold 30px ' + FONT_FALLBACK; // 10% bigger than the original 14px
+  ctx.font = 'bold 18px ' + FONT_FALLBACK; // 40% smaller than the original 30px
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

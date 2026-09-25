@@ -1,9 +1,11 @@
-import { Message, MessageComponentInteraction } from 'discord.js';
+import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { RussianRouletteGame, RoulettePlayer } from '../roulette/RussianRouletteGame.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
 // Active games by channel ID
 const activeGames = new Map<string, RussianRouletteGame>();
+// Pending challenges by channel ID
+const pendingChallenges = new Map<string, { challenger: string, participants: RoulettePlayer[], timeout: NodeJS.Timeout }>();
 
 /**
  * Handle the roulette command
@@ -15,6 +17,12 @@ export async function handleRouletteCommand(message: Message): Promise<void> {
   // Check if a game is already active in this channel
   if (activeGames.has(channelId)) {
     await message.reply('A Russian Roulette game is already in progress in this channel!');
+    return;
+  }
+
+  // Check if there's a pending challenge
+  if (pendingChallenges.has(channelId)) {
+    await message.reply('There is already a pending challenge in this channel. Wait for it to be accepted or declined.');
     return;
   }
 
@@ -83,29 +91,42 @@ export async function handleRouletteCommand(message: Message): Promise<void> {
   }
 
   try {
-    // Send initial message
-    const initialMessage = await message.reply('<:gunpoint:1545149018160631868> Loading Russian Roulette...');
+    // Create challenge message with accept/decline buttons
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('roulette_accept')
+          .setLabel('✅ ACCEPT')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId('roulette_decline')
+          .setLabel('❌ DECLINE')
+          .setStyle(ButtonStyle.Danger)
+      );
 
-    // Create cleanup callback
-    const onGameEnd = () => {
-      activeGames.delete(channelId);
-    };
+    const playerList = participants.map(p => `<@${p.id}>`).join('\n');
+    const challengeMessage = await message.reply({
+      content: `<:gunpoint:1545149018160631868> **RUSSIAN ROULETTE CHALLENGE**\n\n<@${author.id}> has challenged:\n${playerList}\n\nDo you accept the challenge?`,
+      components: [row]
+    });
 
-    // Create game instance
-    const game = new RussianRouletteGame(
-      channelId,
-      guildId || undefined,
+    // Store pending challenge with 2-minute timeout
+    const timeout = setTimeout(() => {
+      if (pendingChallenges.has(channelId)) {
+        pendingChallenges.delete(channelId);
+        challengeMessage.edit({
+          content: '⏰ The challenge has expired.',
+          components: []
+        }).catch(() => {});
+      }
+    }, 2 * 60 * 1000); // 2 minutes
+
+    pendingChallenges.set(channelId, {
+      challenger: author.id,
       participants,
-      onGameEnd
-    );
-
-    // Store game
-    activeGames.set(channelId, game);
-
-    // Start game
-    await game.start(initialMessage);
+      timeout
+    });
   } catch (error) {
-    activeGames.delete(channelId);
     await ErrorHandler.handleMessageError(message, error, 'roulette command');
   }
 }
@@ -115,6 +136,73 @@ export async function handleRouletteCommand(message: Message): Promise<void> {
  */
 export async function handleRouletteInteraction(interaction: MessageComponentInteraction): Promise<void> {
   const channelId = interaction.channelId;
+  const customId = interaction.customId;
+
+  // Handle challenge acceptance/decline
+  if (customId === 'roulette_accept' || customId === 'roulette_decline') {
+    const pendingChallenge = pendingChallenges.get(channelId);
+    
+    if (!pendingChallenge) {
+      await interaction.reply({
+        content: 'No pending challenge found.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Only the challenger can accept/decline
+    if (interaction.user.id !== pendingChallenge.challenger) {
+      await interaction.reply({
+        content: 'Only the challenger can accept or decline this challenge.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Clear the timeout
+    clearTimeout(pendingChallenge.timeout);
+    pendingChallenges.delete(channelId);
+
+    if (customId === 'roulette_decline') {
+      await interaction.update({
+        content: '❌ The challenge has been declined.',
+        components: []
+      });
+      return;
+    }
+
+    // Accept the challenge
+    try {
+      await interaction.update({
+        content: '✅ Challenge accepted! Starting game...',
+        components: []
+      });
+
+      // Create cleanup callback
+      const onGameEnd = () => {
+        activeGames.delete(channelId);
+      };
+
+      // Create game instance
+      const game = new RussianRouletteGame(
+        channelId,
+        interaction.guildId || undefined,
+        pendingChallenge.participants,
+        onGameEnd
+      );
+
+      // Store game
+      activeGames.set(channelId, game);
+
+      // Start game
+      await game.start(interaction.message);
+    } catch (error) {
+      await ErrorHandler.handleInteractionError(interaction, error, 'roulette accept');
+    }
+    return;
+  }
+
+  // Handle game interactions
   const game = activeGames.get(channelId);
 
   if (!game) {

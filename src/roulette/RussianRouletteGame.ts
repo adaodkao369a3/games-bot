@@ -40,6 +40,8 @@ export class RussianRouletteGame {
   private currentMessage?: Message;
   private timers: NodeJS.Timeout[] = [];
   private onGameEnd?: () => void;
+  private gameTimeout?: NodeJS.Timeout;
+  private static readonly GAME_EXPIRATION_MS = 5 * 60 * 1000; // 5 minutes
 
   // GIF URLs
   private static readonly STARTING_PLAYER_GIF = 'https://c.tenor.com/sjaTtq5lHVwAAAAd/tenor.gif';
@@ -94,8 +96,37 @@ export class RussianRouletteGame {
   async start(message: Message): Promise<void> {
     this.currentMessage = message;
     
+    // Start game expiration timer
+    this.startExpirationTimer();
+    
     // Show starting player selection GIF
     await this.showStartingPlayerSelection();
+  }
+  
+  /**
+   * Start the game expiration timer
+   */
+  private startExpirationTimer(): void {
+    this.gameTimeout = setTimeout(() => {
+      if (!this.state.isGameOver) {
+        this.state.isGameOver = true;
+        console.log(`[RussianRoulette] Game expired for channel ${this.state.channelId}`);
+        this.clearTimers();
+        if (this.onGameEnd) {
+          this.onGameEnd();
+        }
+      }
+    }, RussianRouletteGame.GAME_EXPIRATION_MS);
+  }
+  
+  /**
+   * Clear the expiration timer
+   */
+  private clearExpirationTimer(): void {
+    if (this.gameTimeout) {
+      clearTimeout(this.gameTimeout);
+      this.gameTimeout = undefined;
+    }
   }
 
   /**
@@ -264,6 +295,11 @@ export class RussianRouletteGame {
 
     // Automatically trigger
     await this.pullTrigger();
+    
+    // If this timeout ends the game, clear expiration timer
+    if (this.state.isGameOver) {
+      this.clearExpirationTimer();
+    }
   }
 
   /**
@@ -551,6 +587,7 @@ export class RussianRouletteGame {
     this.state.winner = winner.id;
     this.state.isGameOver = true;
     this.clearTimers();
+    this.clearExpirationTimer();
 
     const embed = new EmbedBuilder()
       .setTitle('<:gunpoint:1545149018160631868> RUSSIAN ROULETTE')

@@ -112,7 +112,12 @@ export class DatamuseWordProvider implements WordProvider {
       ? 'https://api.datamuse.com/words' 
       : DatamuseWordProvider.API_BASE);
     
-    url.searchParams.append('sp', '?'.repeat(length)); // Pattern match for exact length
+    // Use a random starting letter to get variety from different parts of the alphabet
+    const letters = 'abcdefghijklmnopqrstuvwxyz';
+    const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+    const pattern = randomLetter + '?'.repeat(length - 1);
+    
+    url.searchParams.append('sp', pattern); // Pattern match with random starting letter
     url.searchParams.append('max', '100'); // Get up to 100 words
     
     const response = await this.makeApiRequest(url.toString());

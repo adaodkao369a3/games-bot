@@ -7,7 +7,7 @@ import { isStaff } from '../utils/permissions.js';
 // Global wheel state
 let wheelCooldownUntil = 0;
 let wheelSpinning = false;
-const COOLDOWN_DURATION = 2 * 60 * 1000; // 2 minutes in milliseconds
+const COOLDOWN_DURATION = 15 * 1000; // 15 seconds in milliseconds
 
 /**
  * Handle the wheel command
@@ -26,12 +26,9 @@ export async function handleWheelCommand(message: Message, args: string[]): Prom
     const now = Date.now();
     if (!isStaff(message.member) && now < wheelCooldownUntil) {
       const remainingTime = Math.ceil((wheelCooldownUntil - now) / 1000);
-      const minutes = Math.floor(remainingTime / 60);
-      const seconds = remainingTime % 60;
-      const timeString = minutes > 0 ? `${minutes} minute${minutes > 1 ? 's' : ''} ${seconds} second${seconds !== 1 ? 's' : ''}` : `${seconds} second${seconds !== 1 ? 's' : ''}`;
       
       await message.reply({
-        content: `⏳ The wheel is cooling down.\n<@${message.author.id}>, someone already spun the wheel.\nYou can spin again in ${timeString}.`,
+        content: `⏳ The wheel is cooling down.\n<@${message.author.id}>, someone already spun the wheel.\nYou can spin again in ${remainingTime} second${remainingTime !== 1 ? 's' : ''}.`,
       });
       return;
     }
@@ -144,7 +141,7 @@ async function startWheelSpin(message: Message, category: string, options: any[]
         `<a:cd:1545149009855778848> <@${message.author.id}> spun the wheel!\n\n` +
         `<a:cargando:1545149001983197364> **${selectedOption.label}**\n\n` +
         `${selectedOption.description}\n\n` +
-        `⏳ Wheel cooldown: 2 minutes`
+        `⏳ Wheel cooldown: 15 seconds`
       )
       .setImage(`attachment://${pngFilename}`);
 

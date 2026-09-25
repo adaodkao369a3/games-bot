@@ -34,6 +34,8 @@ export class QuickDrawGame {
   private state: QuickDrawState;
   private currentMessage?: Message;
   private timers: NodeJS.Timeout[] = [];
+  private gameTimeout?: NodeJS.Timeout;
+  private static readonly GAME_EXPIRATION_MS = 5 * 60 * 1000; // 5 minutes
   
   // GIF URLs
   private static readonly PLAYER1_WIN_GIF = 'https://c.tenor.com/oNRn8VZn9bQAAAAC/tenor.gif';
@@ -70,6 +72,9 @@ export class QuickDrawGame {
   async start(message: Message): Promise<void> {
     this.currentMessage = message;
     
+    // Start game expiration timer
+    this.startExpirationTimer();
+    
     // Initial duel message with disabled button
     const initialEmbed = await this.createInitialEmbed();
     const disabledRow = this.createDisabledButtonRow();
@@ -83,6 +88,29 @@ export class QuickDrawGame {
     
     // Start the suspense sequence
     await this.runSuspenseSequence();
+  }
+  
+  /**
+   * Start the game expiration timer
+   */
+  private startExpirationTimer(): void {
+    this.gameTimeout = setTimeout(() => {
+      if (!this.state.isGameOver) {
+        this.state.isGameOver = true;
+        console.log(`[QuickDraw] Game expired for channel ${this.state.channelId}`);
+        this.clearTimers();
+      }
+    }, QuickDrawGame.GAME_EXPIRATION_MS);
+  }
+  
+  /**
+   * Clear the expiration timer
+   */
+  private clearExpirationTimer(): void {
+    if (this.gameTimeout) {
+      clearTimeout(this.gameTimeout);
+      this.gameTimeout = undefined;
+    }
   }
 
   /**
@@ -207,6 +235,7 @@ export class QuickDrawGame {
     
     // Clear all timers
     this.clearTimers();
+    this.clearExpirationTimer();
     
     // Disable button immediately
     const row = new ActionRowBuilder<ButtonBuilder>()
@@ -246,6 +275,7 @@ export class QuickDrawGame {
   private async endGameNoWinner(): Promise<void> {
     this.state.isGameOver = true;
     this.clearTimers();
+    this.clearExpirationTimer();
     
     const timeoutEmbed = this.createTimeoutEmbed();
     await this.currentMessage?.edit({

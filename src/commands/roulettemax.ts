@@ -1,9 +1,11 @@
-import { Message, MessageComponentInteraction } from 'discord.js';
+import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { RouletteMaxGame, RouletteMaxPlayer } from '../roulette/RouletteMaxGame.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
 // Active games by channel ID
 const activeGames = new Map<string, RouletteMaxGame>();
+// Pending challenges by channel ID
+const pendingChallenges = new Map<string, { challenger: string, opponents: string[], player1: RouletteMaxPlayer, player2: RouletteMaxPlayer, player3?: RouletteMaxPlayer, timeout: NodeJS.Timeout }>();
 
 /**
  * Handle the roulettemax command
@@ -15,6 +17,12 @@ export async function handleRouletteMaxCommand(message: Message): Promise<void> 
   // Check if a game is already active in this channel
   if (activeGames.has(channelId)) {
     await message.reply('A Roulette Max game is already in progress in this channel!');
+    return;
+  }
+
+  // Check if there's a pending challenge
+  if (pendingChallenges.has(channelId)) {
+    await message.reply('There is already a pending challenge in this channel. Wait for it to be accepted or declined.');
     return;
   }
 
@@ -52,9 +60,6 @@ export async function handleRouletteMaxCommand(message: Message): Promise<void> 
   }
 
   try {
-    // Send initial message
-    const initialMessage = await message.reply('<:gunpoint:1545149018160631868> Loading Roulette Max...');
-
     // Create players
     const player1: RouletteMaxPlayer = {
       id: author.id,
@@ -78,28 +83,45 @@ export async function handleRouletteMaxCommand(message: Message): Promise<void> 
       };
     }
 
-    // Create cleanup callback
-    const onGameEnd = () => {
-      activeGames.delete(channelId);
-    };
+    // Create challenge message with accept/decline buttons
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('roulettemax_accept')
+          .setLabel('✅ ACCEPT')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId('roulettemax_decline')
+          .setLabel('❌ DECLINE')
+          .setStyle(ButtonStyle.Danger)
+      );
 
-    // Create game instance (with or without player 3)
-    const game = new RouletteMaxGame(
-      channelId,
-      guildId || undefined,
+    const opponentList = opponents.map(op => `<@${op.id}>`).join('\n');
+    const challengeMessage = await message.reply({
+      content: `<:gunpoint:1545149018160631868> **ROULETTE MAX CHALLENGE**\n\n<@${author.id}> has challenged:\n${opponentList}\n\nDo you accept the challenge?`,
+      components: [row]
+    });
+
+    // Store pending challenge with 2-minute timeout
+    const timeout = setTimeout(() => {
+      if (pendingChallenges.has(channelId)) {
+        pendingChallenges.delete(channelId);
+        challengeMessage.edit({
+          content: '⏰ The challenge has expired.',
+          components: []
+        }).catch(() => {});
+      }
+    }, 2 * 60 * 1000); // 2 minutes
+
+    pendingChallenges.set(channelId, {
+      challenger: author.id,
+      opponents: opponents.map(op => op.id),
       player1,
       player2,
       player3,
-      onGameEnd
-    );
-
-    // Store game
-    activeGames.set(channelId, game);
-
-    // Start game
-    await game.start(initialMessage);
+      timeout
+    });
   } catch (error) {
-    activeGames.delete(channelId);
     await ErrorHandler.handleMessageError(message, error, 'roulettemax command');
   }
 }
@@ -109,6 +131,75 @@ export async function handleRouletteMaxCommand(message: Message): Promise<void> 
  */
 export async function handleRouletteMaxInteraction(interaction: MessageComponentInteraction): Promise<void> {
   const channelId = interaction.channelId;
+  const customId = interaction.customId;
+
+  // Handle challenge acceptance/decline
+  if (customId === 'roulettemax_accept' || customId === 'roulettemax_decline') {
+    const pendingChallenge = pendingChallenges.get(channelId);
+    
+    if (!pendingChallenge) {
+      await interaction.reply({
+        content: 'No pending challenge found.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // All opponents must accept
+    if (!pendingChallenge.opponents.includes(interaction.user.id)) {
+      await interaction.reply({
+        content: 'Only the challenged opponents can accept or decline this challenge.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Clear the timeout
+    clearTimeout(pendingChallenge.timeout);
+    pendingChallenges.delete(channelId);
+
+    if (customId === 'roulettemax_decline') {
+      await interaction.update({
+        content: '❌ The challenge has been declined.',
+        components: []
+      });
+      return;
+    }
+
+    // Accept the challenge
+    try {
+      await interaction.update({
+        content: '✅ Challenge accepted! Starting game...',
+        components: []
+      });
+
+      // Create cleanup callback
+      const onGameEnd = () => {
+        activeGames.delete(channelId);
+      };
+
+      // Create game instance (with or without player 3)
+      const game = new RouletteMaxGame(
+        channelId,
+        interaction.guildId || undefined,
+        pendingChallenge.player1,
+        pendingChallenge.player2,
+        pendingChallenge.player3,
+        onGameEnd
+      );
+
+      // Store game
+      activeGames.set(channelId, game);
+
+      // Start game
+      await game.start(interaction.message);
+    } catch (error) {
+      await ErrorHandler.handleInteractionError(interaction, error, 'roulettemax accept');
+    }
+    return;
+  }
+
+  // Handle game interactions
   const game = activeGames.get(channelId);
 
   if (!game) {
