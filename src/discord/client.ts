@@ -33,6 +33,8 @@ import { handleNumGuessCommand, handleNumGuessInteraction, handleNumGuessMessage
 import { handleSimonSaysCommand, handleSimonSaysInteraction } from '../commands/simonsays.js';
 import { handleQuizCommand, handleQuizInteraction } from '../commands/quiz.js';
 import { handleChallengeCommand, handleChallengeInteraction } from '../commands/challenge.js';
+import { handleRedirectCommand } from '../commands/redirect.js';
+import { handleMogCommand } from '../commands/mog.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -241,6 +243,16 @@ export class DiscordClient {
 
       if (command === 'quote') {
         await handleQuoteCommand(message, args);
+        return;
+      }
+
+      if (command === 'redirect') {
+        await handleRedirectCommand(message, args);
+        return;
+      }
+
+      if (command === 'mog') {
+        await handleMogCommand(message, args);
         return;
       }
 

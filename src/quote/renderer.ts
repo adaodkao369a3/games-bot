@@ -76,6 +76,7 @@ async function renderQuoteCardLayer(opts: QuoteCardOptions, layout: LayerOptions
   const { H } = LAYOUT;
   const { cardWidth, mirror, drawWatermark } = layout;
   const preset = GRADIENT_PRESETS[opts.preset ?? 'classic'];
+  const isWhitePreset = (opts.preset ?? 'classic') === 'white';
 
   const SCALE = 2;
   const canvas = createCanvas(cardWidth * SCALE, H * SCALE);
@@ -94,7 +95,7 @@ async function renderQuoteCardLayer(opts: QuoteCardOptions, layout: LayerOptions
   // The PFP owns one H-wide edge of the card — left normally, right when
   // mirrored. Discord avatars are normally square; object-fit: cover keeps
   // that H x H footprint even if an unexpected non-square source is returned.
-  drawAvatar(ctx, avatarImg, pfpWidth, avatarX);
+  drawAvatar(ctx, avatarImg, pfpWidth, avatarX, H);
 
   // The colour layer is full-card and sits ABOVE the PFP. Its edge nearest
   // the quote text is a single broad curve that cuts into the PFP near the
@@ -109,8 +110,10 @@ async function renderQuoteCardLayer(opts: QuoteCardOptions, layout: LayerOptions
     opts.username,
     cardWidth,
     pfpWidth,
+    H,
     mirror,
     drawWatermark,
+    isWhitePreset,
     opts.stickerUrl,
     opts.imageUrl,
   );
@@ -120,24 +123,39 @@ async function renderQuoteCardLayer(opts: QuoteCardOptions, layout: LayerOptions
 
 /**
  * Stacks 2+ quote cards vertically — oldest/topmost message first, most
- * recent last — into a single image. Each card keeps its own full H-tall
- * slot (no compression — total height is always an exact multiple of H),
- * but:
- *  - cards alternate orientation: the 1st (and 3rd, 5th...) keep the normal
- *    avatar-left/quote-right layout, the 2nd (and 4th, 6th...) are mirrored
- *    (quote-left/avatar-right), matching a top/flip/top/flip pattern.
- *  - the quote/text column is widened (LAYOUT.STACK_QUOTE_WIDTH_MULTIPLIER)
- *    on every card, while the avatar stays the same H x H size, so the
- *    composite reads as a wide banner rather than stacked squares.
- *  - no card draws its own corner watermark; instead a single centered
- *    "BOMBO PRODUCTIONS" badge sits at each seam between cards.
+ * recent last — into ONE continuous composite, drawn in a single pass on
+ * one canvas (not N independently-rendered cards glued together
+ * afterward). That matters for two things that broke under the old
+ * glue-after-the-fact approach:
+ *
+ *  - Backdrop continuity: the whole composite gets exactly one background
+ *    fill, painted once, in one direction. There is structurally no seam
+ *    to mismatch, because there's nothing separate to mismatch against —
+ *    every card's avatar-curve overlay reuses that same fill function, so
+ *    its color at any (x, y) is always identical to whatever the backdrop
+ *    already painted there. (Trade-off: since the fill is never reversed
+ *    per-card anymore, a mirrored card's quote text sits over whichever
+ *    end of the gradient naturally falls at that x — it no longer always
+ *    gets the "rich" end the way the single quote card's text does.)
+ *  - Melt direction: cards alternate orientation (1st/3rd/5th... normal
+ *    avatar-left/quote-right; 2nd/4th/6th... mirrored avatar-right/
+ *    quote-left) AND, on top of that, every card except the first also
+ *    flips its curve mask vertically. That's what makes each avatar's
+ *    "deep melt" concentrate toward the seam it shares with a neighbour
+ *    (framing the shared watermark badge) instead of both cards melting
+ *    toward the bottom regardless of the seam's actual position.
+ *    (This two-seam framing is only validated for exactly 2 cards; a
+ *    future .quote 3+ middle card sits between two seams and would need
+ *    its own two-ended curve shape, not just a flip.)
+ *
+ * The quote/text column is widened (LAYOUT.STACK_QUOTE_WIDTH_MULTIPLIER)
+ * on every card, while the avatar stays the same H x H size, so the
+ * composite reads as a wide banner rather than stacked squares. No card
+ * draws its own corner watermark; instead one centered "BOMBO PRODUCTIONS"
+ * badge sits at each seam between cards.
  *
  * All cards must share one preset (opts.preset on cards[0] is treated as
- * the composite's theme). Where two cards touch, each card's shared edge
- * fades to transparent over LAYOUT.STACK_EDGE_FADE px, revealing a
- * same-coloured backdrop underneath — since that backdrop matches each
- * card's own background exactly, the seam reads as a soft melt rather
- * than a hard cut.
+ * the composite's theme).
  */
 export async function renderStackedQuoteCard(cards: QuoteCardOptions[]): Promise<Buffer> {
   if (cards.length === 0) {
@@ -147,102 +165,138 @@ export async function renderStackedQuoteCard(cards: QuoteCardOptions[]): Promise
     return renderQuoteCard(cards[0]);
   }
 
-  const { H, W, STACK_EDGE_FADE, STACK_QUOTE_WIDTH_MULTIPLIER } = LAYOUT;
+  const { H, W, STACK_QUOTE_WIDTH_MULTIPLIER, STACK_HEIGHT_MULTIPLIER } = LAYOUT;
   const N = cards.length;
   const preset = GRADIENT_PRESETS[cards[0].preset ?? 'classic'];
+  const isWhitePreset = (cards[0].preset ?? 'classic') === 'white';
 
-  // Avatar stays LAYOUT.H wide; only the quote/text column grows.
   const stackCardWidth = H + (W - H) * STACK_QUOTE_WIDTH_MULTIPLIER;
 
-  // Each card is rendered independently first (alternating mirror, no
-  // per-card watermark), then composited.
-  const cardBuffers = await Promise.all(
-    cards.map((opts, i) =>
-      renderQuoteCardLayer(opts, { cardWidth: stackCardWidth, mirror: i % 2 === 1, drawWatermark: false }),
-    ),
-  );
-  const cardImages = await Promise.all(cardBuffers.map((buf) => loadImage(buf)));
+  // Total composite height is capped at H*1.5 regardless of N (see
+  // STACK_HEIGHT_MULTIPLIER) — each card's slot, and its square avatar,
+  // shrinks to fit within that instead of the old H*N (no compression).
+  const compH = H * STACK_HEIGHT_MULTIPLIER;
+  const rowHeight = compH / N;
+  const pfpWidth = rowHeight; // avatar stays square: side = this card's (now-compressed) slot height
 
   const SCALE = 2;
-  const compH = H * N; // exact multiple of the single-card height — no compression
   const canvas = createCanvas(stackCardWidth * SCALE, compH * SCALE);
   const ctx = canvas.getContext('2d');
   ctx.scale(SCALE, SCALE);
 
-  // The backdrop revealed at each card's faded top/bottom edge must match
-  // THAT card's own gradient direction — not a single flat direction for
-  // the whole composite. Mirrored (odd) cards reverse their gradient (see
-  // drawColorCurveOverlay) so the quote-text side always shows the rich
-  // end; if the backdrop stayed a plain function of x here, a mirrored
-  // card's fade would reveal the wrong (unreversed) colour at that x and
-  // show up as a bright mismatched seam instead of a clean melt.
+  // ONE continuous diagonal backdrop for the entire composite, painted once.
+  // Every card's overlay below reuses this exact same fill (never reversed,
+  // just re-anchored to its own row offset), so there is nothing for a seam
+  // to mismatch against.
+  fillPresetDiagonal(ctx, preset, stackCardWidth, compH, stackCardWidth, compH, 0);
+
+  const avatarImgs = await Promise.all(cards.map((c) => loadImage(c.avatarUrl)));
+
+  // Built once (the per-pixel curve computation is the expensive part) and
+  // reused per card via cheap canvas-transform flips instead of recomputing.
+  // `true` bakes in the seam-facing (bottom-edge) fade — only a stacked
+  // composite has an internal seam to soften; a standalone card's top/bottom
+  // are just the canvas edges.
+  const baseMask = createCurveMask(stackCardWidth, pfpWidth, rowHeight, true);
+
   for (let i = 0; i < N; i++) {
+    const mirror = i % 2 === 1;       // avatar-right/quote-left instead of avatar-left/quote-right
+    const flipVertical = i > 0;       // this card's near-seam edge is its own top, not its own bottom
+    const avatarX = mirror ? stackCardWidth - pfpWidth : 0;
+    const rowYOffset = i * rowHeight;
+
     ctx.save();
-    ctx.translate(0, i * H);
-    fillPreset(ctx, preset, stackCardWidth, H, i % 2 === 1);
+    ctx.translate(0, rowYOffset);
+
+    drawAvatar(ctx, avatarImgs[i], pfpWidth, avatarX, rowHeight);
+    drawStackCurveOverlay(
+      ctx, preset, stackCardWidth, pfpWidth, rowHeight, baseMask as any, mirror, flipVertical,
+      stackCardWidth, compH, rowYOffset,
+    );
+
     ctx.restore();
-  }
-
-  for (let i = 0; i < N; i++) {
-    const yOffset = i * H;
-    const fadeTop = i > 0;       // shares an edge with the card above
-    const fadeBottom = i < N - 1; // shares an edge with the card below
-
-    if (!fadeTop && !fadeBottom) {
-      // Only possible when N === 1, already short-circuited above, but
-      // kept as a safe no-mask fallback.
-      ctx.drawImage(cardImages[i], 0, yOffset, stackCardWidth, H);
-      continue;
-    }
-
-    const layer = createCanvas(stackCardWidth, H);
-    const lctx = layer.getContext('2d');
-    lctx.drawImage(cardImages[i], 0, 0, stackCardWidth, H);
-    lctx.globalCompositeOperation = 'destination-in';
-    lctx.drawImage(edgeFadeMask(stackCardWidth, H, STACK_EDGE_FADE, fadeTop, fadeBottom), 0, 0);
-
-    ctx.drawImage(layer, 0, yOffset);
   }
 
   // One shared watermark badge centered at each internal seam, instead of
   // a per-card corner watermark.
   for (let i = 0; i < N - 1; i++) {
-    const seamY = (i + 1) * H;
-    drawWatermarkBadge(ctx, stackCardWidth / 2, seamY);
+    const seamY = (i + 1) * rowHeight;
+    drawWatermarkBadge(ctx, stackCardWidth / 2, seamY, isWhitePreset);
+  }
+
+  // Text/nickname/media drawn last (on top of every avatar+overlay), one
+  // card at a time so each stays sequential against the shared context.
+  for (let i = 0; i < N; i++) {
+    const mirror = i % 2 === 1;
+    ctx.save();
+    ctx.translate(0, i * rowHeight);
+    await drawText(
+      ctx,
+      cards[i].quoteText,
+      cards[i].nickname,
+      cards[i].username,
+      stackCardWidth,
+      pfpWidth,
+      rowHeight,
+      mirror,
+      false, // per-card watermark stays off — the shared seam badge covers it
+      isWhitePreset,
+      cards[i].stickerUrl,
+      cards[i].imageUrl,
+    );
+    ctx.restore();
   }
 
   return canvas.toBuffer('image/png');
 }
 
 /**
- * White mask the size of one card: fully opaque through the middle,
- * ramping to transparent over `fade` px at the top (if fadeTop) and/or
- * bottom (if fadeBottom). Used with destination-in to fade a card's
- * shared edges into the backdrop behind it.
+ * Draws one card's avatar-curve overlay directly into a stacked composite.
+ * Unlike drawColorCurveOverlay (used by the standalone single-card path),
+ * this always fills with the SAME unreversed function of x that painted
+ * the composite's shared backdrop — so its color matches that backdrop
+ * exactly at every point, guaranteeing no visible seam regardless of which
+ * card or how many share the canvas. `mirror` flips the mask horizontally
+ * (avatar to the right edge); `flipVertical` additionally flips it so the
+ * curve's "deep melt" end lands on whichever edge is nearest a seam.
  */
-function edgeFadeMask(w: number, h: number, fade: number, fadeTop: boolean, fadeBottom: boolean) {
-  const mask = createCanvas(w, h);
-  const mctx = mask.getContext('2d');
-  const grad = mctx.createLinearGradient(0, 0, 0, h);
+function drawStackCurveOverlay(
+  mainCtx: SKRSContext2D,
+  preset: (typeof GRADIENT_PRESETS)[PresetName],
+  cardWidth: number,
+  pfpWidth: number,
+  rowHeight: number,
+  baseMask: ReturnType<typeof createCanvas>,
+  mirror: boolean,
+  flipVertical: boolean,
+  totalWidth: number,
+  totalHeight: number,
+  rowYOffset: number,
+) {
+  const overlay = createCanvas(cardWidth, rowHeight);
+  const octx = overlay.getContext('2d');
 
-  grad.addColorStop(0, fadeTop ? 'rgba(255,255,255,0)' : 'rgba(255,255,255,1)');
-  if (fadeTop) grad.addColorStop(fade / h, 'rgba(255,255,255,1)');
-  if (fadeBottom) grad.addColorStop(1 - fade / h, 'rgba(255,255,255,1)');
-  grad.addColorStop(1, fadeBottom ? 'rgba(255,255,255,0)' : 'rgba(255,255,255,1)');
+  // Anchored to this row's absolute position so it reproduces exactly the
+  // same diagonal gradient the shared backdrop painted there — same trick
+  // the old plain x-based fillPreset call got "for free", just carried
+  // over explicitly now that the fill also depends on y.
+  fillPresetDiagonal(octx, preset, cardWidth, rowHeight, totalWidth, totalHeight, rowYOffset);
 
-  mctx.fillStyle = grad;
-  mctx.fillRect(0, 0, w, h);
-  return mask;
+  const mask = transformMask(baseMask, cardWidth, rowHeight, mirror, flipVertical);
+  octx.globalCompositeOperation = 'destination-in';
+  octx.drawImage(mask as any, 0, 0);
+
+  mainCtx.drawImage(overlay as any, 0, 0);
 }
 
 /** Centered "BOMBO PRODUCTIONS" badge (text only, no border) — used at
  * stack seams, where a single shared watermark replaces each card's own
  * corner one. */
-function drawWatermarkBadge(ctx: SKRSContext2D, centerX: number, centerY: number) {
+function drawWatermarkBadge(ctx: SKRSContext2D, centerX: number, centerY: number, isWhitePreset: boolean) {
   const label = 'BOMBO PRODUCTIONS';
 
   ctx.font = 'bold 18px ' + FONT_FALLBACK; // 40% smaller than the original 30px
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.85)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, centerX, centerY + 1);
@@ -251,15 +305,18 @@ function drawWatermarkBadge(ctx: SKRSContext2D, centerX: number, centerY: number
   ctx.textBaseline = 'middle';
 }
 
-/** Returns a new canvas with `source` flipped horizontally. Used to mirror
- * the avatar-side curve mask onto the opposite edge without recomputing
- * its boundary math from scratch. */
-function flipHorizontal(source: any, w: number, h: number) {
+/** Returns a new canvas with `source` flipped horizontally (flipX),
+ * vertically (flipY), or both (180° rotation) — or the same source
+ * untouched if neither is requested. Used to re-orient a curve mask
+ * without recomputing its per-pixel boundary math from scratch. */
+function transformMask(source: ReturnType<typeof createCanvas>, w: number, h: number, flipX: boolean, flipY: boolean) {
+  if (!flipX && !flipY) return source;
+
   const out = createCanvas(w, h);
   const octx = out.getContext('2d');
-  octx.translate(w, 0);
-  octx.scale(-1, 1);
-  octx.drawImage(source, 0, 0);
+  octx.translate(flipX ? w : 0, flipY ? h : 0);
+  octx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+  octx.drawImage(source as any, 0, 0);
   return out;
 }
 
@@ -293,18 +350,56 @@ function fillPreset(
 }
 
 /**
+ * Continuous diagonal backdrop for stacked quotes. A soft, straight band of
+ * the preset's second-darkest colour runs from bottom-left to top-right;
+ * the opposite diagonal stays at the darkest colour. Keeping the highlight
+ * capped at a mid-tone protects white quote text from washing out.
+ *
+ * The gradient is anchored to the full composite, and each row overlay uses
+ * the same absolute y offset so the colour field remains seamless.
+ */
+function fillPresetDiagonal(
+  ctx: SKRSContext2D,
+  preset: (typeof GRADIENT_PRESETS)[PresetName],
+  w: number,
+  h: number,
+  totalW: number,
+  totalH: number,
+  yOffset: number,
+) {
+  if (preset.type === 'solid') {
+    ctx.fillStyle = rgb(preset.colors[0]);
+    ctx.fillRect(0, 0, w, h);
+    return;
+  }
+
+  const colors = preset.colors; // ordered palest → darkest
+  const darkest = colors[colors.length - 1];
+  const highlight = colors[Math.max(0, colors.length - 2)];
+
+  // Axis runs top-left → bottom-right; its midpoint's iso-line runs
+  // bottom-left → top-right, matching the intended diagonal flow.
+  const grad = ctx.createLinearGradient(0, -yOffset, totalW, totalH - yOffset);
+  grad.addColorStop(0, rgb(darkest));
+  grad.addColorStop(0.5, rgb(highlight));
+  grad.addColorStop(1, rgb(darkest));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+/**
  * Builds the avatar-side fade mask assuming the avatar sits at the LEFT
  * edge of a `cardWidth`-wide canvas. Mirroring is handled by the caller
  * flipping the returned mask, rather than recomputing the boundary math —
  * the curve's own geometry (blend strengthens moving away from the avatar,
  * toward the quote text) is symmetric under that flip.
  */
-function createCurveMask(cardWidth: number, pfpWidth: number) {
-  const { H, CURVE_TOP_FRACTION, CURVE_BOTTOM_FRACTION, CURVE_BASE_ALPHA } = LAYOUT;
+function createCurveMask(cardWidth: number, pfpWidth: number, rowHeight: number, includeSeamFade: boolean) {
+  const { CURVE_TOP_FRACTION, CURVE_BOTTOM_FRACTION, CURVE_BASE_ALPHA } = LAYOUT;
 
-  const mask = createCanvas(cardWidth, H);
+  const mask = createCanvas(cardWidth, rowHeight);
   const maskCtx = mask.getContext('2d');
-  const pixels = maskCtx.createImageData(cardWidth, H);
+  const pixels = maskCtx.createImageData(cardWidth, rowHeight);
   const data = pixels.data;
 
   // Smooth deterministic "noise" (sum of a few irrational-ratio sine
@@ -329,7 +424,7 @@ function createCurveMask(cardWidth: number, pfpWidth: number) {
   const boundaryX = (y: number) => {
     const topX = pfpWidth * CURVE_TOP_FRACTION;
     const bottomX = pfpWidth * CURVE_BOTTOM_FRACTION;
-    const t = Math.max(0, Math.min(1, y / H));
+    const t = Math.max(0, Math.min(1, y / rowHeight));
     const eased = Math.pow(t, 3); // Ease-in cubic
     const base = topX + (bottomX - topX) * eased;
     return base + noise(y, 0) * BOUNDARY_WAVE_PX;
@@ -339,17 +434,56 @@ function createCurveMask(cardWidth: number, pfpWidth: number) {
   // The fade happens entirely within the PFP area, providing a smooth blend.
   const fullyOpaqueX = pfpWidth;
 
-  for (let y = 0; y < H; y++) {
+  // Seam-facing counterpart to boundaryX above, transposed onto the other
+  // axis: instead of a boundary in x that varies with y, this is a fade
+  // depth in y that varies with x, softening the avatar's BOTTOM edge
+  // where it meets the next card's seam (the hard line the previous version
+  // left behind). Only baked in for a stacked composite (includeSeamFade) —
+  // a standalone card's top/bottom are the canvas edges, not a seam, so
+  // they never need this. Whichever row actually needs the fade on its TOP
+  // edge instead gets it by the caller flipping this whole mask vertically,
+  // not by recomputing it here — only validated for the 2-card case; a
+  // future middle card (seams on both edges) would need its own two-ended
+  // version of this.
+  const seamFadeDepth = (x: number) => {
+    const nearDepth = rowHeight * (1 - CURVE_TOP_FRACTION);    // shallow, far from the text side
+    const farDepth = rowHeight * (1 - CURVE_BOTTOM_FRACTION);  // deep, near the text side
+    const t = Math.max(0, Math.min(1, x / pfpWidth));
+    const eased = Math.pow(t, 3);
+    const base = nearDepth + (farDepth - nearDepth) * eased;
+    return Math.max(MIN_FADE_PX, base + noise(x, 3.1) * BOUNDARY_WAVE_PX);
+  };
+
+  for (let y = 0; y < rowHeight; y++) {
     // Clamp so the wave can never push the boundary within MIN_FADE_PX of
     // the PFP edge — otherwise on some rows the fade would collapse right
     // at x=fullyOpaqueX, leaving the avatar visibly peeking through the
     // color layer (a translucent "notch") instead of a clean full-opacity edge.
     const edge = Math.min(boundaryX(y), fullyOpaqueX - MIN_FADE_PX);
     const fadeWidth = Math.max(MIN_FADE_PX, fullyOpaqueX - edge);
+    const distFromBottom = rowHeight - y;
 
     for (let x = 0; x < cardWidth; x++) {
-      // The curve starts with base alpha and strengthens moving right
-      const u = Math.max(0, Math.min(1, (x - edge) / fadeWidth));
+      // Text-facing progress: 0 right at the boundary, 1 once fully past it.
+      const nx = Math.max(0, Math.min(1, (x - edge) / fadeWidth));
+
+      let u = nx;
+      if (includeSeamFade && x < pfpWidth) {
+        // Seam-facing progress, same idea transposed onto y.
+        const fadePx = seamFadeDepth(x);
+        const ny = Math.max(0, Math.min(1, (fadePx - distFromBottom) / fadePx));
+
+        // Rounded-corner combine (p-norm) instead of a raw max(). A plain
+        // max() of two independently-noisy 1D fades creates a visible
+        // crease/glitch exactly where they cross — near the crossover,
+        // tiny noise differences flip which one "wins," so the boundary
+        // jitters instead of curving smoothly. This blends nx/ny into ONE
+        // continuous field first, so the corner rounds off the way a
+        // single quarter-circle-ish fade would, then everything below
+        // (bias + smoothstep + wisp) runs once against that combined value.
+        const CORNER_ROUNDING_POWER = 2.2;
+        u = Math.min(1, Math.pow(Math.pow(nx, CORNER_ROUNDING_POWER) + Math.pow(ny, CORNER_ROUNDING_POWER), 1 / CORNER_ROUNDING_POWER));
+      }
 
       // Apply bias for gradual strengthening, then smoothstep
       const biased = Math.pow(u, 1.5);
@@ -359,7 +493,6 @@ function createCurveMask(cardWidth: number, pfpWidth: number) {
       // smooth value itself) so it only textures the transition band and
       // never touches the fully-opaque or fully-transparent regions.
       const wisp = noise(x * 1.3 + y * 0.7, y * 0.01) * TURBULENCE_STRENGTH * (1 - Math.abs(smooth * 2 - 1));
-
       const alphaFrac = Math.max(0, Math.min(1, CURVE_BASE_ALPHA + (1 - CURVE_BASE_ALPHA) * smooth + wisp));
       const alpha = Math.round(alphaFrac * 255);
 
@@ -375,7 +508,7 @@ function createCurveMask(cardWidth: number, pfpWidth: number) {
 
   // Sanity check: ensure mask alpha at PFP edge is sufficiently opaque
   // to prevent hard seams. Sample a few rows near the middle.
-  for (let y = Math.floor(H * 0.3); y <= Math.floor(H * 0.7); y += Math.floor(H * 0.2)) {
+  for (let y = Math.floor(rowHeight * 0.3); y <= Math.floor(rowHeight * 0.7); y += Math.floor(rowHeight * 0.2)) {
     const i = (y * cardWidth + (pfpWidth - 1)) * 4 + 3; // Alpha channel at x = pfpWidth - 1
     const alphaAtEdge = data[i];
     if (alphaAtEdge < 242) { // Require at least ~95% opacity at edge
@@ -386,19 +519,17 @@ function createCurveMask(cardWidth: number, pfpWidth: number) {
   return mask;
 }
 
-function drawAvatar(mainCtx: SKRSContext2D, avatarImg: Image, pfpWidth: number, avatarX: number) {
-  const { H } = LAYOUT;
-
-  // Cover exactly the pfpWidth x H PFP area without stretching the source.
-  const scale = Math.max(pfpWidth / avatarImg.width, H / avatarImg.height);
+function drawAvatar(mainCtx: SKRSContext2D, avatarImg: Image, pfpWidth: number, avatarX: number, rowHeight: number) {
+  // Cover exactly the pfpWidth x rowHeight PFP area without stretching the source.
+  const scale = Math.max(pfpWidth / avatarImg.width, rowHeight / avatarImg.height);
   const drawWidth = avatarImg.width * scale;
   const drawHeight = avatarImg.height * scale;
   const cropX = (drawWidth - pfpWidth) / 2;
-  const cropY = (drawHeight - H) / 2;
+  const cropY = (drawHeight - rowHeight) / 2;
 
   mainCtx.save();
   mainCtx.beginPath();
-  mainCtx.rect(avatarX, 0, pfpWidth, H);
+  mainCtx.rect(avatarX, 0, pfpWidth, rowHeight);
   mainCtx.clip();
   mainCtx.drawImage(avatarImg, avatarX - cropX, -cropY, drawWidth, drawHeight);
   mainCtx.restore();
@@ -428,19 +559,16 @@ function drawColorCurveOverlay(
   // The mask is always built assuming the avatar is at the LEFT edge;
   // mirrored cards just flip it, which moves the fade to the right edge
   // while keeping the same blend direction relative to the avatar.
-  let mask = createCurveMask(cardWidth, pfpWidth);
-  if (mirror) {
-    mask = flipHorizontal(mask, cardWidth, H);
-  }
+  const mask = transformMask(createCurveMask(cardWidth, pfpWidth, H, false) as any, cardWidth, H, mirror, false);
 
   // Keep only the area on the far side of the curved boundary. The mask is
   // feathered, so its alpha falls gradually toward the PFP instead of making
   // a hard black edge. Because this overlay is drawn after the PFP, the
   // PFP naturally shows through more as the mask becomes transparent.
   octx.globalCompositeOperation = 'destination-in';
-  octx.drawImage(mask, 0, 0);
+  octx.drawImage(mask as any, 0, 0);
 
-  mainCtx.drawImage(overlay, 0, 0);
+  mainCtx.drawImage(overlay as any, 0, 0);
 }
 
 async function drawText(
@@ -450,13 +578,15 @@ async function drawText(
   username: string,
   cardWidth: number,
   pfpWidth: number,
+  cardHeight: number,
   mirror: boolean,
   drawWatermark: boolean,
+  isWhitePreset: boolean,
   stickerUrl?: string,
   imageUrl?: string,
 ) {
+  const H = cardHeight;
   const {
-    H,
     QUOTE_SAFE_LEFT_INSET,
     QUOTE_SAFE_RIGHT_INSET,
     QUOTE_SAFE_TOP_INSET,
@@ -570,8 +700,14 @@ async function drawText(
     const usableWidth = textAreaWidth * 0.9;
     const safeBoxCenterX = textAreaLeft + textAreaWidth / 2;
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = isWhitePreset ? '#000000' : '#ffffff';
     ctx.textBaseline = 'middle';
+    if (!isWhitePreset) {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.32)';
+      ctx.shadowBlur = 2;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 1;
+    }
 
     // Segment the text for emoji support
     const segments = segmentText(quote);
@@ -620,6 +756,10 @@ async function drawText(
       }
       y += lineHeight;
     }
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
   }
 
   // Nickname/username block positioned below quote safe area
@@ -630,28 +770,32 @@ async function drawText(
 
   // Center separator line around the full quote area, unaffected by any
   // sticker split above it.
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.strokeStyle = isWhitePreset ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.4)';
   ctx.beginPath();
   ctx.moveTo(fullAreaCenterX - separatorWidth / 2, nicknameY);
   ctx.lineTo(fullAreaCenterX + separatorWidth / 2, nicknameY);
   ctx.stroke();
 
-  // Center nickname and username at fullAreaCenterX
+  // Nickname block sits toward the outer edge of its quote area, away from
+  // the shared center seam. Mirrored cards use the opposite side.
+  const nicknameCenterX = mirror
+    ? quoteAreaX0 + quoteAreaWidth * 0.28
+    : quoteAreaX0 + quoteAreaWidth * 0.72;
   ctx.textAlign = 'center';
   ctx.font = `26px ${FONT_FALLBACK}`;
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.fillText(nickname, fullAreaCenterX, nicknameY + 32);
+  ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)';
+  ctx.fillText(nickname, nicknameCenterX, nicknameY + 32);
 
   ctx.font = `20px ${FONT_FALLBACK}`;
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.fillText(`@${username}`, fullAreaCenterX, nicknameY + 62);
+  ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)';
+  ctx.fillText(`@${username}`, nicknameCenterX, nicknameY + 62);
   ctx.textAlign = 'left'; // Reset to default
 
   if (drawWatermark) {
     // Watermark in bottom-right corner of the card (single quotes only —
     // stacked composites draw one shared badge at each seam instead).
     ctx.font = 'bold 15px ' + FONT_FALLBACK; // 10% bigger than the original 14px
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.5)';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'bottom';
     ctx.fillText('BOMBO PRODUCTIONS', cardWidth - WATERMARK_RIGHT_MARGIN, H - WATERMARK_BOTTOM_MARGIN);

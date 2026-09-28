@@ -1,7 +1,7 @@
 import { Pool, PoolClient, type QueryResultRow } from 'pg';
 import { config } from '../config/index.js';
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 
 let pool: Pool | null = null;
 
@@ -223,6 +223,78 @@ async function initializeSchema(): Promise<void> {
         console.log('✓ title_ownership table created');
       } else {
         console.log('✓ title_ownership table exists');
+      }
+
+      // Check if quote_redirect_settings table exists
+      const quoteRedirectCheck = await pool!.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_name = 'quote_redirect_settings' 
+        AND table_schema = 'public'
+      `);
+
+      if (quoteRedirectCheck.rows.length === 0) {
+        console.log('⚠ quote_redirect_settings table does not exist, creating...');
+        
+        await pool!.query(`
+          CREATE TABLE IF NOT EXISTS quote_redirect_settings (
+            guild_id VARCHAR(255) PRIMARY KEY,
+            redirect_enabled BOOLEAN NOT NULL DEFAULT true,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        
+        // Create index
+        await pool!.query(`
+          CREATE INDEX IF NOT EXISTS idx_quote_redirect_settings_guild_id ON quote_redirect_settings(guild_id)
+        `);
+        
+        // Create trigger for updated_at
+        await pool!.query(`
+          CREATE TRIGGER update_quote_redirect_settings_updated_at
+          BEFORE UPDATE ON quote_redirect_settings
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column()
+        `);
+        
+        console.log('✓ quote_redirect_settings table created');
+      } else {
+        console.log('✓ quote_redirect_settings table exists');
+      }
+
+      // Check if mog_profiles table exists
+      const mogProfilesCheck = await pool!.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_name = 'mog_profiles' 
+        AND table_schema = 'public'
+      `);
+
+      if (mogProfilesCheck.rows.length === 0) {
+        console.log('⚠ mog_profiles table does not exist, creating...');
+        
+        await pool!.query(`
+          CREATE TABLE IF NOT EXISTS mog_profiles (
+            guild_id VARCHAR(255) NOT NULL,
+            user_id VARCHAR(255) NOT NULL,
+            rank VARCHAR(10) NOT NULL CHECK (rank IN ('D', 'C', 'B', 'A', 'S', 'SS')),
+            stars INTEGER NOT NULL CHECK (stars >= 1 AND stars <= 5),
+            title VARCHAR(255) NOT NULL,
+            description TEXT NOT NULL,
+            theme_color VARCHAR(7) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (guild_id, user_id)
+          )
+        `);
+        
+        // Create index
+        await pool!.query(`
+          CREATE INDEX IF NOT EXISTS idx_mog_profiles_user_id ON mog_profiles(user_id)
+        `);
+        
+        console.log('✓ mog_profiles table created');
+      } else {
+        console.log('✓ mog_profiles table exists');
       }
     }
   } catch (error) {
@@ -499,6 +571,22 @@ export interface TitleOwnership {
   acquired_at: Date | null;
 }
 
+export interface QuoteRedirectSettings {
+  guild_id: string;
+  redirect_enabled: boolean;
+}
+
+export interface MogProfile {
+  guild_id: string;
+  user_id: string;
+  rank: 'D' | 'C' | 'B' | 'A' | 'S' | 'SS';
+  stars: number;
+  title: string;
+  description: string;
+  theme_color: string;
+  created_at: Date;
+}
+
 /**
  * Get the leaderboard of users sorted by coin balance
  * @param limit Maximum number of users to return
@@ -611,6 +699,180 @@ export async function getAllTitleOwnerships(): Promise<Map<string, TitleOwnershi
     }
 
     return ownerships;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get quote redirect settings for a guild
+ * @param guildId Discord guild ID
+ * @returns Quote redirect settings (defaults to enabled if not found)
+ */
+export async function getQuoteRedirectSettings(guildId: string): Promise<QuoteRedirectSettings> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      'SELECT guild_id, redirect_enabled FROM quote_redirect_settings WHERE guild_id = $1',
+      [guildId]
+    );
+
+    if (result.rows.length === 0) {
+      // Default to enabled if not found
+      return {
+        guild_id: guildId,
+        redirect_enabled: true
+      };
+    }
+
+    const row = result.rows[0];
+    return {
+      guild_id: row.guild_id,
+      redirect_enabled: row.redirect_enabled
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Set quote redirect settings for a guild
+ * @param guildId Discord guild ID
+ * @param redirectEnabled Whether redirect is enabled
+ * @returns True if successful
+ */
+export async function setQuoteRedirectSettings(guildId: string, redirectEnabled: boolean): Promise<boolean> {
+  const client = await getClient();
+  try {
+    await client.query(
+      `INSERT INTO quote_redirect_settings (guild_id, redirect_enabled)
+       VALUES ($1, $2)
+       ON CONFLICT (guild_id) 
+       DO UPDATE SET 
+         redirect_enabled = EXCLUDED.redirect_enabled,
+         updated_at = CURRENT_TIMESTAMP`,
+      [guildId, redirectEnabled]
+    );
+    return true;
+  } catch (error) {
+    console.error('[QUOTE_REDIRECT] Failed to set quote redirect settings:', error);
+    return false;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get MOG profile for a user in a guild
+ * @param guildId Discord guild ID
+ * @param userId Discord user ID
+ * @returns MOG profile or null if not found
+ */
+export async function getMogProfile(guildId: string, userId: string): Promise<MogProfile | null> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      'SELECT guild_id, user_id, rank, stars, title, description, theme_color, created_at FROM mog_profiles WHERE guild_id = $1 AND user_id = $2',
+      [guildId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    return {
+      guild_id: row.guild_id,
+      user_id: row.user_id,
+      rank: row.rank as 'D' | 'C' | 'B' | 'A' | 'S' | 'SS',
+      stars: row.stars,
+      title: row.title,
+      description: row.description,
+      theme_color: row.theme_color,
+      created_at: row.created_at
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Create MOG profile for a user in a guild (atomic operation)
+ * Uses INSERT with ON CONFLICT to handle race conditions
+ * @param guildId Discord guild ID
+ * @param userId Discord user ID
+ * @param rank Rank (D, C, B, A, S, SS)
+ * @param stars Star rating (1-5)
+ * @param title Randomized title
+ * @param description Randomized description
+ * @param themeColor Random theme color
+ * @returns Created MOG profile or existing profile if already exists
+ */
+export async function createMogProfile(
+  guildId: string,
+  userId: string,
+  rank: 'D' | 'C' | 'B' | 'A' | 'S' | 'SS',
+  stars: number,
+  title: string,
+  description: string,
+  themeColor: string
+): Promise<MogProfile> {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    // Try to insert new profile with ON CONFLICT to handle race conditions
+    const result = await client.query(
+      `INSERT INTO mog_profiles (guild_id, user_id, rank, stars, title, description, theme_color)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (guild_id, user_id) 
+       DO NOTHING
+       RETURNING guild_id, user_id, rank, stars, title, description, theme_color, created_at`,
+      [guildId, userId, rank, stars, title, description, themeColor]
+    );
+
+    if (result.rows.length > 0) {
+      // Successfully created new profile
+      await client.query('COMMIT');
+      const row = result.rows[0];
+      return {
+        guild_id: row.guild_id,
+        user_id: row.user_id,
+        rank: row.rank as 'D' | 'C' | 'B' | 'A' | 'S' | 'SS',
+        stars: row.stars,
+        title: row.title,
+        description: row.description,
+        theme_color: row.theme_color,
+        created_at: row.created_at
+      };
+    } else {
+      // Profile already exists (race condition), fetch it
+      const existingResult = await client.query(
+        'SELECT guild_id, user_id, rank, stars, title, description, theme_color, created_at FROM mog_profiles WHERE guild_id = $1 AND user_id = $2',
+        [guildId, userId]
+      );
+      
+      await client.query('COMMIT');
+      const row = existingResult.rows[0];
+      return {
+        guild_id: row.guild_id,
+        user_id: row.user_id,
+        rank: row.rank as 'D' | 'C' | 'B' | 'A' | 'S' | 'SS',
+        stars: row.stars,
+        title: row.title,
+        description: row.description,
+        theme_color: row.theme_color,
+        created_at: row.created_at
+      };
+    }
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('[MOG_PROFILES] Failed to rollback transaction:', rollbackError);
+    }
+    console.error('[MOG_PROFILES] Failed to create MOG profile:', error);
+    throw error;
   } finally {
     client.release();
   }

@@ -94,3 +94,50 @@ CREATE TRIGGER update_title_ownership_updated_at
   BEFORE UPDATE ON title_ownership
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+-- Quote redirect settings table
+CREATE TABLE IF NOT EXISTS quote_redirect_settings (
+  guild_id VARCHAR(255) PRIMARY KEY,
+  redirect_enabled BOOLEAN NOT NULL DEFAULT true,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for faster lookups (create if not exists by checking first)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_quote_redirect_settings_guild_id') THEN
+        CREATE INDEX idx_quote_redirect_settings_guild_id ON quote_redirect_settings(guild_id);
+    END IF;
+END
+$$;
+
+-- Drop existing trigger if any
+DROP TRIGGER IF EXISTS update_quote_redirect_settings_updated_at ON quote_redirect_settings;
+
+-- Trigger to auto-update updated_at
+CREATE TRIGGER update_quote_redirect_settings_updated_at
+  BEFORE UPDATE ON quote_redirect_settings
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- MOG profiles table for permanent rank classifications
+CREATE TABLE IF NOT EXISTS mog_profiles (
+  guild_id VARCHAR(255) NOT NULL,
+  user_id VARCHAR(255) NOT NULL,
+  rank VARCHAR(10) NOT NULL CHECK (rank IN ('D', 'C', 'B', 'A', 'S', 'SS')),
+  stars INTEGER NOT NULL CHECK (stars >= 1 AND stars <= 5),
+  title VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL,
+  theme_color VARCHAR(7) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (guild_id, user_id)
+);
+
+-- Index for faster lookups (create if not exists by checking first)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_mog_profiles_user_id') THEN
+        CREATE INDEX idx_mog_profiles_user_id ON mog_profiles(user_id);
+    END IF;
+END
+$$;

@@ -9,9 +9,13 @@ import {
 import { renderQuoteCard, renderStackedQuoteCard, QuoteCardOptions } from '../quote/renderer.js';
 import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS } from '../quote/config.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { isStaff } from '../utils/permissions.js';
+import { getQuoteRedirectSettings } from '../database/client.js';
 
 const THEME_NAMES: PresetName[] = ['classic', 'white', 'sunset', 'ocean', 'purple', 'aurora', 'gold', 'cherry', 'midnight', 'plasma', 'emerald', 'rose', 'ember', 'cyan', 'sapphire', 'coral', 'lime', 'lavender', 'toxic', 'amethyst'];
 const QUOTE_REDIRECT_CHANNEL_ID = '1526869451834654821';
+const QUOTE_COOLDOWN_MS = 5 * 1000; // 5 seconds
+let quoteCooldownUntil = 0;
 
 /** Everything renderQuoteCard needs for one message, minus the shared theme. */
 type QuoteSourceOpts = Omit<QuoteCardOptions, 'preset'>;
@@ -64,6 +68,16 @@ async function buildQuoteSource(message: Message, target: Message): Promise<Quot
 }
 
 export async function handleQuoteCommand(message: Message, args: string[]): Promise<void> {
+  // Check cooldown (staff bypass)
+  const now = Date.now();
+  if (!isStaff(message.member) && now < quoteCooldownUntil) {
+    const remainingTime = Math.ceil((quoteCooldownUntil - now) / 1000);
+    await message.reply({
+      content: `⏳ Please wait ${remainingTime} second${remainingTime !== 1 ? 's' : ''} before creating another quote.`,
+    });
+    return;
+  }
+
   // Check if this is a reply to another message
   if (!message.reference?.messageId) {
     await message.reply(
@@ -172,16 +186,25 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       components: buildSelectRow(),
     });
 
-    // Send copy to redirect channel (only once)
+    // Set cooldown after successful quote creation
+    quoteCooldownUntil = Date.now() + QUOTE_COOLDOWN_MS;
+
+    // Send copy to redirect channel (only once) - check database settings
     let redirectMessage: Message | null = null;
     try {
-      const redirectChannel = await message.guild?.channels.fetch(QUOTE_REDIRECT_CHANNEL_ID);
-      if (redirectChannel && redirectChannel.isTextBased()) {
-        redirectMessage = await redirectChannel.send({
-          content,
-          files: [attachment],
-          components: buildSelectRow(),
-        });
+      if (message.guild) {
+        const redirectSettings = await getQuoteRedirectSettings(message.guild.id);
+        
+        if (redirectSettings.redirect_enabled) {
+          const redirectChannel = await message.guild.channels.fetch(QUOTE_REDIRECT_CHANNEL_ID);
+          if (redirectChannel && redirectChannel.isTextBased()) {
+            redirectMessage = await redirectChannel.send({
+              content,
+              files: [attachment],
+              components: buildSelectRow(),
+            });
+          }
+        }
       }
     } catch (redirectError) {
       console.error('[QUOTE] Failed to send quote to redirect channel:', redirectError);

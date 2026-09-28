@@ -58,18 +58,24 @@ export const LAYOUT = {
   IMAGE_STACK_HEIGHT_FRACTION: 0.38,
   IMAGE_STACK_GAP: 24,
 
-  // Multi-quote stacking (.quote 2, and later .quote 3/4/...): each card
+  // Multi-quote stacking (.quote 2, and later .quote 3/4/...): every card
   // keeps its own full H-tall slot (no compression — total height is
-  // always an exact multiple of H), but the edge each card shares with a
-  // neighbour fades to transparent over this many px, revealing a
-  // same-coloured backdrop underneath so adjacent cards melt together at
-  // the seam instead of butting against a hard line.
-  STACK_EDGE_FADE: 70,
+  // always an exact multiple of H). The whole stack is painted as one
+  // continuous backdrop across all cards in a single pass, so there is no
+  // per-card seam to blend — the earlier STACK_EDGE_FADE compositing trick
+  // is gone because there's no longer a seam it needs to hide.
 
   // Stacked cards get a wider quote/text column than a single card (the
   // avatar itself stays the same H x H square either way) — this
   // multiplies the standard (W - H) quote-column width.
-  STACK_QUOTE_WIDTH_MULTIPLIER: 1.2,
+  STACK_QUOTE_WIDTH_MULTIPLIER: 1.4,
+
+  // Total composite height target for a stack, regardless of N (fixed at
+  // H*1.5 for now rather than H*N — each card's slot, and its square
+  // avatar, shrinks to fit within this instead of the composite growing
+  // with every added card). Revisit this ratio if/when .quote 3+ needs a
+  // different one; for now every N squeezes into the same H*1.5 total.
+  STACK_HEIGHT_MULTIPLIER: 1.5,
 } as const;
 
 export const FONT_FALLBACK = 'Butler, Georgia, serif';
