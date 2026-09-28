@@ -50,12 +50,12 @@ export interface MogImageData {
 
 // Rank definitions with colors
 const RANK_CONFIG = {
-  'D': { classification: 'ROOKIE', color: '#888888', glowColor: '#AAAAAA' },
-  'C': { classification: 'STANDARD', color: '#4CAF50', glowColor: '#66BB6A' },
-  'B': { classification: 'ADVANCED', color: '#2196F3', glowColor: '#42A5F5' },
-  'A': { classification: 'ELITE', color: '#9C27B0', glowColor: '#BA68C8' },
-  'S': { classification: 'LEGENDARY', color: '#FF9800', glowColor: '#FFB74D' },
-  'SS': { classification: 'MYTHIC', color: '#F44336', glowColor: '#EF5350' },
+  'D': { classification: 'ROOKIE', color: '#2196F3', glowColor: '#64B5F6' },
+  'C': { classification: 'STANDARD', color: '#0D47A1', glowColor: '#1976D2' },
+  'B': { classification: 'ADVANCED', color: '#FFEB00', glowColor: '#FFF176' },
+  'A': { classification: 'ELITE', color: '#FF9800', glowColor: '#FFB74D' },
+  'S': { classification: 'LEGENDARY', color: '#F44336', glowColor: '#EF5350' },
+  'SS': { classification: 'MYTHIC', color: '#B000FF', glowColor: '#D580FF' },
 };
 
 // Title options
@@ -277,46 +277,51 @@ export class MogImageGenerator {
     const { username, displayName, avatarBuffer, rankData } = data;
     const themeColor = rankData.theme_color;
 
+    // Get rank-specific colors for decorative elements
+    const rankConfig = RANK_CONFIG[rankData.rank as keyof typeof RANK_CONFIG];
+    const rankColor = rankConfig?.color || '#4A90E2'; // Fallback to blue if rank not found
+    const rankGlowColor = rankConfig?.glowColor || '#64B5F6'; // Fallback glow color
+
     // Create canvas at exact 1080x1920
     const canvas = createCanvas(this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
     const ctx = canvas.getContext('2d');
 
     // Draw background with full canvas usage
-    this.drawBackground(ctx, themeColor);
+    this.drawBackground(ctx, themeColor, rankColor);
 
     // Draw header
-    this.drawHeader(ctx, themeColor);
+    this.drawHeader(ctx, rankColor);
 
     // Draw avatar on the left side of upper row
     const avatar = await loadImage(avatarBuffer);
-    this.drawCircularAvatar(ctx, avatar, this.AVATAR_X, this.AVATAR_Y, this.AVATAR_SIZE, themeColor);
+    this.drawCircularAvatar(ctx, avatar, this.AVATAR_X, this.AVATAR_Y, this.AVATAR_SIZE, rankColor, rankGlowColor);
 
     // Draw rank badge on the right side of upper row (centered with avatar)
-    this.drawRankBadge(ctx, rankData.rank, this.RANK_BADGE_X, this.RANK_BADGE_Y, themeColor);
+    this.drawRankBadge(ctx, rankData.rank, this.RANK_BADGE_X, this.RANK_BADGE_Y, rankColor, rankGlowColor);
 
     // Draw rank name (classification) below badge, centered in right column
-    this.drawRankName(ctx, rankData, this.RANK_BADGE_X, this.RANK_NAME_Y, themeColor);
+    this.drawRankName(ctx, rankData, this.RANK_BADGE_X, this.RANK_NAME_Y);
 
     // Draw stars (custom emoji images, dedicated row)
-    await this.drawStars(ctx, rankData.stars, this.IMAGE_WIDTH / 2, this.STARS_Y);
+    await this.drawStars(ctx, rankData.stars, this.IMAGE_WIDTH / 2, this.STARS_Y, rankColor, rankGlowColor);
 
     // Draw divider line
-    this.drawDivider(ctx, this.IMAGE_WIDTH / 2, this.DIVIDER_Y, themeColor);
+    this.drawDivider(ctx, this.IMAGE_WIDTH / 2, this.DIVIDER_Y, rankColor, rankGlowColor);
 
     // Draw username (major element)
-    this.drawUsername(ctx, displayName, username, this.IMAGE_WIDTH / 2, this.USERNAME_Y, themeColor);
+    this.drawUsername(ctx, displayName, username, this.IMAGE_WIDTH / 2, this.USERNAME_Y);
 
     // Draw title (prominent, dedicated area)
-    this.drawTitle(ctx, rankData.title, this.IMAGE_WIDTH / 2, this.TITLE_Y, themeColor);
+    this.drawTitle(ctx, rankData.title, this.IMAGE_WIDTH / 2, this.TITLE_Y, rankColor, rankGlowColor);
 
     // Draw description (dedicated section, comfortable reading)
-    this.drawDescription(ctx, rankData.description, this.IMAGE_WIDTH / 2, this.DESCRIPTION_Y, themeColor);
+    this.drawDescription(ctx, rankData.description, this.IMAGE_WIDTH / 2, this.DESCRIPTION_Y, rankColor, rankGlowColor);
 
     // Draw classification analysis section
-    this.drawClassificationAnalysis(ctx, rankData, this.IMAGE_WIDTH / 2, this.ANALYSIS_Y, themeColor);
+    this.drawClassificationAnalysis(ctx, rankData, this.IMAGE_WIDTH / 2, this.ANALYSIS_Y, themeColor, rankColor, rankGlowColor);
 
     // Draw footer
-    this.drawFooter(ctx);
+    this.drawFooter(ctx, rankColor, rankGlowColor);
 
     return canvas.toBuffer('image/png');
   }
@@ -353,7 +358,7 @@ export class MogImageGenerator {
   /**
    * Draw dark futuristic background with full canvas usage
    */
-  private static drawBackground(ctx: SKRSContext2D, themeColor: string): void {
+  private static drawBackground(ctx: SKRSContext2D, themeColor: string, rankColor: string): void {
     // Dark blue background (matching reference)
     ctx.fillStyle = '#0d1117';
     ctx.fillRect(0, 0, this.IMAGE_WIDTH, this.IMAGE_HEIGHT);
@@ -376,11 +381,11 @@ export class MogImageGenerator {
       ctx.stroke();
     }
 
-    // Corner brackets with blue accent (original theme)
-    this.drawCornerBracket(ctx, 30, 30, 120, 'top-left', themeColor);
-    this.drawCornerBracket(ctx, this.IMAGE_WIDTH - 30, 30, 120, 'top-right', themeColor);
-    this.drawCornerBracket(ctx, 30, this.IMAGE_HEIGHT - 30, 120, 'bottom-left', themeColor);
-    this.drawCornerBracket(ctx, this.IMAGE_WIDTH - 30, this.IMAGE_HEIGHT - 30, 120, 'bottom-right', themeColor);
+    // Corner brackets with rank color
+    this.drawCornerBracket(ctx, 30, 30, 120, 'top-left', rankColor);
+    this.drawCornerBracket(ctx, this.IMAGE_WIDTH - 30, 30, 120, 'top-right', rankColor);
+    this.drawCornerBracket(ctx, 30, this.IMAGE_HEIGHT - 30, 120, 'bottom-left', rankColor);
+    this.drawCornerBracket(ctx, this.IMAGE_WIDTH - 30, this.IMAGE_HEIGHT - 30, 120, 'bottom-right', rankColor);
 
     // Add subtle radial gradient overlay for depth
     const gradient = ctx.createRadialGradient(
@@ -396,14 +401,14 @@ export class MogImageGenerator {
   /**
    * Draw corner bracket
    */
-  private static drawCornerBracket(ctx: SKRSContext2D, x: number, y: number, size: number, position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right', themeColor: string): void {
-    ctx.strokeStyle = themeColor;
+  private static drawCornerBracket(ctx: SKRSContext2D, x: number, y: number, size: number, position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right', rankColor: string): void {
+    ctx.strokeStyle = rankColor;
     ctx.lineWidth = 3;
-    ctx.shadowColor = themeColor;
+    ctx.shadowColor = rankColor;
     ctx.shadowBlur = 10;
 
     ctx.beginPath();
-    
+
     if (position === 'top-left') {
       ctx.moveTo(x, y + size);
       ctx.lineTo(x, y);
@@ -421,7 +426,7 @@ export class MogImageGenerator {
       ctx.lineTo(x, y);
       ctx.lineTo(x, y - size);
     }
-    
+
     ctx.stroke();
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
@@ -430,11 +435,10 @@ export class MogImageGenerator {
   /**
    * Draw circular avatar with border
    */
-  private static drawCircularAvatar(ctx: SKRSContext2D, image: any, x: number, y: number, size: number, themeColor: string): void {
+  private static drawCircularAvatar(ctx: SKRSContext2D, image: any, x: number, y: number, size: number, rankColor: string, rankGlowColor: string): void {
     const centerX = x + size / 2;
     const centerY = y + size / 2;
     const radius = size / 2;
-    const blueAccent = '#4A90E2';
 
     // Save context for clipping
     ctx.save();
@@ -451,17 +455,17 @@ export class MogImageGenerator {
     // Restore context
     ctx.restore();
 
-    // Draw border with blue accent
+    // Draw border with rank color
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.closePath();
-    
-    ctx.strokeStyle = blueAccent;
+
+    ctx.strokeStyle = rankColor;
     ctx.lineWidth = 6;
-    ctx.shadowColor = blueAccent;
+    ctx.shadowColor = rankGlowColor;
     ctx.shadowBlur = 20;
     ctx.stroke();
-    
+
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
   }
@@ -499,10 +503,9 @@ export class MogImageGenerator {
   /**
    * Draw rank badge (large and prominent)
    */
-  private static drawRankBadge(ctx: SKRSContext2D, rank: string, x: number, y: number, themeColor: string): void {
+  private static drawRankBadge(ctx: SKRSContext2D, rank: string, x: number, y: number, rankColor: string, rankGlowColor: string): void {
     const config = RANK_CONFIG[rank as keyof typeof RANK_CONFIG];
     const size = this.RANK_BADGE_SIZE;
-    const blueAccent = '#4A90E2';
 
     // Draw background circle with rank color
     ctx.beginPath();
@@ -517,10 +520,10 @@ export class MogImageGenerator {
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
 
-    // Draw border with blue accent
-    ctx.strokeStyle = blueAccent;
+    // Draw border with rank color
+    ctx.strokeStyle = rankColor;
     ctx.lineWidth = 8;
-    ctx.shadowColor = blueAccent;
+    ctx.shadowColor = rankGlowColor;
     ctx.shadowBlur = 30;
     ctx.stroke();
 
@@ -542,7 +545,7 @@ export class MogImageGenerator {
   /**
    * Draw rank name (classification) prominently
    */
-  private static drawRankName(ctx: SKRSContext2D, rankData: MogRankData, x: number, y: number, themeColor: string): void {
+  private static drawRankName(ctx: SKRSContext2D, rankData: MogRankData, x: number, y: number): void {
     const config = RANK_CONFIG[rankData.rank as keyof typeof RANK_CONFIG];
 
     ctx.font = 'bold 36px Roboto';
@@ -560,7 +563,7 @@ export class MogImageGenerator {
    * Draw star rating using Discord custom emoji images
    * Following quote renderer's emoji compositing pattern
    */
-  private static async drawStars(ctx: SKRSContext2D, count: number, x: number, y: number): Promise<void> {
+  private static async drawStars(ctx: SKRSContext2D, count: number, x: number, y: number, rankColor: string, rankGlowColor: string): Promise<void> {
     const starSize = this.STAR_SIZE;
     const spacing = this.STAR_SPACING;
     const totalWidth = 5 * spacing;
@@ -593,11 +596,11 @@ export class MogImageGenerator {
         ctx.textBaseline = 'middle';
 
         if (filled) {
-          ctx.fillStyle = '#FFD700';
-          ctx.shadowColor = '#FFD700';
+          ctx.fillStyle = rankColor;
+          ctx.shadowColor = rankGlowColor;
           ctx.shadowBlur = 20;
         } else {
-          ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+          ctx.fillStyle = this.hexToRgba(rankColor, 0.3);
           ctx.shadowColor = 'transparent';
           ctx.shadowBlur = 0;
         }
@@ -620,13 +623,12 @@ export class MogImageGenerator {
   /**
    * Draw header
    */
-  private static drawHeader(ctx: SKRSContext2D, themeColor: string): void {
-    const blueAccent = '#4A90E2';
+  private static drawHeader(ctx: SKRSContext2D, rankColor: string): void {
     ctx.font = 'bold 52px Roboto';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = blueAccent;
-    ctx.shadowColor = blueAccent;
+    ctx.fillStyle = rankColor;
+    ctx.shadowColor = rankColor;
     ctx.shadowBlur = 20;
     ctx.fillText('THE MOG FILES', this.IMAGE_WIDTH / 2, this.HEADER_Y);
     ctx.shadowColor = 'transparent';
@@ -636,26 +638,28 @@ export class MogImageGenerator {
   /**
    * Draw footer
    */
-  private static drawFooter(ctx: SKRSContext2D): void {
+  private static drawFooter(ctx: SKRSContext2D, rankColor: string, rankGlowColor: string): void {
     const tagline = TAGLINES[Math.floor(Math.random() * TAGLINES.length)];
-    const blueAccent = '#4A90E2';
 
     ctx.font = 'bold 28px Roboto';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillStyle = this.hexToRgba(blueAccent, 0.8);
+    ctx.fillStyle = this.hexToRgba(rankColor, 0.8);
+    ctx.shadowColor = rankGlowColor;
+    ctx.shadowBlur = 10;
     ctx.fillText(`BOMBO PRODUCTIONS • ${tagline}`, this.IMAGE_WIDTH / 2, this.FOOTER_Y);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
   }
 
   /**
    * Draw divider line
    */
-  private static drawDivider(ctx: SKRSContext2D, x: number, y: number, themeColor: string): void {
+  private static drawDivider(ctx: SKRSContext2D, x: number, y: number, rankColor: string, rankGlowColor: string): void {
     const width = 600;
-    const blueAccent = '#4A90E2';
-    ctx.strokeStyle = this.hexToRgba(blueAccent, 0.4);
+    ctx.strokeStyle = this.hexToRgba(rankColor, 0.4);
     ctx.lineWidth = 2;
-    ctx.shadowColor = blueAccent;
+    ctx.shadowColor = rankGlowColor;
     ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.moveTo(x - width / 2, y);
@@ -668,7 +672,7 @@ export class MogImageGenerator {
   /**
    * Draw username (major element)
    */
-  private static drawUsername(ctx: SKRSContext2D, displayName: string, username: string, x: number, y: number, themeColor: string): void {
+  private static drawUsername(ctx: SKRSContext2D, displayName: string, username: string, x: number, y: number): void {
     // Display name (large)
     const maxFontSize = 72;
     const minFontSize = 48;
@@ -707,13 +711,12 @@ export class MogImageGenerator {
   /**
    * Draw title (prominent, dedicated area)
    */
-  private static drawTitle(ctx: SKRSContext2D, title: string, x: number, y: number, themeColor: string): void {
-    const blueAccent = '#4A90E2';
+  private static drawTitle(ctx: SKRSContext2D, title: string, x: number, y: number, rankColor: string, rankGlowColor: string): void {
     ctx.font = 'bold 52px Roboto';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = blueAccent;
-    ctx.shadowColor = blueAccent;
+    ctx.fillStyle = rankColor;
+    ctx.shadowColor = rankGlowColor;
     ctx.shadowBlur = 20;
     ctx.fillText(title, x, y);
     ctx.shadowColor = 'transparent';
@@ -723,11 +726,10 @@ export class MogImageGenerator {
   /**
    * Draw description (dedicated section, comfortable reading with frame)
    */
-  private static drawDescription(ctx: SKRSContext2D, description: string, x: number, y: number, themeColor: string): void {
+  private static drawDescription(ctx: SKRSContext2D, description: string, x: number, y: number, rankColor: string, rankGlowColor: string): void {
     const padding = 40;
     const maxWidth = this.IMAGE_WIDTH - 180;
     const lineHeight = 50;
-    const blueAccent = '#4A90E2';
 
     // Word wrap the description first to calculate needed height
     ctx.font = '40px Roboto';
@@ -755,11 +757,11 @@ export class MogImageGenerator {
     const frameX = x - maxWidth / 2 - padding;
     const frameY = y - 25;
 
-    // Draw framed background for quote section with blue accent
-    ctx.fillStyle = this.hexToRgba(blueAccent, 0.1);
-    ctx.strokeStyle = this.hexToRgba(blueAccent, 0.3);
+    // Draw framed background for quote section with rank color
+    ctx.fillStyle = this.hexToRgba(rankColor, 0.1);
+    ctx.strokeStyle = this.hexToRgba(rankColor, 0.3);
     ctx.lineWidth = 2;
-    ctx.shadowColor = blueAccent;
+    ctx.shadowColor = rankGlowColor;
     ctx.shadowBlur = 15;
 
     // Draw rounded rectangle background
@@ -791,19 +793,18 @@ export class MogImageGenerator {
   /**
    * Draw classification analysis section with three stat bars
    */
-  private static drawClassificationAnalysis(ctx: SKRSContext2D, rankData: MogRankData, x: number, y: number, themeColor: string): void {
+  private static drawClassificationAnalysis(ctx: SKRSContext2D, rankData: MogRankData, x: number, y: number, themeColor: string, rankColor: string, rankGlowColor: string): void {
     const sectionPadding = 50;
     const barHeight = 26;
     const barSpacing = 55;
     const sectionWidth = this.IMAGE_WIDTH - (sectionPadding * 2);
-    const blueAccent = '#4A90E2';
 
-    // Draw section header with blue accent
+    // Draw section header with rank color
     ctx.font = 'bold 32px Roboto';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = blueAccent;
-    ctx.shadowColor = blueAccent;
+    ctx.fillStyle = rankColor;
+    ctx.shadowColor = rankGlowColor;
     ctx.shadowBlur = 15;
     ctx.fillText('CLASSIFICATION ANALYSIS', x, y);
     ctx.shadowColor = 'transparent';
@@ -835,12 +836,12 @@ export class MogImageGenerator {
 
       // Draw background bar (centered in available space)
       const barStartX = x - sectionWidth / 2 + labelColumnWidth + gapBetween;
-      ctx.fillStyle = this.hexToRgba(themeColor, 0.2);
+      ctx.fillStyle = this.hexToRgba(rankColor, 0.2);
       ctx.fillRect(barStartX, barY, availableBarWidth, barHeight);
 
       // Draw filled bar
-      ctx.fillStyle = themeColor;
-      ctx.shadowColor = themeColor;
+      ctx.fillStyle = rankColor;
+      ctx.shadowColor = rankGlowColor;
       ctx.shadowBlur = 10;
       ctx.fillRect(barStartX, barY, barWidth, barHeight);
       ctx.shadowColor = 'transparent';

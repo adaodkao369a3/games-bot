@@ -14,12 +14,12 @@ const RANK_CLASSIFICATIONS = {
 
 // Rank colors matching the MOG system
 const RANK_COLORS = {
-  'D': '#888888',
-  'C': '#4CAF50',
-  'B': '#2196F3',
-  'A': '#9C27B0',
-  'S': '#FF9800',
-  'SS': '#F44336',
+  'D': '#2196F3',
+  'C': '#0D47A1',
+  'B': '#FFEB00',
+  'A': '#FF9800',
+  'S': '#F44336',
+  'SS': '#B000FF',
 };
 
 // Rank priority for sorting (higher = better)
