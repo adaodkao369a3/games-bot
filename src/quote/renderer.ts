@@ -114,6 +114,7 @@ async function renderQuoteCardLayer(opts: QuoteCardOptions, layout: LayerOptions
     mirror,
     drawWatermark,
     isWhitePreset,
+    false,
     opts.stickerUrl,
     opts.imageUrl,
   );
@@ -175,8 +176,11 @@ export async function renderStackedQuoteCard(cards: QuoteCardOptions[]): Promise
   // Total composite height is capped at H*1.5 regardless of N (see
   // STACK_HEIGHT_MULTIPLIER) — each card's slot, and its square avatar,
   // shrinks to fit within that instead of the old H*N (no compression).
-  const compH = H * STACK_HEIGHT_MULTIPLIER;
-  const rowHeight = compH / N;
+  // Row height is rounded to a whole pixel: canvases/masks truncate
+  // fractional sizes, which left a sub-pixel strip at the seam where the
+  // avatar showed through un-faded.
+  const rowHeight = Math.round((H * STACK_HEIGHT_MULTIPLIER) / N);
+  const compH = rowHeight * N;
   const pfpWidth = rowHeight; // avatar stays square: side = this card's (now-compressed) slot height
 
   const SCALE = 2;
@@ -241,6 +245,7 @@ export async function renderStackedQuoteCard(cards: QuoteCardOptions[]): Promise
       mirror,
       false, // per-card watermark stays off — the shared seam badge covers it
       isWhitePreset,
+      true,
       cards[i].stickerUrl,
       cards[i].imageUrl,
     );
@@ -582,6 +587,7 @@ async function drawText(
   mirror: boolean,
   drawWatermark: boolean,
   isWhitePreset: boolean,
+  stacked: boolean,
   stickerUrl?: string,
   imageUrl?: string,
 ) {
@@ -624,7 +630,9 @@ async function drawText(
     ? quoteAreaX1 - quoteAreaWidth * nearAvatarInset
     : quoteAreaX1 - quoteAreaWidth * farInset;
   const quoteTop = H * QUOTE_SAFE_TOP_INSET;
-  const quoteBottom = H * QUOTE_SAFE_BOTTOM_INSET;
+  // Stacked rows are shorter, so instead of a % of height the name block
+  // gets a fixed reserve at the bottom of the row — it can never spill.
+  const quoteBottom = stacked ? H - LAYOUT.STACK_NAME_BLOCK_RESERVE : H * QUOTE_SAFE_BOTTOM_INSET;
   const quoteWidth = quoteRight - quoteLeft;
   const quoteHeight = quoteBottom - quoteTop;
 
@@ -763,33 +771,55 @@ async function drawText(
   }
 
   // Nickname/username block positioned below quote safe area
-  const nicknameLeft = quoteAreaX0 + quoteAreaWidth * NICKNAME_LEFT_FRACTION;
-  const nicknameRight = quoteAreaX0 + quoteAreaWidth * NICKNAME_RIGHT_FRACTION;
   const nicknameY = quoteBottom + 20;
-  const separatorWidth = nicknameRight - nicknameLeft;
 
-  // Center separator line around the full quote area, unaffected by any
-  // sticker split above it.
-  ctx.strokeStyle = isWhitePreset ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.4)';
-  ctx.beginPath();
-  ctx.moveTo(fullAreaCenterX - separatorWidth / 2, nicknameY);
-  ctx.lineTo(fullAreaCenterX + separatorWidth / 2, nicknameY);
-  ctx.stroke();
+  if (stacked) {
+    // Stacked: the block sits at the outer edge of its quote column (away
+    // from the pfp) — far right for a normal card, far left for a mirrored
+    // one. The bar spans a fraction of the quote width, anchored to that
+    // same edge, and sits directly above the name and username.
+    const barLength = quoteWidth * LAYOUT.STACK_BAR_LENGTH_FRACTION;
+    const edgeX = mirror ? quoteLeft : quoteRight;
+    const barX0 = mirror ? edgeX : edgeX - barLength;
+    const barX1 = mirror ? edgeX + barLength : edgeX;
 
-  // Nickname block sits toward the outer edge of its quote area, away from
-  // the shared center seam. Mirrored cards use the opposite side.
-  const nicknameCenterX = mirror
-    ? quoteAreaX0 + quoteAreaWidth * 0.28
-    : quoteAreaX0 + quoteAreaWidth * 0.72;
-  ctx.textAlign = 'center';
-  ctx.font = `26px ${FONT_FALLBACK}`;
-  ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)';
-  ctx.fillText(nickname, nicknameCenterX, nicknameY + 32);
+    ctx.strokeStyle = isWhitePreset ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.moveTo(barX0, nicknameY);
+    ctx.lineTo(barX1, nicknameY);
+    ctx.stroke();
 
-  ctx.font = `20px ${FONT_FALLBACK}`;
-  ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)';
-  ctx.fillText(`@${username}`, nicknameCenterX, nicknameY + 62);
-  ctx.textAlign = 'left'; // Reset to default
+    ctx.textAlign = mirror ? 'left' : 'right';
+    ctx.font = `26px ${FONT_FALLBACK}`;
+    ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)';
+    ctx.fillText(nickname, edgeX, nicknameY + 32);
+
+    ctx.font = `20px ${FONT_FALLBACK}`;
+    ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)';
+    ctx.fillText(`@${username}`, edgeX, nicknameY + 62);
+    ctx.textAlign = 'left'; // Reset to default
+  } else {
+    // Single card: bar and name centered in the quote column.
+    const nicknameLeft = quoteAreaX0 + quoteAreaWidth * NICKNAME_LEFT_FRACTION;
+    const nicknameRight = quoteAreaX0 + quoteAreaWidth * NICKNAME_RIGHT_FRACTION;
+    const separatorWidth = nicknameRight - nicknameLeft;
+
+    ctx.strokeStyle = isWhitePreset ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.moveTo(fullAreaCenterX - separatorWidth / 2, nicknameY);
+    ctx.lineTo(fullAreaCenterX + separatorWidth / 2, nicknameY);
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.font = `26px ${FONT_FALLBACK}`;
+    ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)';
+    ctx.fillText(nickname, fullAreaCenterX, nicknameY + 32);
+
+    ctx.font = `20px ${FONT_FALLBACK}`;
+    ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)';
+    ctx.fillText(`@${username}`, fullAreaCenterX, nicknameY + 62);
+    ctx.textAlign = 'left'; // Reset to default
+  }
 
   if (drawWatermark) {
     // Watermark in bottom-right corner of the card (single quotes only —

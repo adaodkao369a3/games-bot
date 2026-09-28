@@ -129,6 +129,8 @@ CREATE TABLE IF NOT EXISTS mog_profiles (
   title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
   theme_color VARCHAR(7) NOT NULL,
+  attributes JSONB NOT NULL DEFAULT '{}',
+  analysis_attributes VARCHAR(10)[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (guild_id, user_id)
 );

@@ -272,7 +272,7 @@ async function initializeSchema(): Promise<void> {
 
       if (mogProfilesCheck.rows.length === 0) {
         console.log('⚠ mog_profiles table does not exist, creating...');
-        
+
         await pool!.query(`
           CREATE TABLE IF NOT EXISTS mog_profiles (
             guild_id VARCHAR(255) NOT NULL,
@@ -282,19 +282,50 @@ async function initializeSchema(): Promise<void> {
             title VARCHAR(255) NOT NULL,
             description TEXT NOT NULL,
             theme_color VARCHAR(7) NOT NULL,
+            attributes JSONB NOT NULL DEFAULT '{}',
+            analysis_attributes VARCHAR(10)[] NOT NULL DEFAULT '{}',
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (guild_id, user_id)
           )
         `);
-        
+
         // Create index
         await pool!.query(`
           CREATE INDEX IF NOT EXISTS idx_mog_profiles_user_id ON mog_profiles(user_id)
         `);
-        
+
         console.log('✓ mog_profiles table created');
       } else {
         console.log('✓ mog_profiles table exists');
+
+        // Check if attributes column exists
+        const attributesColumnCheck = await pool!.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'mog_profiles' 
+          AND table_schema = 'public'
+          AND column_name = 'attributes'
+        `);
+
+        if (attributesColumnCheck.rows.length === 0) {
+          console.log('⚠ mog_profiles table missing attributes column, adding migration...');
+
+          // Add attributes column
+          await pool!.query(`
+            ALTER TABLE mog_profiles 
+            ADD COLUMN IF NOT EXISTS attributes JSONB NOT NULL DEFAULT '{}'
+          `);
+
+          // Add analysis_attributes column
+          await pool!.query(`
+            ALTER TABLE mog_profiles 
+            ADD COLUMN IF NOT EXISTS analysis_attributes VARCHAR(10)[] NOT NULL DEFAULT '{}'
+          `);
+
+          console.log('✓ Migration completed: attributes and analysis_attributes columns added to mog_profiles');
+        } else {
+          console.log('✓ mog_profiles table has attributes column');
+        }
       }
     }
   } catch (error) {
@@ -584,6 +615,20 @@ export interface MogProfile {
   title: string;
   description: string;
   theme_color: string;
+  attributes: { [key: string]: number };
+  analysis_attributes: string[];
+  created_at: Date;
+}
+
+export interface MogLeaderboardEntry {
+  user_id: string;
+  rank: 'D' | 'C' | 'B' | 'A' | 'S' | 'SS';
+  stars: number;
+  title: string;
+  description: string;
+  theme_color: string;
+  attributes: { [key: string]: number };
+  analysis_attributes: string[];
   created_at: Date;
 }
 
@@ -772,7 +817,7 @@ export async function getMogProfile(guildId: string, userId: string): Promise<Mo
   const client = await getClient();
   try {
     const result = await client.query(
-      'SELECT guild_id, user_id, rank, stars, title, description, theme_color, created_at FROM mog_profiles WHERE guild_id = $1 AND user_id = $2',
+      'SELECT guild_id, user_id, rank, stars, title, description, theme_color, attributes, analysis_attributes, created_at FROM mog_profiles WHERE guild_id = $1 AND user_id = $2',
       [guildId, userId]
     );
 
@@ -789,6 +834,8 @@ export async function getMogProfile(guildId: string, userId: string): Promise<Mo
       title: row.title,
       description: row.description,
       theme_color: row.theme_color,
+      attributes: row.attributes || {},
+      analysis_attributes: row.analysis_attributes || [],
       created_at: row.created_at
     };
   } finally {
@@ -806,6 +853,8 @@ export async function getMogProfile(guildId: string, userId: string): Promise<Mo
  * @param title Randomized title
  * @param description Randomized description
  * @param themeColor Random theme color
+ * @param attributes Object with attribute values
+ * @param analysisAttributes Array of 3 selected attribute names for analysis
  * @returns Created MOG profile or existing profile if already exists
  */
 export async function createMogProfile(
@@ -815,7 +864,9 @@ export async function createMogProfile(
   stars: number,
   title: string,
   description: string,
-  themeColor: string
+  themeColor: string,
+  attributes: { [key: string]: number },
+  analysisAttributes: string[]
 ): Promise<MogProfile> {
   const client = await getClient();
   try {
@@ -823,12 +874,12 @@ export async function createMogProfile(
 
     // Try to insert new profile with ON CONFLICT to handle race conditions
     const result = await client.query(
-      `INSERT INTO mog_profiles (guild_id, user_id, rank, stars, title, description, theme_color)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (guild_id, user_id) 
+      `INSERT INTO mog_profiles (guild_id, user_id, rank, stars, title, description, theme_color, attributes, analysis_attributes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (guild_id, user_id)
        DO NOTHING
-       RETURNING guild_id, user_id, rank, stars, title, description, theme_color, created_at`,
-      [guildId, userId, rank, stars, title, description, themeColor]
+       RETURNING guild_id, user_id, rank, stars, title, description, theme_color, attributes, analysis_attributes, created_at`,
+      [guildId, userId, rank, stars, title, description, themeColor, JSON.stringify(attributes), analysisAttributes]
     );
 
     if (result.rows.length > 0) {
@@ -843,15 +894,17 @@ export async function createMogProfile(
         title: row.title,
         description: row.description,
         theme_color: row.theme_color,
+        attributes: row.attributes || {},
+        analysis_attributes: row.analysis_attributes || [],
         created_at: row.created_at
       };
     } else {
       // Profile already exists (race condition), fetch it
       const existingResult = await client.query(
-        'SELECT guild_id, user_id, rank, stars, title, description, theme_color, created_at FROM mog_profiles WHERE guild_id = $1 AND user_id = $2',
+        'SELECT guild_id, user_id, rank, stars, title, description, theme_color, attributes, analysis_attributes, created_at FROM mog_profiles WHERE guild_id = $1 AND user_id = $2',
         [guildId, userId]
       );
-      
+
       await client.query('COMMIT');
       const row = existingResult.rows[0];
       return {
@@ -862,6 +915,8 @@ export async function createMogProfile(
         title: row.title,
         description: row.description,
         theme_color: row.theme_color,
+        attributes: row.attributes || {},
+        analysis_attributes: row.analysis_attributes || [],
         created_at: row.created_at
       };
     }
@@ -872,6 +927,142 @@ export async function createMogProfile(
       console.error('[MOG_PROFILES] Failed to rollback transaction:', rollbackError);
     }
     console.error('[MOG_PROFILES] Failed to create MOG profile:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Update MOG profile for a user in a guild
+ * @param guildId Discord guild ID
+ * @param userId Discord user ID
+ * @param rank Rank (D, C, B, A, S, SS)
+ * @param stars Star rating (1-5)
+ * @param title Randomized title
+ * @param description Randomized description
+ * @param themeColor Random theme color
+ * @param attributes Object with attribute values
+ * @param analysisAttributes Array of 3 selected attribute names for analysis
+ * @returns Updated MOG profile
+ */
+export async function updateMogProfile(
+  guildId: string,
+  userId: string,
+  rank: 'D' | 'C' | 'B' | 'A' | 'S' | 'SS',
+  stars: number,
+  title: string,
+  description: string,
+  themeColor: string,
+  attributes: { [key: string]: number },
+  analysisAttributes: string[]
+): Promise<MogProfile> {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE mog_profiles
+       SET rank = $3, stars = $4, title = $5, description = $6, theme_color = $7, attributes = $8, analysis_attributes = $9
+       WHERE guild_id = $1 AND user_id = $2
+       RETURNING guild_id, user_id, rank, stars, title, description, theme_color, attributes, analysis_attributes, created_at`,
+      [guildId, userId, rank, stars, title, description, themeColor, JSON.stringify(attributes), analysisAttributes]
+    );
+
+    await client.query('COMMIT');
+    const row = result.rows[0];
+    return {
+      guild_id: row.guild_id,
+      user_id: row.user_id,
+      rank: row.rank as 'D' | 'C' | 'B' | 'A' | 'S' | 'SS',
+      stars: row.stars,
+      title: row.title,
+      description: row.description,
+      theme_color: row.theme_color,
+      attributes: row.attributes || {},
+      analysis_attributes: row.analysis_attributes || [],
+      created_at: row.created_at
+    };
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('[MOG_PROFILES] Failed to rollback transaction:', rollbackError);
+    }
+    console.error('[MOG_PROFILES] Failed to update MOG profile:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get all MOG profiles for a guild (for leaderboard sorting)
+ * @param guildId Discord guild ID
+ * @returns Array of all MOG profiles for the guild
+ */
+export async function getAllMogProfilesForGuild(guildId: string): Promise<MogLeaderboardEntry[]> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      `SELECT user_id, rank, stars, title, description, theme_color, attributes, analysis_attributes, created_at
+       FROM mog_profiles
+       WHERE guild_id = $1
+       ORDER BY user_id ASC`,
+      [guildId]
+    );
+
+    return result.rows.map(row => ({
+      user_id: row.user_id,
+      rank: row.rank as 'D' | 'C' | 'B' | 'A' | 'S' | 'SS',
+      stars: row.stars,
+      title: row.title,
+      description: row.description,
+      theme_color: row.theme_color,
+      attributes: row.attributes || {},
+      analysis_attributes: row.analysis_attributes || [],
+      created_at: row.created_at
+    }));
+  } catch (error) {
+    console.error('[MOG_PROFILES] Failed to get all MOG profiles for guild:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get paginated MOG leaderboard for a guild
+ * @param guildId Discord guild ID
+ * @param limit Maximum number of entries to return
+ * @param offset Number of entries to skip (for pagination)
+ * @returns Array of MOG leaderboard entries
+ */
+export async function getMogLeaderboard(guildId: string, limit: number = 10, offset: number = 0): Promise<MogLeaderboardEntry[]> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      `SELECT user_id, rank, stars, title, description, theme_color, attributes, analysis_attributes, created_at
+       FROM mog_profiles
+       WHERE guild_id = $1
+       ORDER BY user_id ASC
+       LIMIT $2 OFFSET $3`,
+      [guildId, limit, offset]
+    );
+
+    return result.rows.map(row => ({
+      user_id: row.user_id,
+      rank: row.rank as 'D' | 'C' | 'B' | 'A' | 'S' | 'SS',
+      stars: row.stars,
+      title: row.title,
+      description: row.description,
+      theme_color: row.theme_color,
+      attributes: row.attributes || {},
+      analysis_attributes: row.analysis_attributes || [],
+      created_at: row.created_at
+    }));
+  } catch (error) {
+    console.error('[MOG_PROFILES] Failed to get MOG leaderboard:', error);
     throw error;
   } finally {
     client.release();

@@ -34,7 +34,8 @@ import { handleSimonSaysCommand, handleSimonSaysInteraction } from '../commands/
 import { handleQuizCommand, handleQuizInteraction } from '../commands/quiz.js';
 import { handleChallengeCommand, handleChallengeInteraction } from '../commands/challenge.js';
 import { handleRedirectCommand } from '../commands/redirect.js';
-import { handleMogCommand } from '../commands/mog.js';
+import { handleMogCommand, handleMogInteraction } from '../commands/mog.js';
+import { handleMoglbCommand, handleMoglbInteraction } from '../commands/moglb.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -256,6 +257,11 @@ export class DiscordClient {
         return;
       }
 
+      if (command === 'moglb') {
+        await handleMoglbCommand(message);
+        return;
+      }
+
     }
 
     // Check for Wordle guesses (only if not a command)
@@ -397,6 +403,16 @@ export class DiscordClient {
       // it from falling through to handleSmashVote below, which was
       // replying/acknowledging the interaction before our own collector's
       // i.update() call, causing a "already acknowledged" crash.
+      return;
+    }
+
+    if (customId.startsWith('mog_')) {
+      await handleMogInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('moglb_')) {
+      await handleMoglbInteraction(interaction);
       return;
     }
 

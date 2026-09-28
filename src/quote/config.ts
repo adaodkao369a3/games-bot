@@ -71,11 +71,22 @@ export const LAYOUT = {
   STACK_QUOTE_WIDTH_MULTIPLIER: 1.4,
 
   // Total composite height target for a stack, regardless of N (fixed at
-  // H*1.5 for now rather than H*N — each card's slot, and its square
+  // H*1.6 for now rather than H*N — each card's slot, and its square
   // avatar, shrinks to fit within this instead of the composite growing
-  // with every added card). Revisit this ratio if/when .quote 3+ needs a
-  // different one; for now every N squeezes into the same H*1.5 total.
-  STACK_HEIGHT_MULTIPLIER: 1.5,
+  // with every added card). Bumped from 1.5 so each row has room for the
+  // name block below the quote. Revisit this ratio if/when .quote 3+ needs
+  // a different one; for now every N squeezes into the same H*1.6 total.
+  STACK_HEIGHT_MULTIPLIER: 1.6,
+
+  // Stacked cards only: fixed pixel height reserved at the bottom of each
+  // row for the bar + nickname + username, so the block always fits inside
+  // its row no matter how small the row gets (the single-card layout uses
+  // fractions of a taller card and is untouched).
+  STACK_NAME_BLOCK_RESERVE: 108,
+
+  // Stacked cards only: the bar above the name spans this fraction of the
+  // quote column's width, anchored to the outer edge (away from the pfp).
+  STACK_BAR_LENGTH_FRACTION: 0.75,
 } as const;
 
 export const FONT_FALLBACK = 'Butler, Georgia, serif';
@@ -126,7 +137,7 @@ export const GRADIENT_PRESETS: Record<PresetName, GradientPreset> = {
   rose:     { type: 'linear', colors: [[255,228,235],[253,164,190],[244,63,125],[190,24,93],[76,5,35]], label: 'Rose' },
   ember:    { type: 'linear', colors: [[255,237,213],[251,146,60],[234,88,12],[154,52,18],[67,20,7]], label: 'Ember' },
   cyan:     { type: 'linear', colors: [[207,250,254],[103,232,249],[6,182,212],[14,116,144],[8,47,73]], label: 'Cyan' },
-  sapphire:{ type: 'linear', colors: [[220,240,255],[110,180,255],[30,110,230],[20,55,160],[8,20,65]], label: 'Sapphire' },
+  sapphire: { type: 'linear', colors: [[220,240,255],[110,180,255],[30,110,230],[20,55,160],[8,20,65]], label: 'Sapphire' },
   coral:    { type: 'linear', colors: [[255,225,215],[255,160,135],[251,105,90],[205,55,60],[90,20,30]], label: 'Coral' },
   lime:     { type: 'linear', colors: [[245,255,205],[190,245,90],[120,220,35],[45,145,35],[12,65,25]], label: 'Lime' },
   lavender: { type: 'linear', colors: [[245,238,255],[215,190,250],[175,125,235],[115,70,175],[50,25,85]], label: 'Lavender' },
