@@ -1,16 +1,12 @@
 # Bob Kun Discord Bot <:bob:1545141387656302663>
 
-A cute, chaotic Minion-inspired gaming Discord bot for the Mi Bom3o server. Bob Kun brings social gaming fun with the first game: **Smash This**.
+A cute, chaotic Minion-inspired gaming Discord bot for the Mi Bom3o server. Bob Kun brings social gaming fun with multiplayer games.
 
 ## Features
 
-- **Smash This**: A simple head-to-head voting game between two random recently active users
-- **Smart Activity-Based Spawning**: Events spawn automatically after periods of inactivity followed by renewed chat activity
-- **20-Second Voting**: Fast-paced voting periods with instant winner reveals
-- **Prefix Commands**: Use `.smash` to force an event immediately
-- **Recent Activity Selection**: Events feature people who have actually been active in the channel recently
-- **Random Delays**: Automatic events have a random 1-5 minute delay for surprise factor
-- **Persistent Data**: All event data and votes are stored in JSON
+- **Multiple Games**: Trial, Higher/Lower, Card Roulette, Blackjack, 2-Player Blackjack, Gamble, Dice Duel, Coin Flip, Bomb, Impostor, Number Guess, Simon Says, Wordbomb, MOG, JJK Quiz, and more
+- **Bombo Coins**: Currency system with wallet, highscore leaderboard, and fishing
+- **Quote Generation**: Create beautiful quote cards from messages
 - **Bob Kun Personality**: Cute, chaotic, Minion-inspired responses throughout
 
 ## Requirements
@@ -80,29 +76,6 @@ DISCORD_GUILD_ID=your_guild_id_here
 - `DATABASE_URL`: Path to JSON database file (default: `./data/bob-kun.json`)
 - `PREFIX`: Command prefix for bot commands (default: `.`)
 
-### Activity-Based Spawning Behavior
-
-Bob Kun uses intelligent activity-based spawning for Smash events:
-
-1. **User Chat Activity**: Users are talking normally in the channel
-2. **Chat Goes Quiet**: No qualifying user messages for 30+ minutes
-3. **Inactivity Gap Detected**: Bob Kun detects the extended quiet period
-4. **User Starts Talking Again**: A user sends a message after the inactivity gap
-5. **Spawn Opportunity Created**: Bob Kun may spawn a Smash event
-6. **Random Delay**: 1-5 minute random delay before event appears
-7. **Event Posted**: Smash This event appears with two selected users
-
-**Key Rules:**
-- Continuous active conversation does NOT repeatedly trigger Smash events
-- A 30-minute cooldown alone does NOT trigger Smash events
-- Bob Kun requires an actual 30+ minute inactivity gap followed by renewed activity
-- Bob Kun's own messages do NOT count as user activity
-- Bot messages do NOT incorrectly reset the inactivity timer
-- Multiple messages after the quiet period cannot create multiple simultaneous spawn events
-- An active event prevents another event from spawning
-- Fewer than two eligible recent users prevents spawning
-- Random 1-5 minute delay adds surprise factor
-
 ## Running the Bot
 
 ### Development Mode
@@ -124,72 +97,6 @@ Then run:
 ```bash
 npm start
 ```
-
-## How Smash This Works
-
-### Overview
-
-Smash This is a simple head-to-head voting game between two random recently active users. Each event is standalone with no tournaments or rounds.
-
-### Automatic Behavior
-
-Bob Kun automatically creates Smash events based on chat activity:
-
-1. **Chat Activity**: Users are talking normally in the channel
-2. **Quiet Period**: Channel goes quiet for 30+ minutes
-3. **Renewed Activity**: Users start talking again after the quiet period
-4. **User Selection**: Bob Kun selects two random recently active human users
-5. **Random Delay**: Bob Kun waits 1-5 minutes (randomly generated)
-6. **Event Posted**: Smash This event appears with the two selected users
-7. **Voting Period**: 20-second voting period opens
-8. **Winner Revealed**: Winner is announced or tie is declared
-9. **Done**: Event ends, Bob Kun returns to lurking
-
-### Manual Trigger
-
-You can force an event immediately using `.smash`:
-
-1. Use `.smash` command
-2. Bob Kun selects two random recently active users
-3. Event appears immediately (no delay)
-4. Normal 20-second voting period
-5. Winner revealed
-
-### Testing Specific Users
-
-You can specify users to smash:
-
-1. Use `.smash @User1 @User2` command
-2. Bob Kun validates both users are real members and not bots
-3. Event appears immediately with the specified users
-4. Normal 20-second voting period
-5. Winner revealed
-
-### Event Selection Pool
-
-- Bob Kun selects from **recently active users** in the channel
-- Selection pool is based on actual chat activity (not random server members)
-- Default time window: 7 days of recent activity
-- Bots (including Bob Kun) are excluded from selection
-- Requires at least 2 eligible recently active users
-
-### Voting Rules
-
-- 20-second voting period
-- One vote per user per event
-- Bot votes are rejected
-- Duplicate votes are prevented
-- Users can't change their vote after casting
-- Ties result in no winner (both players lose)
-
-### Visual Design
-
-- Landscape card (approximately 554px × 251px)
-- Two player panels with avatars
-- One "<a:purplebomb:1545149042378407986> SMASH" button under each player
-- Cute decorative border with hearts/stars/sparkles/banana motifs
-- No giant VS graphic in center
-- Clean, symmetrical layout
 
 ## Deployment
 
@@ -238,30 +145,13 @@ pm2 restart bob-kun
 bob-kun-discord-bot/
 ├── src/
 │   ├── commands/           # Prefix command handlers
-│   │   └── smash.ts        # .smash command
 │   ├── games/              # Game modules
-│   │   └── smash-this/
-│   │       ├── smash-event.ts    # Event handler
-│   │       └── voting-system.ts  # Voting logic
 │   ├── database/           # Database layer
-│   │   ├── schema.ts       # Database schema
-│   │   ├── connection.ts   # Database connection
-│   │   └── repositories/
-│   │       └── smash-repository.ts
 │   ├── services/           # Business logic
-│   │   ├── bob-kun-personality.ts
-│   │   ├── activity-tracker.ts
-│   │   ├── recent-user-tracker.ts
-│   │   └── smash-scheduler.ts
 │   ├── ui/                 # UI components
-│   │   └── smash-ui.ts
 │   ├── discord/            # Discord client
-│   │   └── client.ts
 │   ├── utils/              # Utilities
-│   │   ├── logger.ts
-│   │   └── error-handler.ts
 │   ├── config/             # Configuration
-│   │   └── index.ts
 │   └── index.ts            # Entry point
 ├── data/                   # Database files (gitignored)
 ├── .env.example            # Environment template
@@ -292,21 +182,6 @@ bob-kun-discord-bot/
 - Verify bot has proper permissions in the server
 - Check console logs for error messages
 - Ensure required intents are enabled in Discord Developer Portal
-
-### Activity spawning not working
-
-- Ensure there are at least 2 recently active users in the channel
-- Activity requires genuine inactivity followed by renewed activity
-- Users need to have sent messages recently (within 7 days) to be eligible
-- Check that the random 1-5 minute delay hasn't made it seem like spawning isn't working
-
-### `.smash` command fails
-
-- Ensure there are at least 2 recently active users in the channel
-- Check that users have sent messages recently (within 7 days)
-- Verify bot has permission to send messages in the channel
-- Check that there isn't already an active Smash event in the channel
-- When using `.@User1 @User2`, ensure both tags are valid server members and not bots
 
 ## Adding More Games
 

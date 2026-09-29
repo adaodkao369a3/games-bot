@@ -1,6 +1,29 @@
 import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, TextChannel } from 'discord.js';
-import { DatamuseWordProvider } from '../wordle/datamuseProvider.js';
 import { awardCoins } from '../services/coins.js';
+
+// Simple word provider for WordBomb
+export class SimpleWordProvider {
+  private words: string[] = [
+    'apple', 'banana', 'cherry', 'dog', 'elephant', 'flower', 'guitar', 'house',
+    'island', 'jungle', 'kite', 'lemon', 'mountain', 'night', 'ocean', 'piano',
+    'queen', 'rainbow', 'sun', 'tree', 'umbrella', 'violin', 'water', 'xylophone',
+    'yellow', 'zebra', 'book', 'cat', 'desk', 'egg', 'fish', 'garden', 'hat',
+    'ice', 'jump', 'key', 'lamp', 'moon', 'nest', 'orange', 'pen', 'quilt',
+    'ring', 'star', 'table', 'up', 'vase', 'window', 'box', 'year', 'zoo'
+  ];
+
+  getRandomWord(): string {
+    return this.words[Math.floor(Math.random() * this.words.length)];
+  }
+
+  getWordsStartingWith(letter: string): string[] {
+    return this.words.filter(word => word.toLowerCase().startsWith(letter.toLowerCase()));
+  }
+
+  isValidWord(word: string): boolean {
+    return this.words.includes(word.toLowerCase());
+  }
+}
 
 type WordBombState = 'idle' | 'joining' | 'playing' | 'complete' | 'timeout';
 
@@ -53,13 +76,13 @@ const GAME_CONFIG = {
 export class WordBombGame {
   private state: WordBombState = 'idle';
   private data: WordBombGameData;
-  private wordProvider: DatamuseWordProvider;
+  private wordProvider: SimpleWordProvider;
   private joinTimeout: NodeJS.Timeout | null = null;
   private roundTimeout: NodeJS.Timeout | null = null;
   private gameStartTime: number;
   private playerOrder: string[] = [];
 
-  constructor(channelId: string, guildId: string | undefined, wordProvider: DatamuseWordProvider) {
+  constructor(channelId: string, guildId: string | undefined, wordProvider: SimpleWordProvider) {
     this.wordProvider = wordProvider;
     this.gameStartTime = Date.now();
     this.data = {

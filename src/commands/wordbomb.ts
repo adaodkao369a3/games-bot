@@ -1,13 +1,12 @@
 import { Message, MessageComponentInteraction } from 'discord.js';
-import { WordBombGame } from '../wordbomb/WordBombGame.js';
-import { DatamuseWordProvider } from '../wordle/datamuseProvider.js';
+import { WordBombGame, SimpleWordProvider } from '../wordbomb/WordBombGame.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
 // Active games keyed by channel ID
 const activeGames = new Map<string, WordBombGame>();
 
 // Word provider instance (shared across all games)
-const wordProvider = new DatamuseWordProvider();
+const wordProvider = new SimpleWordProvider();
 
 /**
  * Handle the wordbomb command

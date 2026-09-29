@@ -2,17 +2,9 @@ import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { config, validateConfig } from '../config/index.js';
 import { BobKunPersonality } from '../services/bob-kun-personality.js';
 import { ErrorHandler } from '../utils/error-handler.js';
-import { handleSmashCommand, handleSmashVote } from '../commands/smash.js';
-import { handleWordleCommand, handleWordleGuess } from '../commands/wordle.js';
-import { handleWheelCommand } from '../commands/wheel.js';
 import { handleHelpCommand } from '../commands/help.js';
 import { handleBobkunCommand } from '../commands/bobkun.js';
-import { handleQuickDrawCommand, handleQuickDrawInteraction } from '../commands/quickdraw.js';
-import { handleQuickDrawMaxCommand, handleQuickDrawMaxInteraction } from '../commands/quickdrawmax.js';
-import { handleRouletteCommand, handleRouletteInteraction } from '../commands/roulette.js';
-import { handleRouletteMaxCommand, handleRouletteMaxInteraction } from '../commands/roulettemax.js';
 import { handlePissCompCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
-import { handleSmashMaxCommand, handleSmashMaxInteraction } from '../commands/smashmax.js';
 import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } from '../commands/trial.js';
 import { handleGambleCommand } from '../commands/gamble.js';
 import { handleQuoteCommand } from '../commands/quote.js';
@@ -73,7 +65,7 @@ export class DiscordClient {
     console.log(`Logged in as ${this.client.user?.tag}`);
     
     // Set bot status
-    this.client.user?.setActivity('quick draw on these bitches', { type: 3 as any });
+    this.client.user?.setActivity('games', { type: 3 as any });
     
     // Initialize AniList service (non-blocking, will populate cache in background if needed)
     const anilistService = AniListCharacterService.getInstance();
@@ -91,21 +83,6 @@ export class DiscordClient {
       const args = message.content.slice(config.prefix.length).trim().split(/\s+/);
       const command = args.shift()?.toLowerCase();
 
-      if (command === 'smash') {
-        await handleSmashCommand(message, args);
-        return;
-      }
-
-      if (command === 'wordle') {
-        await handleWordleCommand(message, args);
-        return;
-      }
-
-      if (command === 'wheel') {
-        await handleWheelCommand(message, args);
-        return;
-      }
-
       if (command === 'help') {
         await handleHelpCommand(message);
         return;
@@ -116,33 +93,8 @@ export class DiscordClient {
         return;
       }
 
-      if (command === 'quickdraw') {
-        await handleQuickDrawCommand(message, args);
-        return;
-      }
-
-      if (command === 'quickdrawmax') {
-        await handleQuickDrawMaxCommand(message, args);
-        return;
-      }
-
-      if (command === 'roulette') {
-        await handleRouletteCommand(message);
-        return;
-      }
-
-      if (command === 'roulettemax') {
-        await handleRouletteMaxCommand(message);
-        return;
-      }
-
       if (command === 'pisscomp') {
         await handlePissCompCommand(message, args);
-        return;
-      }
-
-      if (command === 'smashmax') {
-        await handleSmashMaxCommand(message);
         return;
       }
 
@@ -264,9 +216,6 @@ export class DiscordClient {
 
     }
 
-    // Check for Wordle guesses (only if not a command)
-    await handleWordleGuess(message);
-
     // Check for Impostor clue submissions
     await handleImpostorMessage(message);
 
@@ -291,34 +240,9 @@ export class DiscordClient {
 
   private async handleButtonInteraction(interaction: any): Promise<void> {
     const customId = interaction.customId;
-    
-    if (customId === 'quickdraw_fire') {
-      await handleQuickDrawInteraction(interaction);
-      return;
-    }
-
-    if (customId === 'quickdrawmax_fire') {
-      await handleQuickDrawMaxInteraction(interaction);
-      return;
-    }
-
-    if (customId === 'roulette_trigger' || customId === 'roulette_double') {
-      await handleRouletteInteraction(interaction);
-      return;
-    }
-
-    if (customId.startsWith('roulettemax_')) {
-      await handleRouletteMaxInteraction(interaction);
-      return;
-    }
 
     if (customId.startsWith('pisscomp_')) {
       await handlePissCompInteraction(interaction);
-      return;
-    }
-
-    if (customId.startsWith('smashmax_')) {
-      await handleSmashMaxInteraction(interaction);
       return;
     }
 
@@ -399,10 +323,7 @@ export class DiscordClient {
 
     if (customId.startsWith('quote-')) {
       // Handled entirely by the message-scoped collector created inside
-      // handleQuoteCommand (src/commands/quote.ts). Returning here stops
-      // it from falling through to handleSmashVote below, which was
-      // replying/acknowledging the interaction before our own collector's
-      // i.update() call, causing a "already acknowledged" crash.
+      // handleQuoteCommand (src/commands/quote.ts).
       return;
     }
 
@@ -415,8 +336,6 @@ export class DiscordClient {
       await handleMoglbInteraction(interaction);
       return;
     }
-
-    await handleSmashVote(interaction);
   }
 
   private async handleModalSubmit(interaction: any): Promise<void> {

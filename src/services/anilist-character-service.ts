@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { SmashMaxCharacterTracker } from './smashmax-character-tracker.js';
 
 interface AniListCharacter {
   id: number;
@@ -109,9 +108,6 @@ export class AniListCharacterService {
 
   // Background population
   private isPopulating = false;
-
-  // Character tracker
-  private characterTracker = SmashMaxCharacterTracker.getInstance();
 
   private constructor() {
     this.ensureDataDirectory();
@@ -408,11 +404,6 @@ export class AniListCharacterService {
       console.log(`[AniListService] Filtered to ${validCachedChars.length} non-adult characters.`);
     }
 
-    // Filter out previously used characters
-    const beforeFilterCount = validCachedChars.length;
-    validCachedChars = this.characterTracker.filterUsedCachedCharacters(validCachedChars);
-    console.log(`[AniListService] Filtered out ${beforeFilterCount - validCachedChars.length} previously used characters. Remaining: ${validCachedChars.length}`);
-    
     if (validCachedChars.length >= 2) {
       console.log('[AniListService] Using cached characters.');
       return this.selectTwoFromCache(validCachedChars);
