@@ -268,10 +268,13 @@ export class CoinFlipGame {
     this.state = 'complete';
     this.clearTimeout();
 
+    const flipEmoji = this.data.lastFlip === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
+
     const embed = new EmbedBuilder()
       .setTitle('💥 WRONG!')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `You called **${this.data.lastCall}**.\nThe coin landed on **${this.data.lastFlip}**.\n\n` +
+        `${flipEmoji} **${this.data.lastFlip}**\n\n` +
+        `You called **${this.data.lastCall}**.\n\n` +
         `**Streak:** ${this.data.streak}\n\n` +
         `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
         `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
@@ -337,20 +340,21 @@ export class CoinFlipGame {
 
   private createGameEmbed(statusMessage: string = '', resultMessage: string = ''): EmbedBuilder {
     const multiplier = getMultiplier(this.data.streak);
-    
+
     let description = `━━━━━━━━━━━━━━\n\n`;
     description += `**STREAK**\n${this.data.streak}\n\n`;
     description += `**CURRENT POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
 
     if (this.data.lastFlip !== null) {
-      description += `**LAST FLIP**\n🪙 → ${this.data.lastFlip}\n\n`;
+      const flipEmoji = this.data.lastFlip === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
+      description += `**LAST FLIP**\n${flipEmoji} **${this.data.lastFlip}**\n\n`;
       description += `**YOUR CALL**\n${this.data.lastCall}\n\n`;
       description += `**RESULT**\n${statusMessage}\n\n`;
       if (resultMessage) {
         description += `${resultMessage}\n\n`;
       }
     } else {
-      description += `> Call it.\n\n`;
+      description += `<a:coinflip:1555521942205767711> Call it.\n\n`;
     }
 
     description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;

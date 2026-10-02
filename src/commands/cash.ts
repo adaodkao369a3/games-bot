@@ -1,6 +1,7 @@
 import { Message, EmbedBuilder } from 'discord.js';
 import { awardCoins } from '../services/coins.js';
 import { isStaff } from '../utils/permissions.js';
+import { parseWagerAmount } from '../utils/wager-parser.js';
 
 export async function handleCashCommand(message: Message, args: string[]): Promise<void> {
   // Check if user is staff
@@ -11,7 +12,7 @@ export async function handleCashCommand(message: Message, args: string[]): Promi
 
   // Parse arguments
   if (args.length < 2) {
-    await message.reply('Usage: `.cash @user [amount]` or `.cash @everyone [amount]`\nExample: `.cash @user 1000` or `.cash @everyone 500`');
+    await message.reply('Usage: `.cash @user [amount]` or `.cash @everyone [amount]`\nExample: `.cash @user 1000`, `.cash @user 10k`, `.cash @user 1.5m` or `.cash @everyone 500`');
     return;
   }
 
@@ -50,12 +51,12 @@ export async function handleCashCommand(message: Message, args: string[]): Promi
     targetUsers = [targetUserId];
   }
 
-  // Parse amount
+  // Parse amount (supports k, m, b suffixes)
   const amountArg = args[1];
-  const amount = parseInt(amountArg.replace(/,/g, ''), 10);
+  const amount = parseWagerAmount(amountArg, Number.MAX_SAFE_INTEGER);
 
-  if (isNaN(amount) || amount <= 0) {
-    await message.reply('Please specify a valid positive amount.');
+  if (amount === null || amount <= 0) {
+    await message.reply('Please specify a valid positive amount. Examples: `.cash @user 1000`, `.cash @user 10k`, `.cash @user 1.5m`');
     return;
   }
 

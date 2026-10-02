@@ -12,6 +12,7 @@ export const config = {
   database: {
     url: process.env.DATABASE_URL || '',
   },
+  gameFloorChannelId: '1542311921007460542',
 };
 
 export function validateConfig(): void {

@@ -3,6 +3,7 @@ import { BombDefusalGame } from '../bomb/BombDefusalGame.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { parseWagerAmount } from '../utils/wager-parser.js';
+import { config } from '../config/index.js';
 
 // Active games keyed by user ID
 const activeGames = new Map<string, BombDefusalGame>();
@@ -11,6 +12,12 @@ const activeGames = new Map<string, BombDefusalGame>();
  * Handle the bomb command
  */
 export async function handleBombCommand(message: Message, args: string[]): Promise<void> {
+  // Check if command is used in game floor channel
+  if (message.channel.id !== config.gameFloorChannelId) {
+    await message.reply('This command can only be used in the game floor channel.');
+    return;
+  }
+
   const userId = message.author.id;
 
   // Parse bet amount

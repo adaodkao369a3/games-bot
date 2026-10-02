@@ -144,25 +144,66 @@ async function initializeSchema(): Promise<void> {
 
       // Check if users has lifetime_gambled column
       const usersCheck = await pool!.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'users' 
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'users'
         AND table_schema = 'public'
         AND column_name = 'lifetime_gambled'
       `);
 
       if (usersCheck.rows.length === 0) {
         console.log('⚠ users table missing lifetime_gambled column, adding migration...');
-        
+
         // Add lifetime_gambled column (allow NULL for existing rows)
         await pool!.query(`
-          ALTER TABLE users 
+          ALTER TABLE users
           ADD COLUMN IF NOT EXISTS lifetime_gambled BIGINT DEFAULT 0
         `);
-        
+
         console.log('✓ Migration completed: lifetime_gambled column added to users');
       } else {
         console.log('✓ users table has lifetime_gambled column');
+      }
+
+      // Check if goon_edge_tracking table exists
+      const goonEdgeCheck = await pool!.query(`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_name = 'goon_edge_tracking'
+        AND table_schema = 'public'
+      `);
+
+      if (goonEdgeCheck.rows.length === 0) {
+        console.log('⚠ goon_edge_tracking table does not exist, creating...');
+
+        await pool!.query(`
+          CREATE TABLE goon_edge_tracking (
+            user_id VARCHAR(255) PRIMARY KEY,
+            last_goon_used TIMESTAMP WITH TIME ZONE,
+            last_edge_used TIMESTAMP WITH TIME ZONE,
+            edge_daily_count INTEGER NOT NULL DEFAULT 0,
+            edge_daily_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            goon_count INTEGER NOT NULL DEFAULT 0,
+            edge_blocked_until TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
+        await pool!.query(`
+          CREATE INDEX idx_goon_edge_tracking_daily_date ON goon_edge_tracking(edge_daily_date)
+        `);
+
+        await pool!.query(`
+          CREATE TRIGGER update_goon_edge_tracking_updated_at
+          BEFORE UPDATE ON goon_edge_tracking
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column()
+        `);
+
+        console.log('✓ Migration completed: goon_edge_tracking table created');
+      } else {
+        console.log('✓ goon_edge_tracking table exists');
       }
 
       // Check if fishing_loot table exists

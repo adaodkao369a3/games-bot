@@ -3,6 +3,7 @@ import { DiceDuelGame } from '../diceduel/DiceDuelGame.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { parseWagerAmount } from '../utils/wager-parser.js';
+import { config } from '../config/index.js';
 
 // Active games keyed by player IDs (both players map to the same game)
 const activeGames = new Map<string, DiceDuelGame>();
@@ -11,6 +12,12 @@ const activeGames = new Map<string, DiceDuelGame>();
  * Handle the diceduel command
  */
 export async function handleDiceDuelCommand(message: Message, args: string[]): Promise<void> {
+  // Check if command is used in game floor channel
+  if (message.channel.id !== config.gameFloorChannelId) {
+    await message.reply('This command can only be used in the game floor channel.');
+    return;
+  }
+
   const userId = message.author.id;
 
   // Parse arguments

@@ -2,6 +2,7 @@ import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, 
 import { FishingGame } from '../fishing/FishingGame.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { config } from '../config/index.js';
 
 // Active games keyed by user ID
 const activeGames = new Map<string, FishingGame>();
@@ -12,6 +13,12 @@ const pendingConfirmations = new Map<string, { timeout: NodeJS.Timeout }>();
  * Handle the fish command
  */
 export async function handleFishCommand(message: Message): Promise<void> {
+  // Check if command is used in game floor channel
+  if (message.channel.id !== config.gameFloorChannelId) {
+    await message.reply('This command can only be used in the game floor channel.');
+    return;
+  }
+
   const userId = message.author.id;
 
   // Check if user already has an active fishing session

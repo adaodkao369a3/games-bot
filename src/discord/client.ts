@@ -28,6 +28,8 @@ import { handleChallengeCommand, handleChallengeInteraction } from '../commands/
 import { handleRedirectCommand } from '../commands/redirect.js';
 import { handleMogCommand, handleMogInteraction } from '../commands/mog.js';
 import { handleMoglbCommand, handleMoglbInteraction } from '../commands/moglb.js';
+import { handleGoonCommand } from '../commands/goon.js';
+import { handleEdgeCommand } from '../commands/edge.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -83,7 +85,7 @@ export class DiscordClient {
       const args = message.content.slice(config.prefix.length).trim().split(/\s+/);
       const command = args.shift()?.toLowerCase();
 
-      if (command === 'help') {
+      if (command === 'qhelp') {
         await handleHelpCommand(message);
         return;
       }
@@ -110,7 +112,7 @@ export class DiscordClient {
       }
 
       if (command === 'wallet' || command === 'w' || command === 'wal') {
-        await handleWalletCommand(message);
+        await handleWalletCommand(message, args);
         return;
       }
 
@@ -211,6 +213,16 @@ export class DiscordClient {
 
       if (command === 'moglb') {
         await handleMoglbCommand(message);
+        return;
+      }
+
+      if (command === 'goon') {
+        await handleGoonCommand(message);
+        return;
+      }
+
+      if (command === 'edge') {
+        await handleEdgeCommand(message);
         return;
       }
 

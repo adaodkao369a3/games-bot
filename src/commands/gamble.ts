@@ -2,6 +2,7 @@ import { Message, EmbedBuilder } from 'discord.js';
 import { getCoinBalanceInfo, removeCoins, awardCoins } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { parseWagerAmount } from '../utils/wager-parser.js';
+import { config } from '../config/index.js';
 
 const SLOT_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>', '<:slotsstrawberry:1545161917834993804>'];
 const WIN_SYMBOL = '<:slotsseven:1545161915649753119>';
@@ -46,6 +47,12 @@ function buildSpinMessage(): string {
 }
 
 export async function handleGambleCommand(message: Message, args: string[]): Promise<void> {
+  // Check if command is used in game floor channel
+  if (message.channel.id !== config.gameFloorChannelId) {
+    await message.reply('This command can only be used in the game floor channel.');
+    return;
+  }
+
   const userId = message.author.id;
 
   // Parse wager amount
@@ -92,7 +99,24 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     const initialMessage = await message.reply(buildLoadingMessage());
 
     // Determine result up front (50/50) so the reel animation can land on it.
-    const won = Math.random() < 0.5;
+    // 1% chance for 10x jackpot, 49% for normal win, 50% for loss
+    const jackpotChance = Math.random();
+    let won = false;
+    let jackpot = false;
+    
+    if (jackpotChance < 0.01) {
+      // 1% jackpot
+      won = true;
+      jackpot = true;
+    } else if (jackpotChance < 0.5) {
+      // 49% normal win
+      won = true;
+      jackpot = false;
+    } else {
+      // 50% loss
+      won = false;
+      jackpot = false;
+    }
 
     // Pre-calculate the final landing frame and extract individual symbols
     const landingFrame = finalReelFrame(won);
@@ -132,8 +156,8 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
     // Second message: result with details
     if (won) {
-      // WIN: Award 2x wager (user already lost wager, so add 2x to get net +wager)
-      const payout = wager * 2;
+      // WIN: Award 10x for jackpot, 2x for normal win (user already lost wager, so add payout to get net gain)
+      const payout = jackpot ? wager * 10 : wager * 2;
       
       // Award winnings (no retries needed - transaction system handles this)
       const awardResult = await awardCoins(
@@ -175,8 +199,8 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       // Edit message with win result embed
       const winResultEmbed = new EmbedBuilder()
         .setTitle('The results are...')
-        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n<a:win:1545165325614583888> **YOU WON!!**\n\n**Bet:** ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n**Total Payout:** +${payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`)
-        .setColor(0x00FF00);
+        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n${jackpot ? '🎰 **JACKPOT!!!** 🎰' : '<a:win:1545165325614583888> **YOU WON!!**'}\n\n**Bet:** ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n**Total Payout:** +${payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>${jackpot ? '\n\n🌟 **10X MULTIPLIER!** 🌟' : ''}`)
+        .setColor(jackpot ? 0xFFD700 : 0x00FF00);
 
       await initialMessage.edit({ embeds: [winResultEmbed] });
     } else {

@@ -466,7 +466,7 @@ export class CardRouletteGame {
   private async createGameEmbed(statusMessage: string = ''): Promise<EmbedBuilder> {
     const multiplier = getMultiplier(this.data.drawsSurvived);
     const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
-    
+
     let description = `**${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji} • **${this.data.drawsSurvived}** cards • **x${multiplier.toFixed(2)}**\n`;
     description += `Win: **${this.data.currentPayout.toLocaleString('en-US')}** ${coinEmoji}\n\n`;
 
@@ -474,7 +474,7 @@ export class CardRouletteGame {
       description += `${this.data.currentCard.emoji}\n\n`;
       description += `**${this.data.currentCard.name}**\n${this.data.currentCard.description}\n\n`;
     } else {
-      description += `🎲 Draw a card\n\n`;
+      description += `<:card_back:1549652972219277372> Draw a card\n\n`;
     }
 
     if (statusMessage) {

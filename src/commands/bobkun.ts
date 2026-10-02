@@ -27,7 +27,7 @@ export async function handleBobkunCommand(message: Message): Promise<void> {
       },
       {
         name: '📖 NEW PLAYER? START HERE',
-        value: '① Type **__.help__** to see available commands\n② Mention players with @ for multiplayer games\n③ Follow the instructions shown by the game\n④ Use the buttons/reactions when prompted\n⑤ Have fun — and don\'t take anything too seriously 😎\n\n💡 QUICK TIP\nSome games require another player, so grab a friend and let the chaos begin!',
+        value: '① Type **__.qhelp__** to see available commands\n② Mention players with @ for multiplayer games\n③ Follow the instructions shown by the game\n④ Use the buttons/reactions when prompted\n⑤ Have fun — and don\'t take anything too seriously 😎\n\n💡 QUICK TIP\nSome games require another player, so grab a friend and let the chaos begin!',
         inline: false,
       },
     ]);
