@@ -20,6 +20,14 @@ interface CoinFlipGameData {
   messageId: string | null;
   message: Message | null;
   gameInstanceId: string;
+  flipHistory: FlipResult[];
+}
+
+interface FlipResult {
+  round: number;
+  call: CoinSide;
+  result: CoinSide;
+  won: boolean;
 }
 
 // Game configuration
@@ -89,6 +97,7 @@ export class CoinFlipGame {
       messageId: null,
       message: null,
       gameInstanceId: `cf_${userId}_${Date.now()}`,
+      flipHistory: [],
     };
   }
 
@@ -194,12 +203,21 @@ export class CoinFlipGame {
     this.data.lastCall = call;
     this.data.lastFlip = result;
 
+    // Record flip in history
+    const roundNumber = this.data.flipHistory.length + 1;
+    this.data.flipHistory.push({
+      round: roundNumber,
+      call,
+      result,
+      won: correct,
+    });
+
     if (correct) {
       // Correct prediction
       this.data.streak++;
       this.data.currentPayout = calculatePayout(this.data.betAmount, this.data.streak);
 
-      const embed = this.createGameEmbed('✅ CORRECT!', `The coin landed on **${result}**.`);
+      const embed = this.createGameEmbed();
       const row = this.createGameButtons();
 
       await interaction.update({
@@ -207,7 +225,7 @@ export class CoinFlipGame {
         components: [row],
       });
     } else {
-      // Wrong prediction
+      // Wrong prediction - end game immediately
       await this.lose(interaction);
     }
   }
@@ -272,16 +290,34 @@ export class CoinFlipGame {
 
     const flipEmoji = this.data.lastFlip === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
 
+    // GAME OVER EMBED
+    let description = `**GAME OVER**\n\n`;
+    description += `${flipEmoji} **${this.data.lastFlip}**\n\n`;
+    description += `You called **${this.data.lastCall}**.\n\n`;
+    description += `─────────────────\n\n`;
+    description += `**WIN STREAK:** ${this.data.streak}\n\n`;
+    description += `**ORIGINAL BET:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**AMOUNT LOST:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `─────────────────\n\n`;
+
+    // FLIP HISTORY
+    description += `📜 **FLIP HISTORY**\n\n`;
+    if (this.data.flipHistory.length === 0) {
+      description += `No flips yet.\n\n`;
+    } else {
+      const recentHistory = this.data.flipHistory.slice(-8).reverse();
+      recentHistory.forEach((flip) => {
+        const flipEmoji = flip.result === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
+        const resultText = flip.won ? '✅ WIN' : '❌ LOSS';
+        description += `R${flip.round} | ${flip.call} → ${flipEmoji} | ${resultText}\n`;
+      });
+      description += `\n`;
+    }
+
     const embed = new EmbedBuilder()
       .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() })
       .setTitle('💥 WRONG!')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `${flipEmoji} **${this.data.lastFlip}**\n\n` +
-        `You called **${this.data.lastCall}**.\n\n` +
-        `**Streak:** ${this.data.streak}\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `━━━━━━━━━━━━━━`)
+      .setDescription(description)
       .setColor(0xe74c3c);
 
     await interaction.update({
@@ -344,24 +380,41 @@ export class CoinFlipGame {
   private createGameEmbed(statusMessage: string = '', resultMessage: string = ''): EmbedBuilder {
     const multiplier = getMultiplier(this.data.streak);
 
-    let description = `━━━━━━━━━━━━━━\n\n`;
-    description += `**STREAK**\n${this.data.streak}\n\n`;
-    description += `**CURRENT POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    // TOP - CURRENT GAME STATS
+    let description = `**WIN STREAK**\n${this.data.streak}\n\n`;
+    description += `**CURRENT BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `─────────────────\n\n`;
 
+    // MIDDLE - FLIP AREA
     if (this.data.lastFlip !== null) {
       const flipEmoji = this.data.lastFlip === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
-      description += `**LAST FLIP**\n${flipEmoji} **${this.data.lastFlip}**\n\n`;
-      description += `**YOUR CALL**\n${this.data.lastCall}\n\n`;
-      description += `**RESULT**\n${statusMessage}\n\n`;
+      description += `${flipEmoji}\n\n`;
+      description += `**YOUR CALL:** ${this.data.lastCall}\n\n`;
+      description += `**RESULT:** ${statusMessage}\n\n`;
       if (resultMessage) {
         description += `${resultMessage}\n\n`;
       }
     } else {
-      description += `<a:coinflip:1555521942205767711> Call it.\n\n`;
+      description += `<a:coinflip:1555521942205767711>\n\n`;
+      description += `**CALL YOUR SIDE**\n\n`;
     }
 
-    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `━━━━━━━━━━━━━━`;
+    description += `─────────────────\n\n`;
+
+    // BOTTOM - FLIP HISTORY
+    description += `📜 **FLIP HISTORY**\n\n`;
+    if (this.data.flipHistory.length === 0) {
+      description += `No flips yet.\n\n`;
+    } else {
+      const recentHistory = this.data.flipHistory.slice(-8).reverse();
+      recentHistory.forEach((flip) => {
+        const flipEmoji = flip.result === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
+        const resultText = flip.won ? '✅ WIN' : '❌ LOSS';
+        description += `R${flip.round} | ${flip.call} → ${flipEmoji} | ${resultText}\n`;
+      });
+      description += `\n`;
+    }
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
@@ -374,15 +427,30 @@ export class CoinFlipGame {
     const netProfit = this.data.currentPayout - this.data.betAmount;
     const multiplier = getMultiplier(this.data.streak);
 
+    let description = `**WIN STREAK**\n${this.data.streak}\n\n`;
+    description += `**ORIGINAL BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**PAYOUT**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `**NET PROFIT**\n${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
+    description += `─────────────────\n\n`;
+
+    // FLIP HISTORY
+    description += `📜 **FLIP HISTORY**\n\n`;
+    if (this.data.flipHistory.length === 0) {
+      description += `No flips yet.\n\n`;
+    } else {
+      const recentHistory = this.data.flipHistory.slice(-8).reverse();
+      recentHistory.forEach((flip) => {
+        const flipEmoji = flip.result === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
+        const resultText = flip.won ? '✅ WIN' : '❌ LOSS';
+        description += `R${flip.round} | ${flip.call} → ${flipEmoji} | ${resultText}\n`;
+      });
+      description += `\n`;
+    }
+
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('💰 CASHED OUT!')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**STREAK**\n${this.data.streak}\n\n` +
-        `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `**PAYOUT**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `**NET PROFIT**\n${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `━━━━━━━━━━━━━━`)
+      .setDescription(description)
       .setColor(0xFFD700);
   }
 
