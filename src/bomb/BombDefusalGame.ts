@@ -16,6 +16,7 @@ interface Challenge {
 interface BombDefusalGameData {
   userId: string;
   username: string;
+  avatarUrl: string;
   channelId: string;
   guildId: string | undefined;
   betAmount: number;
@@ -163,10 +164,11 @@ export class BombDefusalGame {
   private data: BombDefusalGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
 
-  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined) {
+  constructor(userId: string, username: string, avatarUrl: string, betAmount: number, channelId: string, guildId: string | undefined) {
     this.data = {
       userId,
       username,
+      avatarUrl,
       channelId,
       guildId,
       betAmount,
@@ -366,6 +368,7 @@ export class BombDefusalGame {
     const correctOption = challenge.options[challenge.correctIndex];
 
     const embed = new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('💥 BOOM!')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Selected:** ${selectedOption}\n` +
@@ -402,6 +405,7 @@ export class BombDefusalGame {
     );
 
     const embed = new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('💣 BOMB DEFUSAL')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Game timed out.\n\n` +
@@ -450,6 +454,7 @@ export class BombDefusalGame {
     }
 
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('💣 BOMB DEFUSAL')
       .setDescription(description)
       .setColor(0x3498db);
@@ -458,8 +463,9 @@ export class BombDefusalGame {
   private createCashoutEmbed(): EmbedBuilder {
     const netProfit = this.data.currentPayout - this.data.betAmount;
     const multiplier = getMultiplier(this.data.stagesDefused);
-    
+
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('💰 CASHED OUT!')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Stages Defused:** ${this.data.stagesDefused}\n\n` +

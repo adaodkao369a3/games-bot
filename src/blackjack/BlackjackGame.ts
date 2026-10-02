@@ -9,6 +9,7 @@ type BlackjackState = 'idle' | 'playing' | 'dealer_turn' | 'complete' | 'timeout
 interface BlackjackGameData {
   userId: string;
   username: string;
+  avatarUrl: string;
   channelId: string;
   guildId: string | undefined;
   betAmount: number;
@@ -35,10 +36,11 @@ export class BlackjackGame {
   private data: BlackjackGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
 
-  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
+  constructor(userId: string, username: string, avatarUrl: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
     this.data = {
       userId,
       username,
+      avatarUrl,
       channelId,
       guildId,
       betAmount,
@@ -408,6 +410,7 @@ export class BlackjackGame {
     );
 
     const embed = new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('🃏 BLACKJACK')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Game timed out.**\n\n` +
@@ -446,6 +449,7 @@ export class BlackjackGame {
     const coinEmoji = await getEmoji(client, 'bombocoin');
 
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('🃏 BLACKJACK')
       .setDescription(`${await formatHand(this.data.playerHand, false, client)} **${playerTotal}**\n\n` +
         `${await formatHand(this.data.dealerHand, true, client)} **${dealerShowing}**\n\n` +
@@ -459,6 +463,7 @@ export class BlackjackGame {
     const coinEmoji = await getEmoji(client, 'bombocoin');
 
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('💥 BUST')
       .setDescription(`${await formatHand(this.data.playerHand, false, client)} **${playerTotal}**\n\n` +
         `${await formatHand(this.data.dealerHand, false, client)} **${dealerTotal}**\n\n` +
@@ -485,6 +490,7 @@ export class BlackjackGame {
     }
 
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle(title)
       .setDescription(description)
       .setColor(color);

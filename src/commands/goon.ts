@@ -188,10 +188,14 @@ export async function handleGoonCommand(message: Message): Promise<void> {
   }
 
   const embed = new EmbedBuilder()
+    .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
     .setTitle('🎉 SUCCESSFULLY GOONED!')
-    .setDescription(`You have successfully gooned and earned **${GOON_REWARD}** <:bombocoin:1545139736312815840>!\n\n` +
+    .setDescription(`You earned **${GOON_REWARD}** <:bombocoin:1545139736312815840>!\n\n` +
       `${newGoonCount >= GOON_STREAK_LIMIT ? `⚠️ **Goon streak complete!** You cannot use .edge for 1 hour.\n\n` : ''}` +
-      `**Goon Count:** ${newGoonCount}/${GOON_STREAK_LIMIT}`)
+      `**Goon Count:** ${newGoonCount}/${GOON_STREAK_LIMIT}\n\n` +
+      `Use \`.goon\` ${GOON_STREAK_LIMIT} times to block .edge for 1 hour!\n` +
+      `Resets daily.`)
+    .setThumbnail(message.author.displayAvatarURL())
     .setColor(0xFF69B4);
 
   await message.reply({ embeds: [embed] });

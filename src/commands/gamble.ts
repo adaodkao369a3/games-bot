@@ -49,7 +49,7 @@ function buildSpinMessage(): string {
 export async function handleGambleCommand(message: Message, args: string[]): Promise<void> {
   // Check if command is used in game floor channel
   if (message.channel.id !== config.gameFloorChannelId) {
-    await message.reply('This command can only be used in the game floor channel.');
+    await message.reply(`This command can only be used in <#${config.gameFloorChannelId}>.`);
     return;
   }
 
@@ -198,6 +198,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
       // Edit message with win result embed
       const winResultEmbed = new EmbedBuilder()
+        .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
         .setTitle('The results are...')
         .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n${jackpot ? '🎰 **JACKPOT!!!** 🎰' : '<a:win:1545165325614583888> **YOU WON!!**'}\n\n**Bet:** ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n**Total Payout:** +${payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>${jackpot ? '\n\n🌟 **10X MULTIPLIER!** 🌟' : ''}`)
         .setColor(jackpot ? 0xFFD700 : 0x00FF00);
@@ -207,6 +208,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       // LOSE: User gets nothing back (wager already deducted)
       // Edit message with lose result embed
       const loseResultEmbed = new EmbedBuilder()
+        .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
         .setTitle('The results are...')
         .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n<:lotteryslots:1545161895261241454> **YOU LOST...**\n\n**Bet:** ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n**Total Loss:** -${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`)
         .setColor(0xFF0000);

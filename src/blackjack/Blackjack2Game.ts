@@ -9,6 +9,7 @@ type Blackjack2State = 'idle' | 'challenging' | 'playing' | 'dealer_turn' | 'com
 interface PlayerHand {
   userId: string;
   username: string;
+  avatarUrl: string;
   hand: Card[];
   betAmount: number;
   doubled: boolean;

@@ -191,12 +191,14 @@ export async function handleEdgeCommand(message: Message): Promise<void> {
   }
 
   const embed = new EmbedBuilder()
-    .setTitle('🔥 SUCCESSFULLY STARTED YOUR EDGE STREAK!!')
-    .setDescription(`You have successfully started your edge streak and earned **${totalReward}** <:bombocoin:1545139736312815840>!\n\n` +
+    .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
+    .setTitle('🔥 EDGE STREAK STARTED!')
+    .setDescription(`You earned **${totalReward}** <:bombocoin:1545139736312815840>!\n\n` +
       `${reachedStreakTarget ? `🌟 **STREAK BONUS!** You reached ${EDGE_STREAK_TARGET} edges today and earned an extra ${EDGE_STREAK_BONUS} coins!\n\n` : ''}` +
-      `**Daily Edge Count:** ${edgeCount}/${EDGE_STREAK_TARGET}\n\n` +
-      `Continue this streak by using .edge ${EDGE_STREAK_TARGET} times in a day to earn ${EDGE_STREAK_BONUS} bonus coins!\n` +
-      `Streak resets at the end of the day (Central Time).`)
+      `**Daily Count:** ${edgeCount}/${EDGE_STREAK_TARGET}\n\n` +
+      `Use \`.edge\` ${EDGE_STREAK_TARGET} times today for ${EDGE_STREAK_BONUS} bonus coins!\n` +
+      `Resets daily.`)
+    .setThumbnail(message.author.displayAvatarURL())
     .setColor(0xFF4500);
 
   await message.reply({ embeds: [embed] });

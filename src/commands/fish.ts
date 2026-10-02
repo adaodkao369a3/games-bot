@@ -15,7 +15,7 @@ const pendingConfirmations = new Map<string, { timeout: NodeJS.Timeout }>();
 export async function handleFishCommand(message: Message): Promise<void> {
   // Check if command is used in game floor channel
   if (message.channel.id !== config.gameFloorChannelId) {
-    await message.reply('This command can only be used in the game floor channel.');
+    await message.reply(`This command can only be used in <#${config.gameFloorChannelId}>.`);
     return;
   }
 

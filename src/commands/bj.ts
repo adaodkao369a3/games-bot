@@ -14,7 +14,7 @@ const activeGames = new Map<string, BlackjackGame>();
 export async function handleBjCommand(message: Message, args: string[], client: Client): Promise<void> {
   // Check if command is used in game floor channel
   if (message.channel.id !== config.gameFloorChannelId) {
-    await message.reply('This command can only be used in the game floor channel.');
+    await message.reply(`This command can only be used in <#${config.gameFloorChannelId}>.`);
     return;
   }
 
@@ -67,9 +67,10 @@ export async function handleBjCommand(message: Message, args: string[], client: 
     const channelId = message.channel.id;
     const guildId = message.guild?.id;
     const username = message.author.username;
+    const avatarUrl = message.author.displayAvatarURL();
 
     // Create new game instance
-    const game = new BlackjackGame(userId, username, wager, channelId, guildId, client);
+    const game = new BlackjackGame(userId, username, avatarUrl, wager, channelId, guildId, client);
     
     // Store in active games
     activeGames.set(userId, game);

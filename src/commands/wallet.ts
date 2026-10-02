@@ -1,8 +1,14 @@
 import { Message, EmbedBuilder } from 'discord.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { createOrUpdateUser } from '../database/client.js';
+import { config } from '../config/index.js';
 
 export async function handleWalletCommand(message: Message, args: string[] = []): Promise<void> {
+  // Check if command is used in game floor channel
+  if (message.channel.id !== config.gameFloorChannelId) {
+    await message.reply(`This command can only be used in <#${config.gameFloorChannelId}>.`);
+    return;
+  }
   let userId = message.author.id;
   let isOtherUser = false;
 

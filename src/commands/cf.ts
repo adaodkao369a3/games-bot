@@ -14,7 +14,7 @@ const activeGames = new Map<string, CoinFlipGame>();
 export async function handleCfCommand(message: Message, args: string[]): Promise<void> {
   // Check if command is used in game floor channel
   if (message.channel.id !== config.gameFloorChannelId) {
-    await message.reply('This command can only be used in the game floor channel.');
+    await message.reply(`This command can only be used in <#${config.gameFloorChannelId}>.`);
     return;
   }
 
@@ -67,9 +67,10 @@ export async function handleCfCommand(message: Message, args: string[]): Promise
     const channelId = message.channel.id;
     const guildId = message.guild?.id;
     const username = message.author.username;
+    const avatarUrl = message.author.displayAvatarURL();
 
     // Create new game instance
-    const game = new CoinFlipGame(userId, username, wager, channelId, guildId);
+    const game = new CoinFlipGame(userId, username, avatarUrl, wager, channelId, guildId);
     
     // Store in active games
     activeGames.set(userId, game);

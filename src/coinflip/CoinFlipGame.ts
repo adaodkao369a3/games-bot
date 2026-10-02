@@ -9,6 +9,7 @@ type CoinSide = 'HEADS' | 'TAILS';
 interface CoinFlipGameData {
   userId: string;
   username: string;
+  avatarUrl: string;
   channelId: string;
   guildId: string | undefined;
   betAmount: number;
@@ -73,10 +74,11 @@ export class CoinFlipGame {
   private data: CoinFlipGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
 
-  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined) {
+  constructor(userId: string, username: string, avatarUrl: string, betAmount: number, channelId: string, guildId: string | undefined) {
     this.data = {
       userId,
       username,
+      avatarUrl,
       channelId,
       guildId,
       betAmount,
@@ -271,6 +273,7 @@ export class CoinFlipGame {
     const flipEmoji = this.data.lastFlip === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
 
     const embed = new EmbedBuilder()
+      .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() })
       .setTitle('💥 WRONG!')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `${flipEmoji} **${this.data.lastFlip}**\n\n` +
@@ -361,6 +364,7 @@ export class CoinFlipGame {
     description += `━━━━━━━━━━━━━━`;
 
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('🪙 COIN FLIP')
       .setDescription(description)
       .setColor(0x3498db);
@@ -369,8 +373,9 @@ export class CoinFlipGame {
   private createCashoutEmbed(): EmbedBuilder {
     const netProfit = this.data.currentPayout - this.data.betAmount;
     const multiplier = getMultiplier(this.data.streak);
-    
+
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('💰 CASHED OUT!')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**STREAK**\n${this.data.streak}\n\n` +

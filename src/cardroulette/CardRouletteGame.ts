@@ -19,6 +19,7 @@ interface CardOutcome {
 interface CardRouletteGameData {
   userId: string;
   username: string;
+  avatarUrl: string;
   channelId: string;
   guildId: string | undefined;
   betAmount: number;
@@ -146,10 +147,11 @@ export class CardRouletteGame {
   private data: CardRouletteGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
 
-  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
+  constructor(userId: string, username: string, avatarUrl: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
     this.data = {
       userId,
       username,
+      avatarUrl,
       channelId,
       guildId,
       betAmount,
@@ -482,6 +484,7 @@ export class CardRouletteGame {
     }
 
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('🃏🔫 CARD ROULETTE')
       .setDescription(description)
       .setColor(0x3498db);
@@ -491,7 +494,7 @@ export class CardRouletteGame {
     const netProfit = this.data.currentPayout - this.data.betAmount;
     const multiplier = getMultiplier(this.data.drawsSurvived);
     const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
-    
+
     let description = `**${this.data.drawsSurvived}** cards survived • **x${multiplier.toFixed(2)}**\n\n`;
     description += `Cards: ${this.data.cardsDrawn.map(card => card.emoji).join(' ')}\n\n`;
     description += `Won: **${this.data.currentPayout.toLocaleString('en-US')}** ${coinEmoji}\n`;
@@ -499,6 +502,7 @@ export class CardRouletteGame {
     description += `Profit: **${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')}** ${coinEmoji}`;
 
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('💰 CASHED OUT!')
       .setDescription(description)
       .setColor(0xFFD700);
@@ -507,8 +511,9 @@ export class CardRouletteGame {
   private async createEliminationEmbed(): Promise<EmbedBuilder> {
     const card = this.data.currentCard!;
     const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
-    
+
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setTitle('💀 ELIMINATED')
       .setDescription(`${card.emoji}\n\n` +
         `**${card.name}**\n${card.description}\n\n` +
