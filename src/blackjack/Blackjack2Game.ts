@@ -52,7 +52,7 @@ export class Blackjack2Game {
   private gameTimeout: NodeJS.Timeout | null = null;
   private acceptTimeout: NodeJS.Timeout | null = null;
 
-  constructor(player1Id: string, player2Id: string, player1Name: string, player2Name: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
+  constructor(player1Id: string, player2Id: string, player1Name: string, player2Name: string, player1AvatarUrl: string, player2AvatarUrl: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
     this.data = {
       player1Id,
       player2Id,
@@ -64,6 +64,7 @@ export class Blackjack2Game {
       player1Hand: {
         userId: player1Id,
         username: player1Name,
+        avatarUrl: player1AvatarUrl,
         hand: [],
         betAmount,
         doubled: false,
@@ -73,6 +74,7 @@ export class Blackjack2Game {
       player2Hand: {
         userId: player2Id,
         username: player2Name,
+        avatarUrl: player2AvatarUrl,
         hand: [],
         betAmount,
         doubled: false,
@@ -298,6 +300,7 @@ export class Blackjack2Game {
     this.clearAcceptTimeout();
 
     const embed = new EmbedBuilder()
+      .setAuthor({ name: this.data.player1Name, iconURL: this.data.player1Hand.avatarUrl })
       .setTitle('🃏 2-PLAYER BLACKJACK')
       .setDescription(`**${this.data.player2Name} declined the challenge.**`)
       .setColor(0xe74c3c);
@@ -625,6 +628,7 @@ export class Blackjack2Game {
     await this.refundBothPlayers();
 
     const embed = new EmbedBuilder()
+      .setAuthor({ name: this.data.player1Name, iconURL: this.data.player1Hand.avatarUrl })
       .setTitle('🃏 2-PLAYER BLACKJACK')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Game timed out.\n\n` +
@@ -670,6 +674,7 @@ export class Blackjack2Game {
   private async createChallengeEmbed(client: Client | null = null): Promise<EmbedBuilder> {
     const coinEmoji = await getEmoji(client, 'bombocoin');
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.player1Name, iconURL: this.data.player1Hand.avatarUrl })
       .setTitle('🃏 2-PLAYER BLACKJACK')
       .setDescription(`**${this.data.player1Name}**\nvs\n**${this.data.player2Name}**\n\n` +
         `**BET**\n${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji} each\n\n` +
@@ -692,6 +697,7 @@ export class Blackjack2Game {
     description += `**${this.data.player2Hand.betAmount.toLocaleString('en-US')}** ${coinEmoji} • ${this.data.currentPlayer === 'player2' ? 'Your turn' : this.data.player2Hand.finished ? 'Finished' : 'Waiting'}`;
 
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.player1Name, iconURL: this.data.player1Hand.avatarUrl })
       .setTitle('🃏 2-PLAYER BLACKJACK')
       .setDescription(description)
       .setColor(0x3498db);
@@ -732,6 +738,7 @@ export class Blackjack2Game {
     }
 
     return new EmbedBuilder()
+      .setAuthor({ name: this.data.player1Name, iconURL: this.data.player1Hand.avatarUrl })
       .setTitle('🃏 BLACKJACK RESULTS')
       .setDescription(description)
       .setColor(0x3498db);

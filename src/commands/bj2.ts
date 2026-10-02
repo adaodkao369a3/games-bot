@@ -93,9 +93,11 @@ export async function handleBj2Command(message: Message, args: string[], client:
     const guildId = message.guild?.id;
     const player1Name = message.author.username;
     const player2Name = mentionedUser.username;
+    const player1AvatarUrl = message.author.displayAvatarURL();
+    const player2AvatarUrl = mentionedUser.displayAvatarURL();
 
     // Create new game instance
-    const game = new Blackjack2Game(userId, opponentId, player1Name, player2Name, betAmount, channelId, guildId, client);
+    const game = new Blackjack2Game(userId, opponentId, player1Name, player2Name, player1AvatarUrl, player2AvatarUrl, betAmount, channelId, guildId, client);
     
     // Store in active games for both players
     activeGames.set(userId, game);
