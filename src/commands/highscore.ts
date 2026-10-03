@@ -1,5 +1,5 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
-import { getLeaderboard, getLeaderboardCount } from '../database/client.js';
+import { getLeaderboard } from '../database/client.js';
 
 const MEDAL_EMOJIS = ['<a:firstplacetrophy:1545135079926267964>', '<a:secondplacetrophy:1545135074968608851>', '<a:thirdplacetrophy:1545135071068033024>'];
 const RANK_EMOJIS = ['<:one:1545379088775258112>', '<:two:1545379099394969660>', '<:three:1545379095498727546>', '<:four:1545379083872112641>', '<:five:1545379011876622386>', '<:six:1545379093250310185>', '<:seven:1545379091287506994>', '<:eight:1545379009846706196>', '<:nine:1545379086174527530>', '<:zero:1545379101496311808>'];
@@ -7,13 +7,26 @@ const RANK_EMOJIS = ['<:one:1545379088775258112>', '<:two:1545379099394969660>',
 const PAGE_SIZE = 10;
 
 // Track active pagination sessions
-const activeSessions = new Map<string, { page: number; totalCount: number; leaderboard: any[] }>();
+const activeSessions = new Map<string, { page: number; totalCount: number; leaderboard: any[]; guildMembers: Set<string> }>();
 
 export async function handleHighscoreCommand(message: Message): Promise<void> {
   try {
-    const totalCount = await getLeaderboardCount();
+    if (!message.guild) {
+      await message.reply('This command can only be used in a server.');
+      return;
+    }
 
-    if (totalCount === 0) {
+    // Fetch all guild members
+    const members = await message.guild.members.fetch();
+    const guildMemberIds = new Set(members.keys());
+
+    // Fetch all leaderboard entries (no limit for now, we'll filter and paginate)
+    const allLeaderboard = await getLeaderboard(1000);
+
+    // Filter to only include current guild members
+    const filteredLeaderboard = allLeaderboard.filter(entry => guildMemberIds.has(entry.user_id));
+
+    if (filteredLeaderboard.length === 0) {
       const emptyEmbed = new EmbedBuilder()
         .setTitle('<:bombocoin:1545139736312815840> Bombo Coin Leaderboard')
         .setDescription('__No players yet!__ Be the first to earn some <:bombocoin:1545139736312815840>!')
@@ -25,11 +38,12 @@ export async function handleHighscoreCommand(message: Message): Promise<void> {
     }
 
     const page = 0;
-    const leaderboard = await getLeaderboard(PAGE_SIZE, page * PAGE_SIZE);
+    const totalCount = filteredLeaderboard.length;
+    const leaderboard = filteredLeaderboard.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
     // Store session
     const sessionId = message.author.id;
-    activeSessions.set(sessionId, { page, totalCount, leaderboard });
+    activeSessions.set(sessionId, { page, totalCount, leaderboard, guildMembers: guildMemberIds });
 
     const embed = await buildLeaderboardEmbed(leaderboard, page, totalCount, message);
     const row = buildPaginationButtons(page, totalCount, sessionId);
@@ -72,8 +86,12 @@ export async function handleHighscoreInteraction(interaction: MessageComponentIn
       return;
     }
 
-    const leaderboard = await getLeaderboard(PAGE_SIZE, newPage * PAGE_SIZE);
-    activeSessions.set(sessionId, { page: newPage, totalCount: session.totalCount, leaderboard });
+    // Fetch all leaderboard entries again and filter
+    const allLeaderboard = await getLeaderboard(1000);
+    const filteredLeaderboard = allLeaderboard.filter(entry => session.guildMembers.has(entry.user_id));
+    const leaderboard = filteredLeaderboard.slice(newPage * PAGE_SIZE, (newPage + 1) * PAGE_SIZE);
+
+    activeSessions.set(sessionId, { page: newPage, totalCount: session.totalCount, leaderboard, guildMembers: session.guildMembers });
 
     const embed = await buildLeaderboardEmbed(leaderboard, newPage, session.totalCount, interaction);
     const row = buildPaginationButtons(newPage, session.totalCount, sessionId);
