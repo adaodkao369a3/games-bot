@@ -2,7 +2,7 @@ import { Message, EmbedBuilder } from 'discord.js';
 import { getCoinBalanceInfo, removeCoins, awardCoins } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { parseWagerAmount } from '../utils/wager-parser.js';
-import { config } from '../config/index.js';
+import { config, isGameFloorChannel } from '../config/index.js';
 
 const SLOT_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>', '<:slotsstrawberry:1545161917834993804>'];
 const WIN_SYMBOL = '<:slotsseven:1545161915649753119>';
@@ -48,8 +48,8 @@ function buildSpinMessage(): string {
 
 export async function handleGambleCommand(message: Message, args: string[]): Promise<void> {
   // Check if command is used in game floor channel
-  if (message.channel.id !== config.gameFloorChannelId) {
-    await message.reply(`This command can only be used in <#${config.gameFloorChannelId}>.`);
+  if (!isGameFloorChannel(message.channel.id)) {
+    await message.reply(`This command can only be used in <#${config.gameFloorChannelIds[0]}>.`);
     return;
   }
 

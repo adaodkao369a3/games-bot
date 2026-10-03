@@ -12,8 +12,15 @@ export const config = {
   database: {
     url: process.env.DATABASE_URL || '',
   },
-  gameFloorChannelId: '1542311921007460542',
+  gameFloorChannelIds: ['1542311921007460542', '1535286802871623831'],
 };
+
+/**
+ * Check if a channel ID is in the allowed game floor channels
+ */
+export function isGameFloorChannel(channelId: string): boolean {
+  return config.gameFloorChannelIds.includes(channelId);
+}
 
 export function validateConfig(): void {
   const errors: string[] = [];

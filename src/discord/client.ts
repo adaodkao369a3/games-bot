@@ -11,7 +11,6 @@ import { handleQuoteCommand } from '../commands/quote.js';
 import { handleWalletCommand } from '../commands/wallet.js';
 import { handleHighscoreCommand } from '../commands/highscore.js';
 import { handleCashCommand } from '../commands/cash.js';
-import { handleFishCommand, handleFishInteraction } from '../commands/fish.js';
 import { handleDiceDuelCommand, handleDiceDuelInteraction } from '../commands/diceduel.js';
 import { handleHigherLowerCommand, handleHigherLowerInteraction } from '../commands/higherlower.js';
 import { handleCardRouletteCommand, handleCardRouletteInteraction } from '../commands/croulette.js';
@@ -30,6 +29,15 @@ import { handleMogCommand, handleMogInteraction } from '../commands/mog.js';
 import { handleMoglbCommand, handleMoglbInteraction } from '../commands/moglb.js';
 import { handleGoonCommand } from '../commands/goon.js';
 import { handleEdgeCommand } from '../commands/edge.js';
+import {
+  handlePscoutCommand,
+  handlePrecruitCommand,
+  handlePworkCommand,
+  handlePcollectCommand,
+  handlePlistCommand,
+  handleAgencyInteraction,
+} from '../commands/agency.js';
+import { handlePhelpCommand } from '../commands/phelp.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -126,8 +134,33 @@ export class DiscordClient {
         return;
       }
 
-      if (command === 'fish') {
-        await handleFishCommand(message);
+      if (command === 'pscout') {
+        await handlePscoutCommand(message);
+        return;
+      }
+
+      if (command === 'precruit') {
+        await handlePrecruitCommand(message, args);
+        return;
+      }
+
+      if (command === 'pwork') {
+        await handlePworkCommand(message, args);
+        return;
+      }
+
+      if (command === 'pcollect') {
+        await handlePcollectCommand(message);
+        return;
+      }
+
+      if (command === 'plist') {
+        await handlePlistCommand(message);
+        return;
+      }
+
+      if (command === 'phelp') {
+        await handlePhelpCommand(message);
         return;
       }
 
@@ -263,8 +296,9 @@ export class DiscordClient {
       return;
     }
 
-    if (customId.startsWith('fish_')) {
-      await handleFishInteraction(interaction);
+    // Talent Agency buttons and select menus (pa_<action>_<ownerId>_<arg>)
+    if (customId.startsWith('pa_')) {
+      await handleAgencyInteraction(interaction);
       return;
     }
 

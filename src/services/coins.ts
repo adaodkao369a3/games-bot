@@ -1,4 +1,4 @@
-import { addCoins, getCoinBalance, CoinBalance } from '../database/client.js';
+import { addCoins, getCoinBalance, setCoinBalance, CoinBalance } from '../database/client.js';
 
 export interface CoinOptions {
   reason?: string;
@@ -64,6 +64,24 @@ export class CoinsService {
   static async getCoinBalance(userId: string): Promise<CoinBalance | null> {
     return await getCoinBalance(userId);
   }
+
+  /**
+   * Set a user's coin balance to a specific value
+   * @param userId Discord user ID
+   * @param newBalance The new balance to set
+   * @param source Source of the transaction
+   * @param options Optional reason and description
+   * @returns New balance, or null if failed
+   */
+  static async setBalance(
+    userId: string,
+    newBalance: number,
+    source: string,
+    options?: CoinOptions
+  ): Promise<number | null> {
+    console.log(`[COINS] Setting balance for user ${userId} to ${newBalance} from source: ${source}`);
+    return await setCoinBalance(userId, newBalance, source, options?.reason, options?.description);
+  }
 }
 
 // Convenience functions for backward compatibility and ease of use
@@ -87,4 +105,13 @@ export async function removeCoins(
 
 export async function getCoinBalanceInfo(userId: string): Promise<CoinBalance | null> {
   return await CoinsService.getCoinBalance(userId);
+}
+
+export async function setBalance(
+  userId: string,
+  newBalance: number,
+  source: string,
+  options?: CoinOptions
+): Promise<number | null> {
+  return await CoinsService.setBalance(userId, newBalance, source, options);
 }

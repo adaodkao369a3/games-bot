@@ -185,6 +185,11 @@ async function initializeSchema(): Promise<void> {
             edge_daily_date DATE NOT NULL DEFAULT CURRENT_DATE,
             goon_count INTEGER NOT NULL DEFAULT 0,
             edge_blocked_until TIMESTAMP WITH TIME ZONE,
+            edge_streak INTEGER NOT NULL DEFAULT 0,
+            last_edge_streak_at TIMESTAMP WITH TIME ZONE,
+            goon_powerup_until TIMESTAMP WITH TIME ZONE,
+            goon_daily_count INTEGER NOT NULL DEFAULT 0,
+            goon_daily_date DATE,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
           )
@@ -206,25 +211,15 @@ async function initializeSchema(): Promise<void> {
         console.log('✓ goon_edge_tracking table exists');
       }
 
-      // Check if fishing_loot table exists
-      const fishingCheck = await pool!.query(`
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_name = 'fishing_loot' 
-        AND table_schema = 'public'
+      // Goon/edge rework columns (streak bonus, power-up, daily goon penalty). Idempotent for existing installs.
+      await pool!.query(`
+        ALTER TABLE goon_edge_tracking
+          ADD COLUMN IF NOT EXISTS edge_streak INTEGER NOT NULL DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS last_edge_streak_at TIMESTAMP WITH TIME ZONE,
+          ADD COLUMN IF NOT EXISTS goon_powerup_until TIMESTAMP WITH TIME ZONE,
+          ADD COLUMN IF NOT EXISTS goon_daily_count INTEGER NOT NULL DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS goon_daily_date DATE
       `);
-
-      if (fishingCheck.rows.length === 0) {
-        console.log('⚠ fishing_loot table does not exist, creating...');
-        
-        const fishingSchemaPath = path.join(process.cwd(), 'src', 'database', 'fishing-schema.sql');
-        const fishingSchema = fs.readFileSync(fishingSchemaPath, 'utf-8');
-        await pool!.query(fishingSchema);
-        
-        console.log('✓ fishing_loot table created');
-      } else {
-        console.log('✓ fishing_loot table exists');
-      }
 
       // Check if title_ownership table exists
       const titleCheck = await pool!.query(`
@@ -369,6 +364,27 @@ async function initializeSchema(): Promise<void> {
         }
       }
     }
+
+    // Talent Agency minigame (pa_* tables): create if missing, then always re-seed (idempotent upserts)
+    const agencyCheck = await pool!.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_name = 'pa_characters'
+      AND table_schema = 'public'
+    `);
+
+    if (agencyCheck.rows.length === 0) {
+      console.log('⚠ pa_characters table does not exist, creating agency schema...');
+      const agencySchemaPath = path.join(process.cwd(), 'src', 'database', 'agency-schema.sql');
+      await pool!.query(fs.readFileSync(agencySchemaPath, 'utf-8'));
+      console.log('✓ Talent Agency schema created');
+    } else {
+      console.log('✓ pa_characters table exists');
+    }
+
+    const agencySeedPath = path.join(process.cwd(), 'src', 'database', 'agency-seed.sql');
+    await pool!.query(fs.readFileSync(agencySeedPath, 'utf-8'));
+    console.log('✓ Talent Agency seed applied');
   } catch (error) {
     console.error('✗ Failed to initialize database schema:', error);
     throw error;
@@ -570,6 +586,88 @@ export async function getCoinBalance(userId: string): Promise<CoinBalance | null
       lifetime_spent: parseBigInt(row.lifetime_spent),
       lifetime_gambled: parseBigInt(row.lifetime_gambled || 0)
     };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Set a user's coin balance to a specific value
+ * @param userId Discord user ID
+ * @param newBalance The new balance to set
+ * @param source Source of the transaction
+ * @param reason Optional reason
+ * @param description Optional description
+ * @returns New balance, or null if failed
+ */
+export async function setCoinBalance(
+  userId: string,
+  newBalance: number,
+  source: string,
+  reason?: string,
+  description?: string
+): Promise<number | null> {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    // Get current balance
+    const currentResult = await client.query(
+      'SELECT coin_balance FROM users WHERE user_id = $1',
+      [userId]
+    );
+
+    if (currentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      console.error(`[COINS] setCoinBalance failed: user ${userId} does not exist`);
+      return null;
+    }
+
+    const currentBalance = parseBigInt(currentResult.rows[0].coin_balance);
+    const amount = newBalance - currentBalance;
+
+    // Update user balance
+    await client.query(
+      `UPDATE users 
+       SET coin_balance = $1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $2`,
+      [newBalance, userId]
+    );
+
+    // Determine transaction type
+    let transactionType = 'neutral';
+    if (amount > 0) transactionType = 'earn';
+    if (amount < 0) transactionType = 'spend';
+
+    // Log transaction
+    await client.query(
+      `INSERT INTO coin_transactions 
+       (user_id, amount, balance_before, balance_after, transaction_type, source, reason, description)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        userId,
+        amount,
+        currentBalance,
+        newBalance,
+        transactionType,
+        source,
+        reason || null,
+        description || null,
+      ]
+    );
+
+    await client.query('COMMIT');
+    console.log(`[COINS] Balance set successfully: User ${userId}, Old: ${currentBalance}, New: ${newBalance}, Source: ${source}`);
+    return newBalance;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('[COINS] Failed to rollback transaction:', rollbackError);
+    }
+    console.error('[COINS] setCoinBalance failed:', error);
+    return null;
   } finally {
     client.release();
   }

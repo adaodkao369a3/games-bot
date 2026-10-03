@@ -31,8 +31,13 @@ export async function handleHelpCommand(message: Message): Promise<void> {
         inline: false,
       },
       {
+        name: '🕴️ **Talent Agency**',
+        value: '`.pscout` — Scout new talent (free, every 30 min)\n`.precruit <name>` — Sign talent you scouted\n`.pwork <name>` — Send a talent out to work\n`.pcollect` — Collect earnings from working talent\n`.plist` — Your agency hub: roster, care, training',
+        inline: false,
+      },
+      {
         name: '<:moneybag:1545149026528268308> **Currency**',
-        value: '`.wallet` — Check your Bombo Coin balance\n`.highscore` / `.hs` — View the Bombo Coin leaderboard\n`.fish` — Go fishing (costs 500 💵)',
+        value: '`.wallet` — Check your Bombo Coin balance\n`.highscore` / `.hs` — View the Bombo Coin leaderboard',
         inline: false,
       },
     ]);
