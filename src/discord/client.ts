@@ -9,7 +9,7 @@ import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } fr
 import { handleGambleCommand } from '../commands/gamble.js';
 import { handleQuoteCommand } from '../commands/quote.js';
 import { handleWalletCommand } from '../commands/wallet.js';
-import { handleHighscoreCommand } from '../commands/highscore.js';
+import { handleHighscoreCommand, handleHighscoreInteraction } from '../commands/highscore.js';
 import { handleCashCommand } from '../commands/cash.js';
 import { handleDiceDuelCommand, handleDiceDuelInteraction } from '../commands/diceduel.js';
 import { handleHigherLowerCommand, handleHigherLowerInteraction } from '../commands/higherlower.js';
@@ -380,6 +380,11 @@ export class DiscordClient {
 
     if (customId.startsWith('moglb_')) {
       await handleMoglbInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('hs_')) {
+      await handleHighscoreInteraction(interaction);
       return;
     }
   }

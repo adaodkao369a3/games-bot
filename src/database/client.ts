@@ -774,18 +774,19 @@ export interface MogLeaderboardEntry {
 /**
  * Get the leaderboard of users sorted by coin balance
  * @param limit Maximum number of users to return
+ * @param offset Number of users to skip (for pagination)
  * @returns Array of leaderboard entries
  */
-export async function getLeaderboard(limit: number = 10): Promise<LeaderboardEntry[]> {
+export async function getLeaderboard(limit: number = 10, offset: number = 0): Promise<LeaderboardEntry[]> {
   const client = await getClient();
   try {
     const result = await client.query(
-      `SELECT user_id, coin_balance as balance, lifetime_coins_earned as lifetime_earned, lifetime_coins_spent as lifetime_spent 
-       FROM users 
-       WHERE coin_balance > 0 
-       ORDER BY coin_balance DESC 
-       LIMIT $1`,
-      [limit]
+      `SELECT user_id, coin_balance as balance, lifetime_coins_earned as lifetime_earned, lifetime_coins_spent as lifetime_spent
+       FROM users
+       WHERE coin_balance > 0
+       ORDER BY coin_balance DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
     );
     return result.rows.map(row => ({
       user_id: row.user_id,
@@ -793,6 +794,22 @@ export async function getLeaderboard(limit: number = 10): Promise<LeaderboardEnt
       lifetime_earned: parseBigInt(row.lifetime_earned),
       lifetime_spent: parseBigInt(row.lifetime_spent)
     }));
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get the total count of users with positive balance
+ * @returns Total count
+ */
+export async function getLeaderboardCount(): Promise<number> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      `SELECT COUNT(*) as count FROM users WHERE coin_balance > 0`
+    );
+    return parseBigInt(result.rows[0].count);
   } finally {
     client.release();
   }

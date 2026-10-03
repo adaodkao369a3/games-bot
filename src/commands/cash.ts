@@ -70,20 +70,13 @@ export async function handleCashCommand(message: Message, args: string[]): Promi
 
   // Parse amount (supports k, m, b suffixes)
   const amountArg = args[1];
-  const amount = parseWagerAmount(amountArg, Number.MAX_SAFE_INTEGER);
 
-  if (amount === null) {
-    await message.reply('Please specify a valid amount. Examples: `.cash @user 1000`, `.cash @user 10k`, `.cash @user 1.5m`, `.cash all 0`');
-    return;
-  }
+  // Special case: .cash all 0
+  if (isAll && amountArg === '0') {
+    try {
+      let successCount = 0;
+      let failCount = 0;
 
-  try {
-    let successCount = 0;
-    let failCount = 0;
-    let totalAwarded = 0;
-
-    // If "all" command with amount 0, set all balances to 0
-    if (isAll && amount === 0) {
       for (const userId of targetUsers) {
         const newBalance = await setBalance(
           userId,
@@ -114,7 +107,24 @@ export async function handleCashCommand(message: Message, args: string[]): Promi
 
       await message.reply({ embeds: [successEmbed] });
       return;
+    } catch (error) {
+      console.error('[Cash Command] Error:', error);
+      await message.reply('An error occurred while processing the cash command.');
+      return;
     }
+  }
+
+  const amount = parseWagerAmount(amountArg, Number.MAX_SAFE_INTEGER);
+
+  if (amount === null) {
+    await message.reply('Please specify a valid amount. Examples: `.cash @user 1000`, `.cash @user 10k`, `.cash @user 1.5m`, `.cash all 0`');
+    return;
+  }
+
+  try {
+    let successCount = 0;
+    let failCount = 0;
+    let totalAwarded = 0;
 
     // For positive amounts, award coins
     if (amount <= 0) {
