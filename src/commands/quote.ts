@@ -7,12 +7,13 @@ import {
   StickerFormatType,
 } from 'discord.js';
 import { renderQuoteCard, renderStackedQuoteCard, QuoteCardOptions } from '../quote/renderer.js';
-import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS } from '../quote/config.js';
+import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS, FONT_OPTIONS, FontName } from '../quote/config.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { isStaff } from '../utils/permissions.js';
 import { getQuoteRedirectSettings } from '../database/client.js';
 
 const THEME_NAMES: PresetName[] = ['classic', 'white', 'sunset', 'purple', 'aurora', 'gold', 'cherry', 'midnight', 'plasma', 'emerald', 'rose', 'ember', 'sapphire', 'coral', 'lime'];
+const FONT_NAMES: FontName[] = ['butler', 'roboto', 'roboto_bold', 'angels', 'blazed', 'bleeding_cowboys', 'bouncy', 'cowboy_movie', 'flame', 'hanged_letters', 'magazine_letter', 'matcha_world', 'next_ups', 'sabrina', 'spider_man', 'iknowaghost'];
 const QUOTE_REDIRECT_CHANNEL_ID = '1526869451834654821';
 const QUOTE_COOLDOWN_MS = 5 * 1000; // 5 seconds
 let quoteCooldownUntil = 0;
@@ -117,13 +118,15 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       : [await buildQuoteSource(message, bottomTarget)];
 
     let preset: PresetName = 'classic';
+    let font: FontName = 'butler';
 
     // Shared theme across every card in the stack — one select-menu
     // controls all of them.
-    const renderCard = async (chosenPreset: PresetName) => {
+    const renderCard = async (chosenPreset: PresetName, chosenFont: FontName) => {
       const cardsWithTheme: QuoteCardOptions[] = sources.map((s) => ({
         ...s.opts,
         preset: chosenPreset,
+        font: chosenFont,
       }));
       return isStacked ? renderStackedQuoteCard(cardsWithTheme) : renderQuoteCard(cardsWithTheme[0]);
     };
@@ -147,7 +150,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
         lime: { id: '1556312287319691405' },
       };
 
-      const select = new StringSelectMenuBuilder()
+      const themeSelect = new StringSelectMenuBuilder()
         .setCustomId('quote-theme-select')
         .setPlaceholder('Choose a theme…')
         .setDisabled(disabled)
@@ -159,10 +162,26 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
             default: name === preset,
           }))
         );
-      return [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select)];
+
+      const fontSelect = new StringSelectMenuBuilder()
+        .setCustomId('quote-font-select')
+        .setPlaceholder('Choose a font…')
+        .setDisabled(disabled)
+        .addOptions(
+          FONT_NAMES.map((name) => ({
+            label: FONT_OPTIONS[name].label,
+            value: name,
+            default: name === font,
+          }))
+        );
+
+      return [
+        new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(themeSelect),
+        new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(fontSelect),
+      ];
     };
 
-    const buffer = await renderCard(preset);
+    const buffer = await renderCard(preset, font);
     const attachment = new AttachmentBuilder(buffer, { name: 'quote.png' });
 
     // One jump link per quoted message, oldest first. Jump-to-original
@@ -225,16 +244,22 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       // instead of the (no-longer-first) i.update() call this replaced.
       await i.deferUpdate();
 
-      const chosen = i.values[0] as PresetName;
-      preset = chosen;
+      const customId = i.customId;
+      const chosen = i.values[0];
+
+      if (customId === 'quote-theme-select') {
+        preset = chosen as PresetName;
+      } else if (customId === 'quote-font-select') {
+        font = chosen as FontName;
+      }
 
       let newAttachment: AttachmentBuilder;
       try {
-        const newBuffer = await renderCard(preset);
+        const newBuffer = await renderCard(preset, font);
         newAttachment = new AttachmentBuilder(newBuffer, { name: 'quote.png' });
       } catch (renderError) {
-        console.error('[QUOTE] Failed to re-render quote card on theme change:', renderError);
-        await i.followUp({ content: 'Failed to apply that theme. Please try again.', ephemeral: true }).catch(() => {});
+        console.error('[QUOTE] Failed to re-render quote card on change:', renderError);
+        await i.followUp({ content: 'Failed to apply that change. Please try again.', ephemeral: true }).catch(() => {});
         return;
       }
 

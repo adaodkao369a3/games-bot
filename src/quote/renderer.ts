@@ -2,27 +2,49 @@ import { createCanvas, loadImage, Image, SKRSContext2D, GlobalFonts } from '@nap
 import { join } from 'path';
 import { cwd } from 'process';
 import { existsSync } from 'fs';
-import { LAYOUT, GRADIENT_PRESETS, PresetName, FONT_FALLBACK, EMOJI_FONT } from './config.js';
+import { LAYOUT, GRADIENT_PRESETS, PresetName, FONT_FALLBACK, EMOJI_FONT, FONT_OPTIONS, FontName } from './config.js';
 import { segmentText, preloadCustomEmojis, getCustomEmojiFromCache, Segment } from './textSegmenter.js';
 
 const PROJECT_ROOT = cwd();
 
-const fontPath = join(PROJECT_ROOT, 'assets', 'fonts', 'Butler-Free-Bd.otf');
 const emojiFontPath = join(PROJECT_ROOT, 'assets', 'fonts', 'NotoColorEmoji.ttf');
 
-try {
-  if (existsSync(fontPath)) {
-    const success = GlobalFonts.registerFromPath(fontPath, 'Butler');
-    if (success) {
-      console.log('[QuoteRenderer] Font loaded: assets/fonts/Butler-Free-Bd.otf');
+// Register all fonts
+const fontFiles: Record<FontName, string> = {
+  butler: 'Butler-Free-Bd.otf',
+  roboto: 'Roboto-Regular.ttf',
+  roboto_bold: 'Roboto-Bold.ttf',
+  angels: 'Angels.ttf',
+  blazed: 'Blazed.ttf',
+  bleeding_cowboys: 'Bleeding_Cowboys.ttf',
+  bouncy: 'Bouncy-PERSONAL_USE_ONLY.otf',
+  cowboy_movie: 'Cowboy Movie.ttf',
+  flame: 'Flame on!.ttf',
+  hanged_letters: 'Hanged Letters.ttf',
+  magazine_letter: 'MagazineLetterByBrntlbrnl-Regular.ttf',
+  matcha_world: 'Matcha World.ttf',
+  next_ups: 'Next Ups.ttf',
+  sabrina: 'SABRINAS.TTF',
+  spider_man: 'The Amazing Spider-Man.ttf',
+  iknowaghost: 'iknowaghost.ttf',
+};
+
+for (const [fontName, fileName] of Object.entries(fontFiles)) {
+  const fontPath = join(PROJECT_ROOT, 'assets', 'fonts', fileName);
+  try {
+    if (existsSync(fontPath)) {
+      const success = GlobalFonts.registerFromPath(fontPath, FONT_OPTIONS[fontName as FontName].font);
+      if (success) {
+        console.log(`[QuoteRenderer] Font loaded: assets/fonts/${fileName}`);
+      } else {
+        console.error(`[QuoteRenderer] Font registration failed: ${fileName}`);
+      }
     } else {
-      console.error('[QuoteRenderer] Font registration failed');
+      console.error(`[QuoteRenderer] Font file not found: assets/fonts/${fileName}`);
     }
-  } else {
-    console.error('[QuoteRenderer] Font file not found: assets/fonts/Butler-Free-Bd.otf');
+  } catch (error) {
+    console.error(`[QuoteRenderer] Failed to load font ${fileName}:`, error);
   }
-} catch (error) {
-  console.error('[QuoteRenderer] Failed to load font:', error);
 }
 
 try {
@@ -34,11 +56,12 @@ try {
       console.error('[QuoteRenderer] Emoji font registration failed');
     }
   } else {
-    console.error('[QuoteRenderer] Emoji font file not found: assets/fonts/NotoColorEmoji.ttf');
+    console.error('[QuoteRenderer] Emoji file not found: assets/fonts/NotoColorEmoji.ttf');
   }
 } catch (error) {
   console.error('[QuoteRenderer] Failed to load emoji font:', error);
 }
+
 
 export interface QuoteCardOptions {
   avatarUrl: string;
@@ -46,6 +69,7 @@ export interface QuoteCardOptions {
   nickname: string;
   username: string;
   preset?: PresetName;
+  font?: FontName;
   /** Direct image URL for a sticker attached to the quoted message (PNG/APNG). */
   stickerUrl?: string;
   /** Direct URL for a quoted message's image attachment. Only used when there's no sticker. */
@@ -77,6 +101,7 @@ async function renderQuoteCardLayer(opts: QuoteCardOptions, layout: LayerOptions
   const { cardWidth, mirror, drawWatermark } = layout;
   const preset = GRADIENT_PRESETS[opts.preset ?? 'classic'];
   const isWhitePreset = (opts.preset ?? 'classic') === 'white';
+  const fontOption = FONT_OPTIONS[opts.font ?? 'butler'];
 
   const SCALE = 2;
   const canvas = createCanvas(cardWidth * SCALE, H * SCALE);
@@ -117,6 +142,7 @@ async function renderQuoteCardLayer(opts: QuoteCardOptions, layout: LayerOptions
     false,
     opts.stickerUrl,
     opts.imageUrl,
+    fontOption,
   );
 
   return canvas.toBuffer('image/png');
@@ -170,6 +196,7 @@ export async function renderStackedQuoteCard(cards: QuoteCardOptions[]): Promise
   const N = cards.length;
   const preset = GRADIENT_PRESETS[cards[0].preset ?? 'classic'];
   const isWhitePreset = (cards[0].preset ?? 'classic') === 'white';
+  const fontOption = FONT_OPTIONS[cards[0].font ?? 'butler'];
 
   const stackCardWidth = H + (W - H) * STACK_QUOTE_WIDTH_MULTIPLIER;
 
@@ -225,7 +252,7 @@ export async function renderStackedQuoteCard(cards: QuoteCardOptions[]): Promise
   // a per-card corner watermark.
   for (let i = 0; i < N - 1; i++) {
     const seamY = (i + 1) * rowHeight;
-    drawWatermarkBadge(ctx, stackCardWidth / 2, seamY, isWhitePreset);
+    drawWatermarkBadge(ctx, stackCardWidth / 2, seamY, isWhitePreset, fontOption);
   }
 
   // Text/nickname/media drawn last (on top of every avatar+overlay), one
@@ -248,6 +275,7 @@ export async function renderStackedQuoteCard(cards: QuoteCardOptions[]): Promise
       true,
       cards[i].stickerUrl,
       cards[i].imageUrl,
+      fontOption,
     );
     ctx.restore();
   }
@@ -297,10 +325,10 @@ function drawStackCurveOverlay(
 /** Centered "BOMBO PRODUCTIONS" badge (text only, no border) — used at
  * stack seams, where a single shared watermark replaces each card's own
  * corner one. */
-function drawWatermarkBadge(ctx: SKRSContext2D, centerX: number, centerY: number, isWhitePreset: boolean) {
+function drawWatermarkBadge(ctx: SKRSContext2D, centerX: number, centerY: number, isWhitePreset: boolean, fontOption = FONT_OPTIONS.butler) {
   const label = 'BOMBO PRODUCTIONS';
 
-  ctx.font = 'bold 18px ' + FONT_FALLBACK; // 40% smaller than the original 30px
+  ctx.font = 'bold 18px ' + fontOption.font + ', ' + fontOption.fallback;
   ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.85)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -590,6 +618,7 @@ async function drawText(
   stacked: boolean,
   stickerUrl?: string,
   imageUrl?: string,
+  fontOption = FONT_OPTIONS.butler,
 ) {
   const H = cardHeight;
   const {
@@ -723,8 +752,8 @@ async function drawText(
     // Preload custom emoji images (must be done before wrapping)
     await preloadCustomEmojis(segments);
 
-    const { fontSize, lines } = fitFontSize(ctx, segments, usableWidth, textAreaHeight, MAX_FONT_SIZE);
-    ctx.font = `${fontSize}px ${FONT_FALLBACK}`;
+    const { fontSize, lines } = fitFontSize(ctx, segments, usableWidth, textAreaHeight, MAX_FONT_SIZE, 28, fontOption);
+    ctx.font = `${fontSize}px ${fontOption.font}, ${fontOption.fallback}`;
     const lineHeight = fontSize * 1.25;
     const blockHeight = lines.length * lineHeight;
 
@@ -740,7 +769,7 @@ async function drawText(
       let xOffset = 0;
       for (const segment of line) {
         if (segment.type === 'text') {
-          ctx.font = `${fontSize}px ${FONT_FALLBACK}`;
+          ctx.font = `${fontSize}px ${fontOption.font}, ${fontOption.fallback}`;
           ctx.fillText(segment.content, lineStartX + xOffset, y);
           xOffset += ctx.measureText(segment.content).width;
         } else if (segment.type === 'emoji') {
@@ -755,7 +784,7 @@ async function drawText(
             xOffset += emojiSize;
           } else {
             // Fallback to rendering literal :name: text
-            ctx.font = `${fontSize}px ${FONT_FALLBACK}`;
+            ctx.font = `${fontSize}px ${fontOption.font}, ${fontOption.fallback}`;
             const fallbackText = `:${segment.name}:`;
             ctx.fillText(fallbackText, lineStartX + xOffset, y);
             xOffset += ctx.measureText(fallbackText).width;
@@ -867,28 +896,28 @@ function drawMedia(
  */
 function fitFontSize(
   ctx: SKRSContext2D, segments: Segment[], maxWidth: number, maxHeight: number,
-  maxSize: number, minSize = 28,
+  maxSize: number, minSize = 28, fontOption = FONT_OPTIONS.butler,
 ): { fontSize: number; lines: Segment[][] } {
   for (let size = maxSize; size >= minSize; size -= 2) {
-    ctx.font = `${size}px ${FONT_FALLBACK}`;
+    ctx.font = `${size}px ${fontOption.font}, ${fontOption.fallback}`;
     const lineHeight = size * 1.25;
     const maxLines = Math.max(1, Math.floor(maxHeight / lineHeight));
-    const lines = wrapText(ctx, segments, maxWidth, size);
-    const widest = Math.max(...lines.map(line => measureLineWidth(ctx, line, size)));
+    const lines = wrapText(ctx, segments, maxWidth, size, fontOption);
+    const widest = Math.max(...lines.map(line => measureLineWidth(ctx, line, size, fontOption)));
     if (lines.length <= maxLines && widest <= maxWidth) return { fontSize: size, lines };
   }
 
   // Nothing fit even at minSize. Clamp to however many lines actually fit
   // the available height and truncate the last visible line with an
   // ellipsis, instead of drawing every wrapped line regardless of box size.
-  ctx.font = `${minSize}px ${FONT_FALLBACK}`;
+  ctx.font = `${minSize}px ${fontOption.font}, ${fontOption.fallback}`;
   const lineHeight = minSize * 1.25;
   const maxLines = Math.max(1, Math.floor(maxHeight / lineHeight));
-  let lines = wrapText(ctx, segments, maxWidth, minSize);
+  let lines = wrapText(ctx, segments, maxWidth, minSize, fontOption);
 
   if (lines.length > maxLines) {
     console.warn(`[QuoteRenderer] Quote text truncated: ${lines.length} lines wrapped, only ${maxLines} fit the box`);
-    lines = truncateToMaxLines(ctx, lines, maxLines, maxWidth, minSize);
+    lines = truncateToMaxLines(ctx, lines, maxLines, maxWidth, minSize, fontOption);
   }
 
   return { fontSize: minSize, lines };
@@ -906,16 +935,17 @@ function truncateToMaxLines(
   maxLines: number,
   maxWidth: number,
   fontSize: number,
+  fontOption = FONT_OPTIONS.butler,
 ): Segment[][] {
   const kept = lines.slice(0, maxLines);
   const ellipsis = '…';
 
-  ctx.font = `${fontSize}px ${FONT_FALLBACK}`;
+  ctx.font = `${fontSize}px ${fontOption.font}, ${fontOption.fallback}`;
   const ellipsisWidth = ctx.measureText(ellipsis).width;
 
   let lastLine = [...kept[maxLines - 1]];
 
-  while (lastLine.length > 0 && measureLineWidth(ctx, lastLine, fontSize) + ellipsisWidth > maxWidth) {
+  while (lastLine.length > 0 && measureLineWidth(ctx, lastLine, fontSize, fontOption) + ellipsisWidth > maxWidth) {
     const last = lastLine[lastLine.length - 1];
     if (last.type === 'text' && last.content.length > 1) {
       lastLine[lastLine.length - 1] = { ...last, content: last.content.slice(0, -1) };
@@ -935,7 +965,7 @@ function truncateToMaxLines(
   return kept;
 }
 
-function wrapText(ctx: SKRSContext2D, segments: Segment[], maxWidth: number, fontSize: number): Segment[][] {
+function wrapText(ctx: SKRSContext2D, segments: Segment[], maxWidth: number, fontSize: number, fontOption = FONT_OPTIONS.butler): Segment[][] {
   const lines: Segment[][] = [];
   let currentLine: Segment[] = [];
   let currentWidth = 0;
@@ -949,7 +979,7 @@ function wrapText(ctx: SKRSContext2D, segments: Segment[], maxWidth: number, fon
   };
 
   for (const segment of segments) {
-    const segmentWidth = measureSegmentWidth(ctx, segment, fontSize);
+    const segmentWidth = measureSegmentWidth(ctx, segment, fontSize, fontOption);
 
     // If segment alone exceeds max width, we can't split it, so start new line
     if (segmentWidth > maxWidth) {
@@ -976,7 +1006,7 @@ function wrapText(ctx: SKRSContext2D, segments: Segment[], maxWidth: number, fon
 
   // Regression guard: validate that all lines fit within maxWidth
   for (let i = 0; i < lines.length; i++) {
-    const lineWidth = measureLineWidth(ctx, lines[i], fontSize);
+    const lineWidth = measureLineWidth(ctx, lines[i], fontSize, fontOption);
     if (lineWidth > maxWidth) {
       console.error(`[QuoteRenderer] Line ${i} exceeds maxWidth: ${lineWidth} > ${maxWidth}`);
       // Log the line content for debugging
@@ -988,9 +1018,9 @@ function wrapText(ctx: SKRSContext2D, segments: Segment[], maxWidth: number, fon
   return lines;
 }
 
-function measureSegmentWidth(ctx: SKRSContext2D, segment: Segment, fontSize: number): number {
+function measureSegmentWidth(ctx: SKRSContext2D, segment: Segment, fontSize: number, fontOption = FONT_OPTIONS.butler): number {
   if (segment.type === 'text') {
-    ctx.font = `${fontSize}px ${FONT_FALLBACK}`;
+    ctx.font = `${fontSize}px ${fontOption.font}, ${fontOption.fallback}`;
     return ctx.measureText(segment.content).width;
   } else if (segment.type === 'emoji') {
     ctx.font = `${fontSize}px ${EMOJI_FONT}`;
@@ -1002,8 +1032,8 @@ function measureSegmentWidth(ctx: SKRSContext2D, segment: Segment, fontSize: num
   return 0;
 }
 
-function measureLineWidth(ctx: SKRSContext2D, line: Segment[], fontSize: number): number {
-  return line.reduce((total, segment) => total + measureSegmentWidth(ctx, segment, fontSize), 0);
+function measureLineWidth(ctx: SKRSContext2D, line: Segment[], fontSize: number, fontOption = FONT_OPTIONS.butler): number {
+  return line.reduce((total, segment) => total + measureSegmentWidth(ctx, segment, fontSize, fontOption), 0);
 }
 
 const rgb = ([r, g, b]: [number, number, number]) => `rgb(${r},${g},${b})`;

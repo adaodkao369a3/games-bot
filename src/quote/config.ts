@@ -92,6 +92,49 @@ export const LAYOUT = {
 export const FONT_FALLBACK = 'Butler, Georgia, serif';
 export const EMOJI_FONT = 'NotoEmoji';
 
+export type FontName =
+  | 'butler'
+  | 'roboto'
+  | 'roboto_bold'
+  | 'angels'
+  | 'blazed'
+  | 'bleeding_cowboys'
+  | 'bouncy'
+  | 'cowboy_movie'
+  | 'flame'
+  | 'hanged_letters'
+  | 'magazine_letter'
+  | 'matcha_world'
+  | 'next_ups'
+  | 'sabrina'
+  | 'spider_man'
+  | 'iknowaghost';
+
+export interface FontOption {
+  label: string;
+  font: string;
+  fallback: string;
+}
+
+export const FONT_OPTIONS: Record<FontName, FontOption> = {
+  butler: { label: 'Butler', font: 'Butler', fallback: 'Georgia, serif' },
+  roboto: { label: 'Roboto', font: 'Roboto', fallback: 'Arial, sans-serif' },
+  roboto_bold: { label: 'Roboto Bold', font: 'Roboto-Bold', fallback: 'Arial, sans-serif' },
+  angels: { label: 'Angels', font: 'Angels', fallback: 'Georgia, serif' },
+  blazed: { label: 'Blazed', font: 'Blazed', fallback: 'Impact, sans-serif' },
+  bleeding_cowboys: { label: 'Bleeding Cowboys', font: 'Bleeding_Cowboys', fallback: 'Georgia, serif' },
+  bouncy: { label: 'Bouncy', font: 'Bouncy', fallback: 'Comic Sans MS, cursive' },
+  cowboy_movie: { label: 'Cowboy Movie', font: 'Cowboy_Movie', fallback: 'Georgia, serif' },
+  flame: { label: 'Flame', font: 'Flame', fallback: 'Impact, sans-serif' },
+  hanged_letters: { label: 'Hanged Letters', font: 'Hanged_Letters', fallback: 'Georgia, serif' },
+  magazine_letter: { label: 'Magazine Letter', font: 'MagazineLetterByBrntlbrnl-Regular', fallback: 'Georgia, serif' },
+  matcha_world: { label: 'Matcha World', font: 'Matcha_World', fallback: 'Arial, sans-serif' },
+  next_ups: { label: 'Next Ups', font: 'Next_Ups', fallback: 'Arial, sans-serif' },
+  sabrina: { label: 'Sabrina', font: 'SABRINAS', fallback: 'Georgia, serif' },
+  spider_man: { label: 'Spider-Man', font: 'The_Amazing_Spider_Man', fallback: 'Impact, sans-serif' },
+  iknowaghost: { label: 'I Know A Ghost', font: 'iknowaghost', fallback: 'Georgia, serif' },
+};
+
 export const THEME_SELECT_EXPIRY_MS = 5 * 60 * 1000;
 
 export type PresetName =
