@@ -27,7 +27,7 @@ export async function handleHelpCommand(message: Message): Promise<void> {
       },
       {
         name: '<:pixelsymbolupside:1545149037135536168> **Quotes** <:pixelsymboltop:1545149034593910886>',
-        value: '`.quote` — Create a quote card from a replied message (themes: classic, sunset, ocean, purple)',
+        value: '`.quote` — Create a quote card from a replied message (themes: classic, white, sunset, purple, aurora, gold, cherry, midnight, plasma, emerald, rose, ember, sapphire, coral, lime)',
         inline: false,
       },
       {

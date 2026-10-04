@@ -12,7 +12,7 @@ import { ErrorHandler } from '../utils/error-handler.js';
 import { isStaff } from '../utils/permissions.js';
 import { getQuoteRedirectSettings } from '../database/client.js';
 
-const THEME_NAMES: PresetName[] = ['classic', 'white', 'sunset', 'ocean', 'purple', 'aurora', 'gold', 'cherry', 'midnight', 'plasma', 'emerald', 'rose', 'ember', 'cyan', 'sapphire', 'coral', 'lime', 'lavender', 'toxic', 'amethyst'];
+const THEME_NAMES: PresetName[] = ['classic', 'white', 'sunset', 'purple', 'aurora', 'gold', 'cherry', 'midnight', 'plasma', 'emerald', 'rose', 'ember', 'sapphire', 'coral', 'lime'];
 const QUOTE_REDIRECT_CHANNEL_ID = '1526869451834654821';
 const QUOTE_COOLDOWN_MS = 5 * 1000; // 5 seconds
 let quoteCooldownUntil = 0;
@@ -129,27 +129,22 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
     };
 
     const buildSelectRow = (disabled = false) => {
-      const emojiMap: Record<PresetName, string> = {
-        classic: '🖤',
-        white: '🤍',
-        sunset: '🌅',
-        ocean: '🌊',
-        purple: '💜',
-        aurora: '🌲',
-        gold: '🌟',
-        cherry: '🍒',
-        midnight: '🌑',
-        plasma: '🔮',
-        emerald: '💚',
-        rose: '🌹',
-        ember: '🔥',
-        cyan: '💠',
-        sapphire: '💎',
-        coral: '🪸',
-        lime: '🍋',
-        lavender: '🪻',
-        toxic: '☢️',
-        amethyst: '🔶',
+      const emojiMap: Record<PresetName, { id: string }> = {
+        classic: { id: '1556312273360785460' },
+        white: { id: '1556312307217211532' },
+        sunset: { id: '1556312304566403152' },
+        purple: { id: '1556312294533767208' },
+        aurora: { id: '1556312073665904651' },
+        gold: { id: '1556312283158806548' },
+        cherry: { id: '1556312268759769118' },
+        midnight: { id: '1556312290226077926' },
+        plasma: { id: '1556312292411318383' },
+        emerald: { id: '1556312280130527264' },
+        rose: { id: '1556312298887315466' },
+        ember: { id: '1556312278129840239' },
+        sapphire: { id: '1556312302347620413' },
+        coral: { id: '1556312275688751116' },
+        lime: { id: '1556312287319691405' },
       };
 
       const select = new StringSelectMenuBuilder()
@@ -194,14 +189,14 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
     try {
       if (message.guild) {
         const redirectSettings = await getQuoteRedirectSettings(message.guild.id);
-        
+
         if (redirectSettings.redirect_enabled) {
           const redirectChannel = await message.guild.channels.fetch(QUOTE_REDIRECT_CHANNEL_ID);
           if (redirectChannel && redirectChannel.isTextBased()) {
             redirectMessage = await redirectChannel.send({
               content,
               files: [attachment],
-              components: buildSelectRow(),
+              components: [],
             });
           }
         }
@@ -253,7 +248,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
         try {
           await redirectMessage.edit({
             files: [newAttachment],
-            components: buildSelectRow(),
+            components: [],
           });
         } catch (redirectError) {
           console.error('[QUOTE] Failed to update quote in redirect channel:', redirectError);
@@ -266,10 +261,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       // menu so no more edits can be made.
       await sent.edit({ components: buildSelectRow(true) }).catch(() => {});
 
-      // Also disable the redirect message if it exists
-      if (redirectMessage) {
-        await redirectMessage.edit({ components: buildSelectRow(true) }).catch(() => {});
-      }
+      // Redirect message has no components, so nothing to disable
     });
 
   } catch (error) {

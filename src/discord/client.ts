@@ -38,6 +38,7 @@ import {
   handleAgencyInteraction,
 } from '../commands/agency.js';
 import { handlePhelpCommand } from '../commands/phelp.js';
+import { handleRltCommand, handleRltInteraction, handleRltModalSubmit } from '../commands/rlt.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -259,6 +260,11 @@ export class DiscordClient {
         return;
       }
 
+      if (command === 'rlt') {
+        await handleRltCommand(message, args);
+        return;
+      }
+
     }
 
     // Check for Impostor clue submissions
@@ -387,6 +393,11 @@ export class DiscordClient {
       await handleHighscoreInteraction(interaction);
       return;
     }
+
+    if (customId.startsWith('rlt_')) {
+      await handleRltInteraction(interaction);
+      return;
+    }
   }
 
   private async handleModalSubmit(interaction: any): Promise<void> {
@@ -395,6 +406,11 @@ export class DiscordClient {
     if (customId === 'trial_sentence_modal') {
       const sentence = interaction.fields.getTextInputValue('sentence_text');
       await handleTrialModalSubmit(interaction, sentence);
+      return;
+    }
+
+    if (customId.startsWith('rlt_exact_')) {
+      await handleRltModalSubmit(interaction);
       return;
     }
   }
