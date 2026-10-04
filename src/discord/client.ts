@@ -39,6 +39,7 @@ import {
 } from '../commands/agency.js';
 import { handlePhelpCommand } from '../commands/phelp.js';
 import { handleRltCommand, handleRltInteraction, handleRltModalSubmit } from '../commands/rlt.js';
+import { handleRolesCommand, handleRolesInteraction } from '../commands/roles.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -265,6 +266,11 @@ export class DiscordClient {
         return;
       }
 
+      if (command === 'roles') {
+        await handleRolesCommand(message);
+        return;
+      }
+
     }
 
     // Check for Impostor clue submissions
@@ -396,6 +402,11 @@ export class DiscordClient {
 
     if (customId.startsWith('rlt_')) {
       await handleRltInteraction(interaction);
+      return;
+    }
+
+    if (customId.startsWith('forfeit_role_')) {
+      await handleRolesInteraction(interaction);
       return;
     }
   }

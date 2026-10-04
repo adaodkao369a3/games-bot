@@ -1,6 +1,6 @@
 import { Guild, Role } from 'discord.js';
 import { TitleCategory, TitleOwnership, TITLE_CATEGORIES } from './TitleData.js';
-import { getTitleOwnership, setTitleOwnership, getAllTitleOwnerships } from '../database/client.js';
+import { getTitleOwnership, setTitleOwnership, getAllTitleOwnerships, hasUserForfeitedRole } from '../database/client.js';
 
 // In-memory cache for title ownership (synced with database)
 const titleOwnershipCache: Map<string, TitleOwnership> = new Map();
@@ -11,17 +11,40 @@ const titleOwnershipCache: Map<string, TitleOwnership> = new Map();
 export async function initializeTitleOwnership(): Promise<void> {
   try {
     const ownerships = await getAllTitleOwnerships();
-    
+
     // Load all ownerships from database into cache
     for (const [categoryId, ownership] of ownerships) {
-      titleOwnershipCache.set(categoryId, {
-        categoryId: ownership.category_id,
-        holderId: ownership.holder_id,
-        holderName: ownership.holder_name,
-        acquiredAt: ownership.acquired_at,
-      });
+      // Check if the holder has forfeited this role
+      if (ownership.holder_id) {
+        const hasForfeited = await hasUserForfeitedRole(ownership.holder_id, categoryId);
+        if (hasForfeited) {
+          console.log(`User ${ownership.holder_id} has forfeited ${categoryId}, clearing ownership`);
+          // Clear ownership in database
+          await setTitleOwnership(categoryId, null, null);
+          titleOwnershipCache.set(categoryId, {
+            categoryId: ownership.category_id,
+            holderId: null,
+            holderName: null,
+            acquiredAt: null,
+          });
+        } else {
+          titleOwnershipCache.set(categoryId, {
+            categoryId: ownership.category_id,
+            holderId: ownership.holder_id,
+            holderName: ownership.holder_name,
+            acquiredAt: ownership.acquired_at,
+          });
+        }
+      } else {
+        titleOwnershipCache.set(categoryId, {
+          categoryId: ownership.category_id,
+          holderId: null,
+          holderName: null,
+          acquiredAt: null,
+        });
+      }
     }
-    
+
     // Initialize any missing categories
     for (const categoryId of Object.keys(TITLE_CATEGORIES)) {
       if (!titleOwnershipCache.has(categoryId)) {
@@ -33,7 +56,7 @@ export async function initializeTitleOwnership(): Promise<void> {
         });
       }
     }
-    
+
     console.log('✓ Title ownership initialized from database');
   } catch (error) {
     console.error('✗ Failed to initialize title ownership from database:', error);
@@ -95,6 +118,23 @@ export class TitleSystem {
     const category = TITLE_CATEGORIES[categoryId];
     if (!category) {
       return false;
+    }
+
+    // Check if user has forfeited this role
+    const hasForfeited = await hasUserForfeitedRole(userId, categoryId);
+    if (hasForfeited) {
+      console.log(`User ${userId} has forfeited ${categoryId}, skipping role award`);
+      // Still update ownership in database but don't award the role
+      const success = await setTitleOwnership(categoryId, userId, username);
+      if (success) {
+        titleOwnershipCache.set(categoryId, {
+          categoryId,
+          holderId: userId,
+          holderName: username,
+          acquiredAt: new Date(),
+        });
+      }
+      return success;
     }
 
     // Remove title from current holder if exists

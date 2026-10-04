@@ -2,6 +2,7 @@ import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, 
 import { QuizQuestion } from './TitleData.js';
 import { JJK_DUEL_QUESTIONS } from './JJKQuestions.js';
 import { TitleSystem } from './TitleSystem.js';
+import { hasUserForfeitedRole } from '../database/client.js';
 
 type DuelState = 'idle' | 'challenging' | 'playing' | 'sudden_death' | 'complete' | 'declined' | 'timeout';
 
@@ -65,6 +66,26 @@ export class TitleDuelGame {
    * Start the title duel challenge
    */
   async start(message: Message): Promise<void> {
+    // Check if challenger has forfeited this role
+    const challengerForfeited = await hasUserForfeitedRole(this.data.challengerId, this.data.categoryId);
+    if (challengerForfeited) {
+      await message.reply(
+        `You have forfeited the **${TitleSystem.getCategory(this.data.categoryId)?.name || 'title'}** role.\n\n` +
+        `You cannot challenge for this role.`
+      );
+      return;
+    }
+
+    // Check if holder has forfeited this role
+    const holderForfeited = await hasUserForfeitedRole(this.data.holderId, this.data.categoryId);
+    if (holderForfeited) {
+      await message.reply(
+        `The title holder has forfeited the **${TitleSystem.getCategory(this.data.categoryId)?.name || 'title'}** role.\n\n` +
+        `You cannot challenge for this role.`
+      );
+      return;
+    }
+
     // Verify holder still holds the title
     const ownership = await TitleSystem.getTitleHolder(this.data.categoryId);
     if (!ownership || ownership.holderId !== this.data.holderId) {

@@ -22,7 +22,7 @@ export async function handleHelpCommand(message: Message): Promise<void> {
       },
       {
         name: '👑 **Titles**',
-        value: '`.quiz jjk` — Take the JJK quiz to claim the Lord of the Heian Era title\n`.challenge @user jjk` — Challenge the current title holder for JJK',
+        value: '`.quiz jjk` — Take the JJK quiz to claim the Lord of the Heian Era title\n`.challenge @user jjk` — Challenge the current title holder for JJK\n`.roles` — View and forfeit your earned roles for 2k coins',
         inline: false,
       },
       {

@@ -2,6 +2,7 @@ import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, 
 import { QuizQuestion } from './TitleData.js';
 import { JJK_CLAIM_QUESTIONS } from './JJKQuestions.js';
 import { TitleSystem } from './TitleSystem.js';
+import { hasUserForfeitedRole } from '../database/client.js';
 
 type QuizState = 'idle' | 'playing' | 'complete' | 'timeout';
 
@@ -53,6 +54,16 @@ export class QuizGame {
    * Start the quiz game
    */
   async start(message: Message, guild: Guild): Promise<void> {
+    // Check if user has forfeited this role
+    const hasForfeited = await hasUserForfeitedRole(this.data.userId, this.data.categoryId);
+    if (hasForfeited) {
+      await message.reply(
+        `You have forfeited the **${TitleSystem.getCategory(this.data.categoryId)?.name || 'title'}** role.\n\n` +
+        `You cannot reclaim this role through the quiz.`
+      );
+      return;
+    }
+
     // Check if title is already owned
     const ownership = await TitleSystem.getTitleHolder(this.data.categoryId);
     if (ownership && ownership.holderId && ownership.holderId !== this.data.userId) {

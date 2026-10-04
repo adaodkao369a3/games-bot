@@ -143,3 +143,20 @@ BEGIN
     END IF;
 END
 $$;
+
+-- Role forfeits table to track users who forfeited their title roles
+CREATE TABLE IF NOT EXISTS role_forfeits (
+  user_id VARCHAR(255) NOT NULL,
+  category_id VARCHAR(255) NOT NULL,
+  forfeited_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, category_id)
+);
+
+-- Index for faster lookups (create if not exists by checking first)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_role_forfeits_user_id') THEN
+        CREATE INDEX idx_role_forfeits_user_id ON role_forfeits(user_id);
+    END IF;
+END
+$$;

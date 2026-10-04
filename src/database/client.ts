@@ -363,6 +363,36 @@ async function initializeSchema(): Promise<void> {
           console.log('✓ mog_profiles table has attributes column');
         }
       }
+
+      // Check if role_forfeits table exists
+      const roleForfeitsCheck = await pool!.query(`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_name = 'role_forfeits'
+        AND table_schema = 'public'
+      `);
+
+      if (roleForfeitsCheck.rows.length === 0) {
+        console.log('⚠ role_forfeits table does not exist, creating...');
+
+        await pool!.query(`
+          CREATE TABLE IF NOT EXISTS role_forfeits (
+            user_id VARCHAR(255) NOT NULL,
+            category_id VARCHAR(255) NOT NULL,
+            forfeited_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, category_id)
+          )
+        `);
+
+        // Create index
+        await pool!.query(`
+          CREATE INDEX IF NOT EXISTS idx_role_forfeits_user_id ON role_forfeits(user_id)
+        `);
+
+        console.log('✓ role_forfeits table created');
+      } else {
+        console.log('✓ role_forfeits table exists');
+      }
     }
 
     // Talent Agency minigame (pa_* tables): create if missing, then always re-seed (idempotent upserts)
@@ -767,8 +797,12 @@ export interface MogLeaderboardEntry {
   description: string;
   theme_color: string;
   attributes: { [key: string]: number };
-  analysis_attributes: string[];
-  created_at: Date;
+}
+
+export interface RoleForfeit {
+  user_id: string;
+  category_id: string;
+  forfeited_at: Date;
 }
 
 /**
@@ -900,6 +934,67 @@ export async function getAllTitleOwnerships(): Promise<Map<string, TitleOwnershi
     }
 
     return ownerships;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Check if a user has forfeited a specific role
+ * @param userId Discord user ID
+ * @param categoryId The category ID
+ * @returns True if user has forfeited this role
+ */
+export async function hasUserForfeitedRole(userId: string, categoryId: string): Promise<boolean> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      'SELECT 1 FROM role_forfeits WHERE user_id = $1 AND category_id = $2',
+      [userId, categoryId]
+    );
+    return result.rows.length > 0;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get all forfeited roles for a user
+ * @param userId Discord user ID
+ * @returns Array of forfeited role categories
+ */
+export async function getUserForfeitedRoles(userId: string): Promise<string[]> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      'SELECT category_id FROM role_forfeits WHERE user_id = $1',
+      [userId]
+    );
+    return result.rows.map(row => row.category_id);
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Record a role forfeit for a user
+ * @param userId Discord user ID
+ * @param categoryId The category ID
+ * @returns True if successful
+ */
+export async function recordRoleForfeit(userId: string, categoryId: string): Promise<boolean> {
+  const client = await getClient();
+  try {
+    await client.query(
+      `INSERT INTO role_forfeits (user_id, category_id, forfeited_at)
+       VALUES ($1, $2, CURRENT_TIMESTAMP)
+       ON CONFLICT (user_id, category_id) DO UPDATE SET forfeited_at = CURRENT_TIMESTAMP`,
+      [userId, categoryId]
+    );
+    return true;
+  } catch (error) {
+    console.error('[ROLE_FORFEIT] Failed to record role forfeit:', error);
+    return false;
   } finally {
     client.release();
   }
