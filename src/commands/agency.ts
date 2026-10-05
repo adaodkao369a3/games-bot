@@ -3,7 +3,7 @@
  *
  * Commands: .pscout .precruit <name> .pwork <name> .pcollect .plist
  * Components use customIds shaped like `pa_<action>_<ownerUserId>_<arg>`; every handler rejects
- * anyone who isn't the owner. Game-floor channel only.
+ * anyone who isn't the owner. Talent agency channel only.
  */
 import {
   ActionRowBuilder,
@@ -17,7 +17,7 @@ import {
 } from 'discord.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { config, isGameFloorChannel } from '../config/index.js';
+import { config, isTalentAgencyChannel } from '../config/index.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import {
@@ -89,10 +89,10 @@ const LINES = {
 // ---------------------------------------------------------------------------------------------
 
 function wrongChannel(message: Message): boolean {
-  return !isGameFloorChannel(message.channel.id);
+  return !isTalentAgencyChannel(message.channel.id);
 }
 
-const WRONG_CHANNEL_TEXT = () => `This command can only be used in <#${config.gameFloorChannelIds[0]}>.`;
+const WRONG_CHANNEL_TEXT = () => `This command can only be used in <#${config.talentAgencyChannelId}>.`;
 
 /** Character art from assets/characters/<image_file>. Missing file => null (embed just has no image). */
 function imageFor(character: CharacterDef): AttachmentBuilder | null {
@@ -542,7 +542,7 @@ export async function handleAgencyInteraction(interaction: any): Promise<void> {
     await interaction.reply({ content: "Hands off, those aren't your contracts. Run `.plist` for your own agency.", ephemeral: true });
     return;
   }
-  if (!isGameFloorChannel(interaction.channelId)) {
+  if (!isTalentAgencyChannel(interaction.channelId)) {
     await interaction.reply({ content: WRONG_CHANNEL_TEXT(), ephemeral: true });
     return;
   }

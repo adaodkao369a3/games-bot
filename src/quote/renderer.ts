@@ -763,7 +763,7 @@ async function drawText(
 
     for (const line of lines) {
       // Calculate line width for proper centering
-      const lineWidth = measureLineWidth(ctx, line, fontSize);
+      const lineWidth = measureLineWidth(ctx, line, fontSize, fontOption);
       const lineStartX = safeBoxCenterX - lineWidth / 2;
 
       let xOffset = 0;

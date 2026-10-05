@@ -13,6 +13,7 @@ export const config = {
     url: process.env.DATABASE_URL || '',
   },
   gameFloorChannelIds: ['1542311921007460542', '1535286802871623831'],
+  talentAgencyChannelId: '1556596417110220871',
 };
 
 /**
@@ -20,6 +21,13 @@ export const config = {
  */
 export function isGameFloorChannel(channelId: string): boolean {
   return config.gameFloorChannelIds.includes(channelId);
+}
+
+/**
+ * Check if a channel ID is the talent agency channel
+ */
+export function isTalentAgencyChannel(channelId: string): boolean {
+  return channelId === config.talentAgencyChannelId;
 }
 
 export function validateConfig(): void {
