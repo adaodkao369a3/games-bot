@@ -1,4 +1,4 @@
-import { Message } from 'discord.js';
+import { Message, EmbedBuilder } from 'discord.js';
 import { awardCoins } from '../services/coins.js';
 import { createOrUpdateUser } from '../database/client.js';
 import {
@@ -32,7 +32,11 @@ const EDGE_FLAVOR_LINES = [
 export async function handleEdgeCommand(message: Message): Promise<void> {
   // Check if command is used in game floor channel, talent agency channel, or goon/edge channel
   if (!isGameFloorChannel(message.channel.id) && !isTalentAgencyChannel(message.channel.id) && !isGoonEdgeChannel(message.channel.id)) {
-    await message.reply(`This command can only be used in <#${config.gameFloorChannelIds[0]}>, <#${config.talentAgencyChannelId}>, or <#${config.goonEdgeChannelId}>.`);
+    const errorEmbed = new EmbedBuilder()
+      .setTitle('❌ Wrong Channel')
+      .setDescription(`This command can only be used in <#${config.gameFloorChannelIds[0]}>, <#${config.talentAgencyChannelId}>, or <#${config.goonEdgeChannelId}>.`)
+      .setColor(0xFF0000);
+    await message.reply({ embeds: [errorEmbed] });
     return;
   }
 
@@ -49,7 +53,11 @@ export async function handleEdgeCommand(message: Message): Promise<void> {
     const timeSinceLastUse = now - t.last_edge_used.getTime();
     if (timeSinceLastUse < EDGE_COOLDOWN_MS) {
       const remainingTime = Math.ceil((EDGE_COOLDOWN_MS - timeSinceLastUse) / 1000 / 60);
-      await message.reply(`Cooldown: ${remainingTime}m`);
+      const cooldownEmbed = new EmbedBuilder()
+        .setTitle('⏰ Cooldown Active')
+        .setDescription(`You need to wait ${remainingTime} more minutes before edging again.`)
+        .setColor(0xFFA500);
+      await message.reply({ embeds: [cooldownEmbed] });
       return;
     }
   }
@@ -72,7 +80,11 @@ export async function handleEdgeCommand(message: Message): Promise<void> {
   // Atomic claim: if two .edge messages race, only one gets through
   const claimed = await claimTracking(userId, t, after, ['last_edge_used', 'edge_streak']);
   if (!claimed) {
-    await message.reply('Easy there, one .edge at a time!');
+    const errorEmbed = new EmbedBuilder()
+      .setTitle('⚠️ Slow Down')
+      .setDescription('Easy there, one .edge at a time!')
+      .setColor(0xFFA500);
+    await message.reply({ embeds: [errorEmbed] });
     return;
   }
 
@@ -85,21 +97,38 @@ export async function handleEdgeCommand(message: Message): Promise<void> {
   if (awardResult === null) {
     // Give the use back so a failed payout doesn't burn the cooldown or the streak
     await claimTracking(userId, after, t, ['last_edge_used']).catch(() => undefined);
-    await message.reply('Failed to award coins. Please try again later.');
+    const errorEmbed = new EmbedBuilder()
+      .setTitle('❌ Error')
+      .setDescription('Failed to award coins. Please try again later.')
+      .setColor(0xFF0000);
+    await message.reply({ embeds: [errorEmbed] });
     return;
   }
 
   // Pick random flavor line
   const flavorLine = EDGE_FLAVOR_LINES[Math.floor(Math.random() * EDGE_FLAVOR_LINES.length)];
 
-  // Build info line
-  let infoLine = `💰 +${streakReward} ${COIN} • 🔥 ${streak} streak`;
+  // Build fields for embed
+  const fields = [
+    { name: '💰 Reward', value: `+${streakReward} ${COIN}`, inline: true },
+    { name: '🔥 Streak', value: `${streak}`, inline: true },
+  ];
+
   if (bonusPct > 0) {
-    infoLine += ` • +${bonusPct}% bonus`;
-  }
-  if (grantsPowerup) {
-    infoLine += ` • ⚡ Goon cooldown halved for 1h`;
+    fields.push({ name: '📈 Bonus', value: `+${bonusPct}%`, inline: true });
   }
 
-  await message.reply(`${flavorLine}\n${infoLine}`);
+  let footerText = 'Keep grinding!';
+  if (grantsPowerup) {
+    footerText = '⚡ Goon cooldown halved for 1h!';
+  }
+
+  const successEmbed = new EmbedBuilder()
+    .setTitle('🧱 Edge Successful')
+    .setDescription(flavorLine)
+    .setColor(0x00FF00)
+    .addFields(fields)
+    .setFooter({ text: footerText });
+
+  await message.reply({ embeds: [successEmbed] });
 }

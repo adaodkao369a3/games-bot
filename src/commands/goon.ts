@@ -1,4 +1,4 @@
-import { Message } from 'discord.js';
+import { Message, EmbedBuilder } from 'discord.js';
 import { awardCoins } from '../services/coins.js';
 import { createOrUpdateUser } from '../database/client.js';
 import {
@@ -34,7 +34,11 @@ const GOON_RUSH_FLAVOR = '⚡ The power-up is doing WORK.';
 export async function handleGoonCommand(message: Message): Promise<void> {
   // Check if command is used in game floor channel, talent agency channel, or goon/edge channel
   if (!isGameFloorChannel(message.channel.id) && !isTalentAgencyChannel(message.channel.id) && !isGoonEdgeChannel(message.channel.id)) {
-    await message.reply(`This command can only be used in <#${config.gameFloorChannelIds[0]}>, <#${config.talentAgencyChannelId}>, or <#${config.goonEdgeChannelId}>.`);
+    const errorEmbed = new EmbedBuilder()
+      .setTitle('❌ Wrong Channel')
+      .setDescription(`This command can only be used in <#${config.gameFloorChannelIds[0]}>, <#${config.talentAgencyChannelId}>, or <#${config.goonEdgeChannelId}>.`)
+      .setColor(0xFF0000);
+    await message.reply({ embeds: [errorEmbed] });
     return;
   }
 
@@ -56,7 +60,11 @@ export async function handleGoonCommand(message: Message): Promise<void> {
     const timeSinceLastUse = now - t.last_goon_used.getTime();
     if (timeSinceLastUse < cooldownMs) {
       const remainingTime = Math.ceil((cooldownMs - timeSinceLastUse) / 1000 / 60);
-      await message.reply(`Cooldown: ${remainingTime}m${powerupActive ? ' (power-up active)' : ''}`);
+      const cooldownEmbed = new EmbedBuilder()
+        .setTitle('⏰ Cooldown Active')
+        .setDescription(`You need to wait ${remainingTime} more minutes before gooning again.${powerupActive ? '\n⚡ Power-up is active!' : ''}`)
+        .setColor(0xFFA500);
+      await message.reply({ embeds: [cooldownEmbed] });
       return;
     }
   }
@@ -80,7 +88,11 @@ export async function handleGoonCommand(message: Message): Promise<void> {
   // Atomic claim: if two .goon messages race, only one gets through
   const claimed = await claimTracking(userId, t, after, ['last_goon_used', 'goon_daily_count']);
   if (!claimed) {
-    await message.reply('Easy there, one .goon at a time!');
+    const errorEmbed = new EmbedBuilder()
+      .setTitle('⚠️ Slow Down')
+      .setDescription('Easy there, one .goon at a time!')
+      .setColor(0xFFA500);
+    await message.reply({ embeds: [errorEmbed] });
     return;
   }
 
@@ -93,7 +105,11 @@ export async function handleGoonCommand(message: Message): Promise<void> {
   if (awardResult === null) {
     // Give the use back so a failed payout doesn't burn the cooldown
     await claimTracking(userId, after, t, ['last_goon_used']).catch(() => undefined);
-    await message.reply('Failed to award coins. Please try again later.');
+    const errorEmbed = new EmbedBuilder()
+      .setTitle('❌ Error')
+      .setDescription('Failed to award coins. Please try again later.')
+      .setColor(0xFF0000);
+    await message.reply({ embeds: [errorEmbed] });
     return;
   }
 
@@ -107,16 +123,22 @@ export async function handleGoonCommand(message: Message): Promise<void> {
     flavorLine = GOON_FLAVOR_LINES[Math.floor(Math.random() * GOON_FLAVOR_LINES.length)];
   }
 
-  // Build info line
-  let infoLine = `💰 +${reward} ${COIN} • 🍆 Goon: ${dailyGoonCount}`;
-  if (dailyGoonCount <= GOON_DAILY_FREE_USES) {
-    infoLine += `/${GOON_DAILY_FREE_USES} today`;
-  } else {
-    infoLine += `+ today`;
-  }
+  // Build fields for embed
+  const fields = [
+    { name: '💰 Reward', value: `+${reward} ${COIN}`, inline: true },
+    { name: '🍆 Goon Count', value: `${dailyGoonCount}${dailyGoonCount <= GOON_DAILY_FREE_USES ? `/${GOON_DAILY_FREE_USES}` : '+'} today`, inline: true },
+  ];
+
   if (powerupActive) {
-    infoLine += ` • ⚡ 7.5m cooldown`;
+    fields.push({ name: '⚡ Cooldown', value: '7.5m (power-up active)', inline: true });
   }
 
-  await message.reply(`${flavorLine}\n${infoLine}`);
+  const successEmbed = new EmbedBuilder()
+    .setTitle('💀 Goon Successful')
+    .setDescription(flavorLine)
+    .setColor(0xFF69B4)
+    .addFields(fields)
+    .setFooter({ text: isOverLimit ? 'Reduced rewards (daily limit exceeded)' : 'Free goons remaining today' });
+
+  await message.reply({ embeds: [successEmbed] });
 }
