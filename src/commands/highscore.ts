@@ -1,5 +1,6 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import { getLeaderboard } from '../database/client.js';
+import { config, isGameFloorChannel, isTalentAgencyChannel } from '../config/index.js';
 
 const MEDAL_EMOJIS = ['<a:firstplacetrophy:1545135079926267964>', '<a:secondplacetrophy:1545135074968608851>', '<a:thirdplacetrophy:1545135071068033024>'];
 const RANK_EMOJIS = ['<:one:1545379088775258112>', '<:two:1545379099394969660>', '<:three:1545379095498727546>', '<:four:1545379083872112641>', '<:five:1545379011876622386>', '<:six:1545379093250310185>', '<:seven:1545379091287506994>', '<:eight:1545379009846706196>', '<:nine:1545379086174527530>', '<:zero:1545379101496311808>'];
@@ -11,6 +12,12 @@ const activeSessions = new Map<string, { page: number; totalCount: number; leade
 
 export async function handleHighscoreCommand(message: Message): Promise<void> {
   try {
+    // Check if command is used in game floor channel or talent agency channel
+    if (!isGameFloorChannel(message.channel.id) && !isTalentAgencyChannel(message.channel.id)) {
+      await message.reply(`This command can only be used in <#${config.gameFloorChannelIds[0]}> or <#${config.talentAgencyChannelId}>.`);
+      return;
+    }
+
     if (!message.guild) {
       await message.reply('This command can only be used in a server.');
       return;

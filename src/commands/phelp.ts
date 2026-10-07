@@ -24,8 +24,8 @@ export async function handlePhelpCommand(message: Message): Promise<void> {
       { name: '__.__plist', value: 'View your roster and talent status.' },
       { name: '\u200b', value: '\u200b' },
       { name: '__EDGE & GOON__', value: '\u200b' },
-      { name: '__.__edge', value: `Earn ${COIN} 200 base + streak bonus (up to +50%). Daily bonus at 10 edges: ${COIN} 2000. 5 min cooldown.` },
-      { name: '__.__goon', value: `Earn ${COIN} 400. 15 min cooldown. 10 free uses/day, then ${COIN} 600 penalty per use. 3 goons blocks .edge for 1 hour.` },
+      { name: '__.__edge', value: `Earn ${COIN} 200 base + streak bonus (+5% per edge, max +50%). 10 edges unlocks Goon Rush (halves .goon cooldown). 5 min cooldown.` },
+      { name: '__.__goon', value: `Earn ${COIN} 400 (first 3/day) or ${COIN} 200 (4th+). 15 min cooldown (7.5m with Goon Rush). Resets edge streak.` },
       { name: '\u200b', value: '\u200b' },
       { name: '__TIER PAYOUTS__', value: `Intern: ${COIN} 150 | Trainee: ${COIN} 250 | Rookie: ${COIN} 400 | Pro: ${COIN} 600 | Star: ${COIN} 850 | Legend: ${COIN} 1200` }
     );

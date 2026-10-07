@@ -14,6 +14,7 @@ export const config = {
   },
   gameFloorChannelIds: ['1542311921007460542', '1535286802871623831'],
   talentAgencyChannelId: '1556596417110220871',
+  goonEdgeChannelId: '1556970586767622287',
 };
 
 /**
@@ -28,6 +29,13 @@ export function isGameFloorChannel(channelId: string): boolean {
  */
 export function isTalentAgencyChannel(channelId: string): boolean {
   return channelId === config.talentAgencyChannelId;
+}
+
+/**
+ * Check if a channel ID is the goon/edge channel
+ */
+export function isGoonEdgeChannel(channelId: string): boolean {
+  return channelId === config.goonEdgeChannelId;
 }
 
 export function validateConfig(): void {
