@@ -3,7 +3,7 @@ import { join } from 'path';
 import { cwd } from 'process';
 import { existsSync } from 'fs';
 import { LAYOUT, GRADIENT_PRESETS, PresetName, FONT_FALLBACK, EMOJI_FONT, FONT_OPTIONS, FontName } from './config.js';
-import { segmentText, preloadCustomEmojis, getCustomEmojiFromCache, Segment } from './textSegmenter.js';
+import { segmentText, preloadCustomEmojis, getCustomEmojiFromCache, Segment, TextFormatting } from './textSegmenter.js';
 
 const PROJECT_ROOT = cwd();
 
@@ -768,10 +768,34 @@ async function drawText(
 
       let xOffset = 0;
       for (const segment of line) {
+        const formatting = segment.formatting || {};
+
         if (segment.type === 'text') {
-          ctx.font = `${fontSize}px ${fontOption.font}, ${fontOption.fallback}`;
+          applyTextFormatting(ctx, formatting, fontSize, fontOption, isWhitePreset);
           ctx.fillText(segment.content, lineStartX + xOffset, y);
           xOffset += ctx.measureText(segment.content).width;
+
+          // Draw underline if needed
+          if (formatting.underline) {
+            const textWidth = ctx.measureText(segment.content).width;
+            ctx.beginPath();
+            ctx.strokeStyle = isWhitePreset ? '#000000' : '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.moveTo(lineStartX + xOffset - textWidth, y + fontSize * 0.15);
+            ctx.lineTo(lineStartX + xOffset, y + fontSize * 0.15);
+            ctx.stroke();
+          }
+
+          // Draw strikethrough if needed
+          if (formatting.strikethrough) {
+            const textWidth = ctx.measureText(segment.content).width;
+            ctx.beginPath();
+            ctx.strokeStyle = isWhitePreset ? '#000000' : '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.moveTo(lineStartX + xOffset - textWidth, y - fontSize * 0.05);
+            ctx.lineTo(lineStartX + xOffset, y - fontSize * 0.05);
+            ctx.stroke();
+          }
         } else if (segment.type === 'emoji') {
           ctx.font = `${fontSize}px ${EMOJI_FONT}`;
           ctx.fillText(segment.content, lineStartX + xOffset, y);
@@ -881,6 +905,44 @@ function drawMedia(
   const x = boxX + (boxW - drawWidth) / 2;
   const y = boxY + (boxH - drawHeight) / 2;
   ctx.drawImage(img, x, y, drawWidth, drawHeight);
+}
+
+/**
+ * Applies text formatting to the canvas context based on the formatting options.
+ * Applies bold, italic, underline, strikethrough, and heading styles.
+ */
+function applyTextFormatting(
+  ctx: SKRSContext2D,
+  formatting: TextFormatting,
+  fontSize: number,
+  fontOption: (typeof FONT_OPTIONS)[FontName],
+  isWhitePreset: boolean,
+): void {
+  let fontStyle = '';
+  let fontModifier = '';
+
+  if (formatting.bold) {
+    fontStyle += 'bold ';
+  }
+  if (formatting.italic) {
+    fontStyle += 'italic ';
+  }
+
+  // Heading size adjustments
+  let sizeMultiplier = 1;
+  if (formatting.heading === 1) {
+    sizeMultiplier = 1.5;
+  } else if (formatting.heading === 2) {
+    sizeMultiplier = 1.3;
+  } else if (formatting.heading === 3) {
+    sizeMultiplier = 1.15;
+  }
+
+  const adjustedFontSize = fontSize * sizeMultiplier;
+  ctx.font = `${fontStyle}${adjustedFontSize}px ${fontOption.font}, ${fontOption.fallback}`;
+
+  // Underline is drawn as a line below the text
+  // We'll need to track the y position and draw the line after text rendering
 }
 
 /**
@@ -1019,8 +1081,25 @@ function wrapText(ctx: SKRSContext2D, segments: Segment[], maxWidth: number, fon
 }
 
 function measureSegmentWidth(ctx: SKRSContext2D, segment: Segment, fontSize: number, fontOption = FONT_OPTIONS.butler): number {
+  const formatting = segment.formatting || {};
+
   if (segment.type === 'text') {
-    ctx.font = `${fontSize}px ${fontOption.font}, ${fontOption.fallback}`;
+    // Apply heading size multiplier
+    let sizeMultiplier = 1;
+    if (formatting.heading === 1) {
+      sizeMultiplier = 1.5;
+    } else if (formatting.heading === 2) {
+      sizeMultiplier = 1.3;
+    } else if (formatting.heading === 3) {
+      sizeMultiplier = 1.15;
+    }
+
+    const adjustedFontSize = fontSize * sizeMultiplier;
+    let fontStyle = '';
+    if (formatting.bold) fontStyle += 'bold ';
+    if (formatting.italic) fontStyle += 'italic ';
+
+    ctx.font = `${fontStyle}${adjustedFontSize}px ${fontOption.font}, ${fontOption.fallback}`;
     return ctx.measureText(segment.content).width;
   } else if (segment.type === 'emoji') {
     ctx.font = `${fontSize}px ${EMOJI_FONT}`;

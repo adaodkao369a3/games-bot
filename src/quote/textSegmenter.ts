@@ -2,9 +2,17 @@ import emojiRegex from 'emoji-regex';
 import { Image, loadImage } from '@napi-rs/canvas';
 import { Logger } from '../utils/logger.js';
 
-export type TextSegment = { type: 'text'; content: string };
-export type EmojiSegment = { type: 'emoji'; content: string };
-export type CustomEmojiSegment = { type: 'customEmoji'; name: string; id: string; animated: boolean };
+export type TextFormatting = {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  heading?: 1 | 2 | 3;
+};
+
+export type TextSegment = { type: 'text'; content: string; formatting?: TextFormatting };
+export type EmojiSegment = { type: 'emoji'; content: string; formatting?: TextFormatting };
+export type CustomEmojiSegment = { type: 'customEmoji'; name: string; id: string; animated: boolean; formatting?: TextFormatting };
 
 export type Segment = TextSegment | EmojiSegment | CustomEmojiSegment;
 
@@ -12,8 +20,57 @@ export type Segment = TextSegment | EmojiSegment | CustomEmojiSegment;
 const customEmojiCache = new Map<string, Image>();
 
 /**
+ * Parses markdown-style formatting from text and returns formatted segments.
+ * Supports: **bold**, *italic*, __underline__, ~~strikethrough~~, # ## ### headings
+ * Returns both the formatted text and the formatting applied.
+ */
+function parseMarkdownFormatting(text: string): { text: string; formatting: TextFormatting } {
+  let formatting: TextFormatting = {};
+  let processedText = text;
+
+  // Parse headings (must be at start of line or preceded by whitespace)
+  const headingMatch = processedText.match(/^(#{1,3})\s+(.+)$/);
+  if (headingMatch) {
+    const level = headingMatch[1].length as 1 | 2 | 3;
+    formatting.heading = level;
+    processedText = headingMatch[2];
+  }
+
+  // Parse strikethrough ~~text~~
+  const strikethroughMatch = processedText.match(/~~(.+?)~~/);
+  if (strikethroughMatch) {
+    formatting.strikethrough = true;
+    processedText = processedText.replace(/~~(.+?)~~/, '$1');
+  }
+
+  // Parse bold **text**
+  const boldMatch = processedText.match(/\*\*(.+?)\*\*/);
+  if (boldMatch) {
+    formatting.bold = true;
+    processedText = processedText.replace(/\*\*(.+?)\*\*/, '$1');
+  }
+
+  // Parse italic *text* or _text_
+  const italicMatch = processedText.match(/(?:\*|_)(.+?)(?:\*|_)/);
+  if (italicMatch) {
+    formatting.italic = true;
+    processedText = processedText.replace(/(?:\*|_)(.+?)(?:\*|_)/, '$1');
+  }
+
+  // Parse underline __text__
+  const underlineMatch = processedText.match(/__(.+?)__/);
+  if (underlineMatch) {
+    formatting.underline = true;
+    processedText = processedText.replace(/__(.+?)__/, '$1');
+  }
+
+  return { text: processedText, formatting };
+}
+
+/**
  * Tokenizes quote text into segments: text, Unicode emoji, and Discord custom emoji.
  * Custom emoji matching runs first to avoid collision with Unicode emoji patterns.
+ * Parses markdown formatting for text segments.
  */
 export function segmentText(text: string): Segment[] {
   const segments: Segment[] = [];
@@ -58,8 +115,9 @@ export function segmentText(text: string): Segment[] {
 /**
  * Segments text into text and Unicode emoji segments using emoji-regex.
  * Splits plain text into individual word tokens for proper wrapping.
+ * Preserves formatting context across segments.
  */
-function segmentUnicodeEmojis(text: string): Segment[] {
+function segmentUnicodeEmojis(text: string, parentFormatting: TextFormatting = {}): Segment[] {
   const segments: Segment[] = [];
   let lastIndex = 0;
   const regex = emojiRegex();
@@ -73,11 +131,11 @@ function segmentUnicodeEmojis(text: string): Segment[] {
     // Add text before the emoji, split into word tokens
     if (matchStart > lastIndex) {
       const textBefore = text.slice(lastIndex, matchStart);
-      segments.push(...splitTextIntoWords(textBefore));
+      segments.push(...splitTextIntoWords(textBefore, parentFormatting));
     }
 
-    // Add the emoji segment
-    segments.push({ type: 'emoji', content: emoji });
+    // Add the emoji segment with formatting
+    segments.push({ type: 'emoji', content: emoji, formatting: parentFormatting });
 
     lastIndex = matchEnd;
   }
@@ -85,12 +143,12 @@ function segmentUnicodeEmojis(text: string): Segment[] {
   // Add remaining text after the last emoji, split into word tokens
   if (lastIndex < text.length) {
     const textAfter = text.slice(lastIndex);
-    segments.push(...splitTextIntoWords(textAfter));
+    segments.push(...splitTextIntoWords(textAfter, parentFormatting));
   }
 
   // If no segments were created, the whole text is plain text
   if (segments.length === 0 && text.trim()) {
-    segments.push(...splitTextIntoWords(text));
+    segments.push(...splitTextIntoWords(text, parentFormatting));
   }
 
   return segments;
@@ -99,19 +157,24 @@ function segmentUnicodeEmojis(text: string): Segment[] {
 /**
  * Splits text into individual word tokens for proper text wrapping.
  * Preserves spaces as separate tokens to maintain proper spacing.
+ * Parses markdown formatting from each word token.
+ * Merges with parent formatting context.
  */
-function splitTextIntoWords(text: string): Segment[] {
+function splitTextIntoWords(text: string, parentFormatting: TextFormatting = {}): Segment[] {
   const segments: Segment[] = [];
-  
+
   // Split on whitespace but preserve the whitespace as tokens
   const parts = text.split(/(\s+)/);
-  
+
   for (const part of parts) {
     if (part) {
-      segments.push({ type: 'text', content: part });
+      const { text: processedText, formatting } = parseMarkdownFormatting(part);
+      // Merge parent formatting with local formatting (local takes precedence)
+      const mergedFormatting = { ...parentFormatting, ...formatting };
+      segments.push({ type: 'text', content: processedText, formatting: mergedFormatting });
     }
   }
-  
+
   return segments;
 }
 

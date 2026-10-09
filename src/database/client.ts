@@ -393,6 +393,23 @@ async function initializeSchema(): Promise<void> {
       } else {
         console.log('✓ role_forfeits table exists');
       }
+
+      // Check if chat_rewards_tracking table exists
+      const chatRewardsCheck = await pool!.query(`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_name = 'chat_rewards_tracking'
+        AND table_schema = 'public'
+      `);
+
+      if (chatRewardsCheck.rows.length === 0) {
+        console.log('⚠ chat_rewards_tracking table does not exist, creating...');
+        const chatRewardsSchemaPath = path.join(process.cwd(), 'src', 'database', 'chat-rewards-schema.sql');
+        await pool!.query(fs.readFileSync(chatRewardsSchemaPath, 'utf-8'));
+        console.log('✓ chat_rewards_tracking table created');
+      } else {
+        console.log('✓ chat_rewards_tracking table exists');
+      }
     }
 
     // Talent Agency minigame (pa_* tables): create if missing, then always re-seed (idempotent upserts)
@@ -803,6 +820,20 @@ export interface RoleForfeit {
   user_id: string;
   category_id: string;
   forfeited_at: Date;
+}
+
+export interface ChatRewardsTracking {
+  user_id: string;
+  guild_id: string;
+  message_count: number;
+  last_message_at: Date | null;
+  last_reward_at: Date | null;
+  cooldown_until: Date | null;
+  last_message_content: string | null;
+  consecutive_duplicate_count: number;
+  total_rewards_earned: number;
+  created_at: Date;
+  updated_at: Date;
 }
 
 /**
@@ -1314,6 +1345,166 @@ export async function getMogLeaderboard(guildId: string, limit: number = 10, off
     }));
   } catch (error) {
     console.error('[MOG_PROFILES] Failed to get MOG leaderboard:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get chat rewards tracking for a user
+ * @param userId Discord user ID
+ * @returns Chat rewards tracking data or null if not found
+ */
+export async function getChatRewardsTracking(userId: string): Promise<ChatRewardsTracking | null> {
+  const client = await getClient();
+  try {
+    const result = await client.query(
+      'SELECT * FROM chat_rewards_tracking WHERE user_id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    return {
+      user_id: row.user_id,
+      guild_id: row.guild_id,
+      message_count: row.message_count,
+      last_message_at: row.last_message_at,
+      last_reward_at: row.last_reward_at,
+      cooldown_until: row.cooldown_until,
+      last_message_content: row.last_message_content,
+      consecutive_duplicate_count: row.consecutive_duplicate_count,
+      total_rewards_earned: row.total_rewards_earned,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Create or update chat rewards tracking for a user (atomic operation)
+ * @param userId Discord user ID
+ * @param guildId Discord guild ID
+ * @param messageCount Current message count
+ * @param lastMessageContent Last message content (for duplicate detection)
+ * @param consecutiveDuplicateCount Count of consecutive duplicate messages
+ * @param totalRewardsEarned Total rewards earned by user
+ * @returns Updated tracking data
+ */
+export async function upsertChatRewardsTracking(
+  userId: string,
+  guildId: string,
+  messageCount: number,
+  lastMessageContent: string | null,
+  consecutiveDuplicateCount: number,
+  totalRewardsEarned: number
+): Promise<ChatRewardsTracking> {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `INSERT INTO chat_rewards_tracking (user_id, guild_id, message_count, last_message_at, last_message_content, consecutive_duplicate_count, total_rewards_earned)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6)
+       ON CONFLICT (user_id)
+       DO UPDATE SET
+         guild_id = EXCLUDED.guild_id,
+         message_count = EXCLUDED.message_count,
+         last_message_at = CURRENT_TIMESTAMP,
+         last_message_content = EXCLUDED.last_message_content,
+         consecutive_duplicate_count = EXCLUDED.consecutive_duplicate_count,
+         total_rewards_earned = EXCLUDED.total_rewards_earned,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [userId, guildId, messageCount, lastMessageContent, consecutiveDuplicateCount, totalRewardsEarned]
+    );
+
+    await client.query('COMMIT');
+    const row = result.rows[0];
+    return {
+      user_id: row.user_id,
+      guild_id: row.guild_id,
+      message_count: row.message_count,
+      last_message_at: row.last_message_at,
+      last_reward_at: row.last_reward_at,
+      cooldown_until: row.cooldown_until,
+      last_message_content: row.last_message_content,
+      consecutive_duplicate_count: row.consecutive_duplicate_count,
+      total_rewards_earned: row.total_rewards_earned,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    };
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('[CHAT_REWARDS] Failed to rollback transaction:', rollbackError);
+    }
+    console.error('[CHAT_REWARDS] Failed to upsert chat rewards tracking:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Update chat rewards tracking after a reward is given
+ * @param userId Discord user ID
+ * @param newMessageCount New message count (typically reset to 0)
+ * @param newCooldownUntil New cooldown timestamp
+ * @param newTotalRewards New total rewards earned
+ * @returns Updated tracking data
+ */
+export async function updateChatRewardsAfterReward(
+  userId: string,
+  newMessageCount: number,
+  newCooldownUntil: Date,
+  newTotalRewards: number
+): Promise<ChatRewardsTracking> {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE chat_rewards_tracking
+       SET message_count = $2,
+           last_reward_at = CURRENT_TIMESTAMP,
+           cooldown_until = $3,
+           total_rewards_earned = $4,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1
+       RETURNING *`,
+      [userId, newMessageCount, newCooldownUntil, newTotalRewards]
+    );
+
+    await client.query('COMMIT');
+    const row = result.rows[0];
+    return {
+      user_id: row.user_id,
+      guild_id: row.guild_id,
+      message_count: row.message_count,
+      last_message_at: row.last_message_at,
+      last_reward_at: row.last_reward_at,
+      cooldown_until: row.cooldown_until,
+      last_message_content: row.last_message_content,
+      consecutive_duplicate_count: row.consecutive_duplicate_count,
+      total_rewards_earned: row.total_rewards_earned,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    };
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('[CHAT_REWARDS] Failed to rollback transaction:', error);
+    }
+    console.error('[CHAT_REWARDS] Failed to update chat rewards after reward:', error);
     throw error;
   } finally {
     client.release();

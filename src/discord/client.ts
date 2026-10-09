@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { config, validateConfig } from '../config/index.js';
 import { BobKunPersonality } from '../services/bob-kun-personality.js';
 import { ErrorHandler } from '../utils/error-handler.js';
+import { ChatRewardsService } from '../services/chat-rewards.js';
 import { handleHelpCommand } from '../commands/help.js';
 import { handleBobkunCommand } from '../commands/bobkun.js';
 import { handlePissCompCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
@@ -281,6 +282,11 @@ export class DiscordClient {
 
     // Check for Word Bomb word submissions
     await handleWordBombMessage(message);
+
+    // Process chat rewards (non-blocking)
+    ChatRewardsService.processMessage(message).catch((error) => {
+      console.error('[CHAT_REWARDS] Error in background processing:', error);
+    });
   }
 
   private async onInteractionCreate(interaction: any): Promise<void> {
