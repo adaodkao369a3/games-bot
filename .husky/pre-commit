@@ -1,0 +1,35 @@
+#!/bin/sh
+
+echo "Running pre-commit validation..."
+
+# Check for .env in staged files
+if git diff --cached --name-only | grep -q "^\.env$"; then
+  echo "ERROR: .env file is staged for commit. This file contains secrets and should not be committed."
+  echo "Remove .env from staging: git restore --staged .env"
+  exit 1
+fi
+
+# Check for other environment files
+if git diff --cached --name-only | grep -q "\.env\.local$"; then
+  echo "ERROR: .env.local file is staged for commit. This file should not be committed."
+  echo "Remove .env.local from staging: git restore --staged .env.local"
+  exit 1
+fi
+
+# Run TypeScript build
+echo "Running build..."
+npm run build
+if [ $? -ne 0 ]; then
+  echo "ERROR: Build failed. Please fix TypeScript errors before committing."
+  exit 1
+fi
+
+# Run tests
+echo "Running tests..."
+npm test
+if [ $? -ne 0 ]; then
+  echo "ERROR: Tests failed. Please fix failing tests before committing."
+  exit 1
+fi
+
+echo "Pre-commit validation passed."
