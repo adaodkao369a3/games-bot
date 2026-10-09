@@ -200,7 +200,7 @@ Both commands must succeed before committing. If either fails:
 
 ### What These Commands Do
 - `npm run build`: Runs `tsc` (TypeScript compiler) then `npm run copy-assets` (copies assets to dist/)
-- `npm test`: Runs `tsx --test tests/agency-logic.test.ts` (8 unit tests for Talent Agency logic)
+- `npm test`: Runs all test files in tests/ directory (currently agency-logic.test.ts and wager-parser.test.ts)
 
 ## F. Git and Deployment Rules
 
