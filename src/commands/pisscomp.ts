@@ -251,7 +251,7 @@ export async function handlePissCompInteraction(interaction: MessageComponentInt
     const customId = interaction.customId;
 
     // Check if it's a Piss Comp Max interaction
-    if (customId === 'pisscompmax_dodge') {
+    if (customId === 'pisscompmax_attack') {
       const maxGame = activeMaxGames.get(channelId);
 
       if (!maxGame) {

@@ -424,11 +424,14 @@ export class PissCompMaxGame {
   ): Promise<void> {
     if (!this.state.message) return;
 
+    // Add timestamp to URL to prevent Discord caching
+    const uniqueGifUrl = `${gifUrl}?t=${Date.now()}`;
+
     const embed = new EmbedBuilder()
       .setTitle(title)
       .setDescription(description)
       .setColor(0xFF0000)
-      .setImage(gifUrl)
+      .setImage(uniqueGifUrl)
       .setFooter({
         text: `Round ${this.state.currentRound}/4 | Naoya: ${this.state.player1Score} | ${this.state.currentStage === 1 ? 'Choso' : 'Maki'}: ${this.state.player2Score}`,
       });
@@ -442,14 +445,14 @@ export class PissCompMaxGame {
   }
 
   /**
-   * Create the dodge button
+   * Create the attack button
    */
   private createButton(enabled: boolean): ActionRowBuilder<ButtonBuilder>[] {
     const row = new ActionRowBuilder<ButtonBuilder>();
 
     const button = new ButtonBuilder()
-      .setCustomId('pisscompmax_dodge')
-      .setLabel('Dodge This!')
+      .setCustomId('pisscompmax_attack')
+      .setLabel('Attack!')
       .setStyle(ButtonStyle.Primary)
       .setDisabled(!enabled);
 
