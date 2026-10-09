@@ -487,7 +487,7 @@ export class PissCompMaxGame {
 
     row.addComponents(button);
 
-    console.log(`[PissCompMax] Button created - customId: ${button.data.custom_id}, disabled: ${button.data.disabled}`);
+    console.log(`[PissCompMax] Button created - disabled: ${!enabled}`);
     return [row];
   }
 
