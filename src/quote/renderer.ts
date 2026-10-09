@@ -759,7 +759,7 @@ async function drawText(
 
     // Vertically center quote text within its text area, then nudge lower
     const safeBoxCenterY = textAreaTop + textAreaHeight / 2;
-    let y = safeBoxCenterY - blockHeight / 2 + 20;
+    let y = safeBoxCenterY - blockHeight / 2 + 5;
 
     for (const line of lines) {
       // Calculate line width for proper centering

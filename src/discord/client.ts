@@ -30,6 +30,7 @@ import { handleMogCommand, handleMogInteraction } from '../commands/mog.js';
 import { handleMoglbCommand, handleMoglbInteraction } from '../commands/moglb.js';
 import { handleGoonCommand } from '../commands/goon.js';
 import { handleEdgeCommand } from '../commands/edge.js';
+import { handleAvatarCommand } from '../commands/avatar.js';
 import {
   handlePscoutCommand,
   handlePrecruitCommand,
@@ -269,6 +270,11 @@ export class DiscordClient {
 
       if (command === 'roles') {
         await handleRolesCommand(message);
+        return;
+      }
+
+      if (command === 'av' || command === 'avatar') {
+        await handleAvatarCommand(message);
         return;
       }
 
