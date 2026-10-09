@@ -5,7 +5,7 @@ import { ErrorHandler } from '../utils/error-handler.js';
 import { ChatRewardsService } from '../services/chat-rewards.js';
 import { handleHelpCommand } from '../commands/help.js';
 import { handleBobkunCommand } from '../commands/bobkun.js';
-import { handlePissCompCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
+import { handlePissCompCommand, handlePissCompMaxCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
 import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } from '../commands/trial.js';
 import { handleGambleCommand } from '../commands/gamble.js';
 import { handleQuoteCommand } from '../commands/quote.js';
@@ -109,6 +109,11 @@ export class DiscordClient {
 
       if (command === 'pisscomp') {
         await handlePissCompCommand(message, args);
+        return;
+      }
+
+      if (command === 'pisscompmax') {
+        await handlePissCompMaxCommand(message, args);
         return;
       }
 
