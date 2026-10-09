@@ -1,5 +1,3 @@
-import fetch from 'node-fetch';
-
 /**
  * Cache for GIF durations to avoid repeated downloads
  */
@@ -17,7 +15,7 @@ const CONFIG = {
 };
 
 /**
- * Fetch a URL following redirects safely
+ * Fetch a URL following redirects safely using native fetch
  */
 async function fetchWithRedirects(url: string): Promise<Response> {
   const controller = new AbortController();
@@ -88,7 +86,7 @@ export async function getGifDuration(url: string): Promise<number> {
       return CONFIG.DEFAULT_DURATION_MS;
     }
 
-    const contentType = response.headers.get('content-type');
+    const contentType = (response.headers as any).get('content-type');
     if (!contentType || !contentType.includes('gif')) {
       console.warn(`[GIF_DURATION] Not a GIF: ${contentType}`);
       return CONFIG.DEFAULT_DURATION_MS;

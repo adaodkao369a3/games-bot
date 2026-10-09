@@ -218,7 +218,10 @@ export async function handlePissCompMaxCommand(message: Message, args: string[])
           activeMaxGames.set(channelId, maxGame);
 
           // Start the JJK fight sequence
-          await maxGame.start(initialMessage, winner);
+          maxGame.start(initialMessage, winner).catch((error) => {
+            console.error('[Piss Comp Max] Error starting JJK fight:', error);
+            activeMaxGames.delete(channelId);
+          });
 
           // Clean up when game is finished (fallback cleanup)
           const maxCheckInterval = setInterval(() => {
