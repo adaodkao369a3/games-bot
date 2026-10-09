@@ -168,7 +168,7 @@ export async function handlePissCompMaxCommand(message: Message, args: string[])
     const player2Name = mentionedUser.displayName || mentionedUser.username;
     const player2Avatar = mentionedUser.displayAvatarURL({ size: 256 }) || mentionedUser.defaultAvatarURL;
 
-    // First, run the normal Piss Comp game
+    // First, run the normal Piss Comp game (part of PissCompMax, so no coins awarded)
     const normalGame = new PissCompGame(
       channelId,
       guildId,
@@ -177,7 +177,8 @@ export async function handlePissCompMaxCommand(message: Message, args: string[])
       () => {
         // Cleanup callback: remove game from active games when finished
         activeGames.delete(channelId);
-      }
+      },
+      true // isPartOfMax = true, so no coins will be awarded
     );
 
     // Store in active games
@@ -250,11 +251,15 @@ export async function handlePissCompInteraction(interaction: MessageComponentInt
     const channelId = interaction.channel.id;
     const customId = interaction.customId;
 
+    console.log(`[Piss Comp Interaction] customId: ${customId}, channelId: ${channelId}`);
+
     // Check if it's a Piss Comp Max interaction
     if (customId === 'pisscompmax_attack') {
+      console.log('[Piss Comp Interaction] Handling Piss Comp Max interaction');
       const maxGame = activeMaxGames.get(channelId);
 
       if (!maxGame) {
+        console.log('[Piss Comp Interaction] No active Piss Comp Max game');
         await interaction.reply({
           content: 'No active Piss Comp Max game in this channel.',
           ephemeral: true,

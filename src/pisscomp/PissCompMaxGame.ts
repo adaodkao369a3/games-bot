@@ -7,42 +7,41 @@ import { PissCompGame, PissCompPlayer } from './PissCompGame.js';
  */
 const GIFS = {
   // Transition GIFs
-  TRANSITION_1: 'https://64.media.tumblr.com/b2a2bc168fc2af179a99e6a9b8f264f079d6f36b90.gif',
-  TRANSITION_1_FALLBACK: 'https://64.media.tumblr.com/b2a2bc168fc2af179a99a6/6e8227c4fa592036-46/s540x810/0d5b71a315bf974c68e1a9b8f264f079d6f36b90.gif',
-  TRANSITION_2: 'https://media1.tenor.com/m/UHmop4IsTSAAAAAC/choso-stand-off-choso-aura.gif',
+  TRANSITION_1: 'https://media.tenor.com/UHmop4IsTSAAAAAC/choso-stand-off-choso-aura.gif',
+  TRANSITION_2: 'https://media.tenor.com/puaEEA-J_8oAAAAd/jujutsu-kaisen-jjk.gif',
 
   // Stage 1: Naoya vs Choso
-  STAGE_1_INTRO: 'https://media1.tenor.com/m/UHmop4IsTSAAAAAC/choso-stand-off-choso-aura.gif',
-  
+  STAGE_1_INTRO: 'https://media.tenor.com/UHmop4IsTSAAAAAC/choso-stand-off-choso-aura.gif',
+
   // Naoya Stage 1 attacks
-  NAOYA_S1_MOVE_1: 'https://i.makeagif.com/media/1-24-2026/vg74A7.gif',
-  NAOYA_S1_MOVE_2: 'https://64.media.tumblr.com/1dc3d5d0178d3956169c3b4b92422085/802b826e6e09d301-50/s250x400/79b388e0d7c707d988bfcb339191289838973244.gif',
-  NAOYA_S1_MOVE_3: 'https://64.media.tumblr.com/35c289431389a9c49a8e38da91561a15/802b826e6e09d301-57/s1280x1920/45ce88e6b2c1b9ebfac56f3c303473ddd6f01650.gif',
+  NAOYA_S1_MOVE_1: 'https://media.tenor.com/Wfc3sxS8ZmIAAAAM/naoya-zenin.gif',
+  NAOYA_S1_MOVE_2: 'https://media.tenor.com/ze1DLgRmCl0AAAAM/jjk-jujutsu-kaisen.gif',
+  NAOYA_S1_MOVE_3: 'https://media.tenor.com/L5UvsfC0m5kAAAAd/choso-vs-naoya-jujutsu-kaisen.gif',
   NAOYA_S1_WIN: 'https://media.tenor.com/Wfc3sxS8ZmIAAAAM/naoya-zenin.gif',
-  
+
   // Choso Stage 1 attacks
-  CHOSO_S1_MOVE_1: 'https://i.pinimg.com/originals/8f/c4/cd/8fc4cd008f7a188eedd5c9a9219c3dab.gif',
-  CHOSO_S1_MOVE_2: 'https://media.tenor.com/ze1DLgRmCl0AAAAM/jjk-jujutsu-kaisen.gif',
-  CHOSO_S1_MOVE_3: 'https://media1.tenor.com/m/L5UvsfC0m5kAAAAd/choso-vs-naoya-jujutsu-kaisen.gif',
-  CHOSO_S1_WIN: 'https://64.media.tumblr.com/8b6032fd92d2a9acda88ffe00856e88d/947c30ebb836286b-a9/s1280x1920/a6641d4064d361397d05e3b4229d11d1f8c7c8d5.gif',
+  CHOSO_S1_MOVE_1: 'https://media.tenor.com/ze1DLgRmCl0AAAAM/jjk-jujutsu-kaisen.gif',
+  CHOSO_S1_MOVE_2: 'https://media.tenor.com/L5UvsfC0m5kAAAAd/choso-vs-naoya-jujutsu-kaisen.gif',
+  CHOSO_S1_MOVE_3: 'https://media.tenor.com/UHmop4IsTSAAAAAC/choso-stand-off-choso-aura.gif',
+  CHOSO_S1_WIN: 'https://media.tenor.com/L5UvsfC0m5kAAAAd/choso-vs-naoya-jujutsu-kaisen.gif',
 
   // Stage 2: Naoya vs Maki
-  STAGE_2_INTRO: 'https://media1.tenor.com/m/puaEEA-J_8oAAAAd/jujutsu-kaisen-jjk.gif',
-  
+  STAGE_2_INTRO: 'https://media.tenor.com/puaEEA-J_8oAAAAd/jujutsu-kaisen-jjk.gif',
+
   // Naoya Stage 2 attacks
-  NAOYA_S2_MOVE_1: 'https://i.pinimg.com/originals/16/c5/ca/16c5ca25e6c451eec34254dee90f51ac.gif',
-  NAOYA_S2_MOVE_2: 'https://64.media.tumblr.com/57f89765126595b213aeb43914d183e2/fa6f37fb084d8a9f-ce/s250x400/4306bb1f39587559ad18aed01990b78f1fe2002f.gif',
-  NAOYA_S2_MOVE_3: 'https://i.namu.wiki/i/lZuHbWoqKyJFDY-WmbMNyZNkJhC6h8GCK2gLGYr1N0uUQ6iakbU_JAW6Pj1gomsV_exOsc9WlJ2u98GSYgmk9Q.gif',
-  NAOYA_S2_WIN: 'https://media1.tenor.com/m/3hHnMhrLNYsAAAAd/naoya-folk.gif',
-  
+  NAOYA_S2_MOVE_1: 'https://media.tenor.com/3hHnMhrLNYsAAAAd/naoya-folk.gif',
+  NAOYA_S2_MOVE_2: 'https://media.tenor.com/kANPHZ2EhjIAAAAd/maki-zenin-jujutsu-kaisen.gif',
+  NAOYA_S2_MOVE_3: 'https://media.tenor.com/puaEEA-J_8oAAAAd/jujutsu-kaisen-jjk.gif',
+  NAOYA_S2_WIN: 'https://media.tenor.com/3hHnMhrLNYsAAAAd/naoya-folk.gif',
+
   // Maki Stage 2 attacks
-  MAKI_S2_MOVE_1: 'https://64.media.tumblr.com/bd1b94d7c0a9ac7309e3cea20b232984/fa6f37fb084d8a9f-15/s250x400/4c995a42de48b13d65cc4eaad2efce96a0a7a199.gif',
-  MAKI_S2_MOVE_2: 'https://media1.tenor.com/m/kANPHZ2EhjIAAAAd/maki-zenin-jujutsu-kaisen.gif',
-  MAKI_S2_MOVE_3: 'https://i.makeagif.com/media/2-28-2026/z310pH.gif',
-  MAKI_S2_WIN: 'https://64.media.tumblr.com/8100fb3867bc5f57b4b5bddc8555543d/f4136ceb038047b1-90/s250x400/80ee5c2e2af2d467f6dac22763df9bf94352e792.gif',
+  MAKI_S2_MOVE_1: 'https://media.tenor.com/kANPHZ2EhjIAAAAd/maki-zenin-jujutsu-kaisen.gif',
+  MAKI_S2_MOVE_2: 'https://media.tenor.com/puaEEA-J_8oAAAAd/jujutsu-kaisen-jjk.gif',
+  MAKI_S2_MOVE_3: 'https://media.tenor.com/3hHnMhrLNYsAAAAd/naoya-folk.gif',
+  MAKI_S2_WIN: 'https://media.tenor.com/kANPHZ2EhjIAAAAd/maki-zenin-jujutsu-kaisen.gif',
 
   // Final draw
-  FINAL_DRAW: 'https://i.pinimg.com/originals/29/96/40/29964078bb55b335f62496c81ce637bc.gif',
+  FINAL_DRAW: 'https://media.tenor.com/UHmop4IsTSAAAAAC/choso-stand-off-choso-aura.gif',
 };
 
 /**
@@ -107,6 +106,7 @@ export class PissCompMaxGame {
    * Start the JJK Fight Sequence after normal Piss Comp
    */
   async start(message: Message, normalGameWinner: string): Promise<void> {
+    console.log('[PissCompMax] Starting JJK fight sequence');
     this.state.message = message;
     this.state.normalGameWinner = normalGameWinner;
 
@@ -173,6 +173,7 @@ export class PissCompMaxGame {
    * Start a round
    */
   private async startRound(): Promise<void> {
+    console.log(`[PissCompMax] Starting round ${this.state.currentRound}`);
     this.state.isButtonEnabled = false;
     this.state.roundStartTime = Date.now();
 
@@ -181,6 +182,7 @@ export class PissCompMaxGame {
     const description = `Round ${this.state.currentRound}/4\n\nNaoya Zenin: ${this.state.player1Score}\n${opponentName}: ${this.state.player2Score}\n\nGet ready to dodge!`;
 
     // Show waiting GIF with disabled button
+    console.log('[PissCompMax] Showing waiting embed with disabled button');
     await this.updateEmbed(
       stage === 1 ? 'STAGE 1 — NAOYA VS CHOSO' : 'STAGE 2 — NAOYA VS MAKI',
       stage === 1 ? GIFS.STAGE_1_INTRO : GIFS.STAGE_2_INTRO,
@@ -189,10 +191,16 @@ export class PissCompMaxGame {
     );
 
     // Enable button after 3 seconds
+    console.log(`[PissCompMax] Setting button enable timeout for ${PissCompMaxGame.BUTTON_DISABLE_DELAY_MS}ms`);
     this.disableDelayTimeout = setTimeout(async () => {
-      if (this.state.isGameOver) return;
+      console.log('[PissCompMax] Button enable timeout fired');
+      if (this.state.isGameOver) {
+        console.log('[PissCompMax] Game over, skipping button enable');
+        return;
+      }
 
       this.state.isButtonEnabled = true;
+      console.log('[PissCompMax] Button enabled, updating embed');
       await this.updateEmbed(
         stage === 1 ? 'STAGE 1 — NAOYA VS CHOSO' : 'STAGE 2 — NAOYA VS MAKI',
         stage === 1 ? GIFS.STAGE_1_INTRO : GIFS.STAGE_2_INTRO,
@@ -202,6 +210,7 @@ export class PissCompMaxGame {
 
       // Set round timeout (20 seconds total, so 17 seconds remaining after 3s delay)
       this.roundTimeout = setTimeout(() => {
+        console.log('[PissCompMax] Round timeout fired');
         this.handleTimeout();
       }, PissCompMaxGame.ROUND_TIMEOUT_MS - PissCompMaxGame.BUTTON_DISABLE_DELAY_MS);
     }, PissCompMaxGame.BUTTON_DISABLE_DELAY_MS);
@@ -211,7 +220,12 @@ export class PissCompMaxGame {
    * Handle button interaction
    */
   async handleInteraction(interaction: MessageComponentInteraction): Promise<void> {
+    console.log(`[PissCompMax] Button clicked by ${interaction.user.id}, customId: ${interaction.customId}`);
+    console.log(`[PissCompMax] Game state - isGameOver: ${this.state.isGameOver}, isButtonEnabled: ${this.state.isButtonEnabled}`);
+    console.log(`[PissCompMax] Player 1: ${this.state.player1.id}, Player 2: ${this.state.player2.id}`);
+
     if (this.state.isGameOver) {
+      console.log('[PissCompMax] Game already over, ignoring click');
       await interaction.reply({
         content: 'This game has already ended.',
         ephemeral: true,
@@ -223,6 +237,7 @@ export class PissCompMaxGame {
 
     // Validate: only players can click
     if (userId !== this.state.player1.id && userId !== this.state.player2.id) {
+      console.log('[PissCompMax] Non-player tried to click');
       await interaction.reply({
         content: 'Only the participants can click this button!',
         ephemeral: true,
@@ -232,12 +247,15 @@ export class PissCompMaxGame {
 
     // Validate: button must be enabled
     if (!this.state.isButtonEnabled) {
+      console.log('[PissCompMax] Button not enabled yet');
       await interaction.reply({
         content: 'Wait for the button to be enabled!',
         ephemeral: true,
       });
       return;
     }
+
+    console.log(`[PissCompMax] Button click validated, isButtonEnabled: ${this.state.isButtonEnabled}`);
 
     // Determine winner (first to click wins)
     const winnerId = userId;
@@ -252,6 +270,8 @@ export class PissCompMaxGame {
     } else {
       this.state.player2Score++;
     }
+
+    console.log(`[PissCompMax] Score updated - Naoya: ${this.state.player1Score}, Opponent: ${this.state.player2Score}`);
 
     // Show attack GIF
     await this.showAttack(isPlayer1);
@@ -424,6 +444,9 @@ export class PissCompMaxGame {
   ): Promise<void> {
     if (!this.state.message) return;
 
+    console.log(`[PissCompMax] Updating embed with GIF: ${gifUrl}`);
+    console.log(`[PissCompMax] Button enabled: ${buttonEnabled}`);
+
     // Add timestamp to URL to prevent Discord caching
     const uniqueGifUrl = `${gifUrl}?t=${Date.now()}`;
 
@@ -438,16 +461,22 @@ export class PissCompMaxGame {
 
     const components = this.createButton(buttonEnabled);
 
-    await this.state.message.edit({
-      embeds: [embed],
-      components,
-    });
+    try {
+      await this.state.message.edit({
+        embeds: [embed],
+        components,
+      });
+      console.log('[PissCompMax] Embed updated successfully');
+    } catch (error) {
+      console.error('[PissCompMax] Error updating embed:', error);
+    }
   }
 
   /**
    * Create the attack button
    */
   private createButton(enabled: boolean): ActionRowBuilder<ButtonBuilder>[] {
+    console.log(`[PissCompMax] Creating button - enabled: ${enabled}`);
     const row = new ActionRowBuilder<ButtonBuilder>();
 
     const button = new ButtonBuilder()
@@ -458,6 +487,7 @@ export class PissCompMaxGame {
 
     row.addComponents(button);
 
+    console.log(`[PissCompMax] Button created - customId: ${button.data.custom_id}, disabled: ${button.data.disabled}`);
     return [row];
   }
 

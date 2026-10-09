@@ -34,6 +34,7 @@ export class PissCompGame {
   private state: PissCompState;
   private currentMessage?: Message;
   private onGameEnd?: () => void;
+  private isPartOfMax: boolean = false;
 
   // Game constants
   private static readonly MAX_METER = 100;
@@ -49,7 +50,8 @@ export class PissCompGame {
     guildId: string | undefined,
     player1: PissCompPlayer,
     player2: PissCompPlayer,
-    onGameEnd?: () => void
+    onGameEnd?: () => void,
+    isPartOfMax: boolean = false
   ) {
     this.state = {
       channelId,
@@ -63,6 +65,8 @@ export class PissCompGame {
       gameInstanceId: `pisscomp_${channelId}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
     };
     this.onGameEnd = onGameEnd;
+    this.isPartOfMax = isPartOfMax;
+    console.log(`[PissCompGame] Game created - isPartOfMax: ${isPartOfMax}`);
   }
 
   /**
@@ -190,9 +194,12 @@ export class PissCompGame {
       components: this.createDisabledPumpButtons(),
     });
 
-    // Award Bombo Coins to the winner (only on victory, not on draw)
-    if (this.currentMessage?.channel) {
+    // Award Bombo Coins to the winner (only on victory, not on draw, and NOT if part of PissCompMax)
+    if (!this.isPartOfMax && this.currentMessage?.channel) {
+      console.log(`[PissCompGame] Awarding 900 coins to winner ${winnerId}`);
       await awardGameReward(winnerId, 900, 'Piss Comp', this.currentMessage.channel as TextChannel, this.state.gameInstanceId);
+    } else {
+      console.log(`[PissCompGame] Skipping coin reward - isPartOfMax: ${this.isPartOfMax}`);
     }
 
     // Call cleanup callback to remove game from active games
