@@ -20,6 +20,7 @@ import * as path from 'path';
 import { config, isTalentAgencyChannel } from '../config/index.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
 import {
   CollectLine,
   RosterEntry,
@@ -57,7 +58,7 @@ import {
   workEarnings,
 } from '../agency/agency-logic.js';
 
-const COIN = '<:bombocoin:1545139736312815840>';
+const COIN = EMOJIS.bombocoin;
 const GOLD = 0xf5b800;
 const fmt = (n: number) => n.toLocaleString('en-US');
 const coins = (n: number) => `${fmt(n)} ${COIN}`;
@@ -92,7 +93,7 @@ function wrongChannel(message: Message): boolean {
   return !isTalentAgencyChannel(message.channel.id);
 }
 
-const WRONG_CHANNEL_TEXT = () => `This command can only be used in <#${config.talentAgencyChannelId}>.`;
+const WRONG_CHANNEL_TEXT = () => `This command can only be used in ${config.talentAgencyChannelIds.map(id => `<#${id}>`).join(' or ')}.`;
 
 /** Character art from assets/characters/<image_file>. Missing file => null (embed just has no image). */
 function imageFor(character: CharacterDef): AttachmentBuilder | null {
@@ -159,9 +160,9 @@ async function buildHub(userId: string, note?: string): Promise<View> {
 
   if (roster.length === 0) {
     const unsigned = discovered;
-    let text = "Your roster is emptier than Bob Kun's fridge.\nUse `.pscout` to find talent, then recruit someone.";
+    let text = "Your roster is emptier than Bob Kun's fridge.\nUse **__`.pscout`__** to find talent, then recruit someone.";
     if (unsigned.length > 0) {
-      text += `\n\n**Scouted, not signed yet**\n${unsigned.map((c) => `• ${c.name}: ${coins(c.recruit_price)}`).join('\n')}\nUse \`.precruit <name>\` to sign them.`;
+      text += `\n\n**Scouted, not signed yet**\n${unsigned.map((c) => `• ${c.name}: ${coins(c.recruit_price)}`).join('\n')}\nUse \`\`\`.precruit <name>\`\`\` to sign them.`;
     }
     embed.setDescription(`${note ? note + '\n\n' : ''}${text}`);
     return { embeds: [embed], components: [], files: [] };
@@ -183,7 +184,7 @@ async function buildHub(userId: string, note?: string): Promise<View> {
   const lines: string[] = [];
   if (note) lines.push(note, '');
   lines.push(`Roster **${roster.length}/${MAX_ROSTER}**  ·  Out working **${working.length}/${MAX_WORKING}**`);
-  lines.push(`Waiting to collect: **${coins(waiting)}**${waiting > 0 ? '  (`.pcollect`)' : ''}`);
+  lines.push(`Waiting to collect: **${coins(waiting)}**${waiting > 0 ? '  (**__`.pcollect`__**)' : ''}`);
   const fmtEntry = (e: RosterEntry) => `• **${e.character.name}** (${e.tier.label} Lv${e.level}): ${statusLine(e, now)}`;
   if (ready.length) lines.push('', '**Ready to collect**', ...ready.map(fmtEntry));
   if (out.length) lines.push('', '**Out working**', ...out.map(fmtEntry));
@@ -192,7 +193,7 @@ async function buildHub(userId: string, note?: string): Promise<View> {
   const owned = new Set(roster.map((e) => e.character_slug));
   const unsigned = discovered.filter((c) => !owned.has(c.slug));
   if (unsigned.length) {
-    lines.push('', '**Scouted, not signed**', ...unsigned.map((c) => `• ${c.name}: ${coins(c.recruit_price)}  (\`.precruit ${c.name}\`)`));
+    lines.push('', '**Scouted, not signed**', ...unsigned.map((c) => `• ${c.name}: ${coins(c.recruit_price)}  (\`\`\`.precruit ${c.name}\`\`\`)`));
   }
   embed.setDescription(lines.join('\n').slice(0, 4000));
 
@@ -296,8 +297,8 @@ function scoutCard(
 function confirmView(title: string, text: string, yesId: string, noId: string): View {
   const embed = new EmbedBuilder().setColor(GOLD).setTitle(title).setDescription(text);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(yesId).setLabel('✅ YES').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(noId).setLabel('❌ NO').setStyle(ButtonStyle.Danger)
+    new ButtonBuilder().setCustomId(yesId).setEmoji('tick:1558430105120804884').setLabel('YES').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(noId).setEmoji('cross:1558430092043096154').setLabel('NO').setStyle(ButtonStyle.Danger)
   );
   return { embeds: [embed], components: [row], files: [] };
 }
@@ -371,17 +372,17 @@ export async function handlePrecruitCommand(message: Message, args: string[]): P
       const [discovered, roster] = await Promise.all([getDiscovered(userId), getRoster(userId)]);
       const owned = new Set(roster.map((e) => e.character_slug));
       const open = discovered.filter((c) => !owned.has(c.slug));
+      const recruitMsg = `Who are we signing? Use \`\`\`.precruit <name>\`\`\`.\n${open.map((c) => `• **${c.name}**: ${coins(c.recruit_price)}`).join('\n')}`;
+      const noTalentMsg = `Nobody scouted is waiting to be signed. Use \`\`\`.pscout\`\`\` to find talent.`;
       await message.reply(
-        open.length
-          ? `Who are we signing? Use \`.precruit <name>\`.\n${open.map((c) => `• **${c.name}**: ${coins(c.recruit_price)}`).join('\n')}`
-          : 'Nobody scouted is waiting to be signed. Use `.pscout` to find talent.'
+        open.length ? recruitMsg : noTalentMsg
       );
       return;
     }
 
     const matches = await findDiscoveredByName(userId, query);
     if (matches.length === 0) {
-      await message.reply("Bob Kun doesn't know that name. You can only recruit talent you've scouted, so try `.pscout`.");
+      await message.reply("Bob Kun doesn't know that name. You can only recruit talent you've scouted, so try **__`.pscout`__**.");
       return;
     }
     const { one, ambiguous } = resolveOne(matches, query);
@@ -419,11 +420,11 @@ export async function handlePworkCommand(message: Message, args: string[]): Prom
       const available = roster.filter((e) => e.status === 'resting' && currentStamina(e, now) > 0);
       const out = roster.filter((e) => e.status === 'working').length;
       if (roster.length === 0) {
-        await message.reply('You have no talent yet. Use `.pscout` first.');
+        await message.reply('You have no talent yet. Use **__`.pscout`__** first.');
         return;
       }
       await message.reply(
-        `Who's clocking in? Use \`.pwork <name>\`. (${out}/${MAX_WORKING} out)\n` +
+        `Who's clocking in? Use \`\`\`.pwork <name>\`\`\`. (${out}/${MAX_WORKING} out)\n` +
           (available.length
             ? available.map((e) => `• **${e.character.name}** (${e.tier.label} Lv${e.level}): stamina ${currentStamina(e, now)}/100`).join('\n')
             : 'Nobody is free right now.')
@@ -433,7 +434,7 @@ export async function handlePworkCommand(message: Message, args: string[]): Prom
 
     const matches = await findRosterByName(userId, query);
     if (matches.length === 0) {
-      await message.reply("Nobody on your roster goes by that name. Check `.plist`.");
+      await message.reply("Nobody on your roster goes by that name. Check **__`.plist`__**.");
       return;
     }
     const { one, ambiguous } = resolveOne(
@@ -453,7 +454,7 @@ export async function handlePworkCommand(message: Message, args: string[]): Prom
     const e = result.entry;
     await message.reply(
       `💼 **${e.character.name}** is out working (${result.workingNow}/${MAX_WORKING} out). ${pick(LINES.work)}\n` +
-        `Earns ${coins(payoutPerBlock(e.character, e.level))} per 30 min, up to 2 hours. Use \`.pcollect\` to cash in.`
+        `Earns ${coins(payoutPerBlock(e.character, e.level))} per 30 min, up to 2 hours. Use \`\`\`.pcollect\`\`\` to cash in.`
     );
   } catch (error) {
     await ErrorHandler.handleMessageError(message, error, 'pwork command');
@@ -539,7 +540,7 @@ export async function handleAgencyInteraction(interaction: any): Promise<void> {
   const arg = isOwner ? rest.slice(prefix.length) : rest.slice(rest.indexOf('_') + 1);
 
   if (!isOwner || ownerId !== interaction.user.id) {
-    await interaction.reply({ content: "Hands off, those aren't your contracts. Run `.plist` for your own agency.", ephemeral: true });
+    await interaction.reply({ content: "Hands off, those aren't your contracts. Run **__`.plist`__** for your own agency.", ephemeral: true });
     return;
   }
   if (!isTalentAgencyChannel(interaction.channelId)) {
@@ -673,6 +674,6 @@ export async function handleAgencyInteraction(interaction: any): Promise<void> {
     }
 
     default:
-      await tell(interaction, 'Bob Kun does not recognise that button. Run `.plist` again.');
+      await tell(interaction, 'Bob Kun does not recognise that button. Run **__`.plist`__** again.');
   }
 }

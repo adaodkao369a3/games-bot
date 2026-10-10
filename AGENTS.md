@@ -1,6 +1,6 @@
-# AGENTS.md - Bob Kun Discord Bot
+# AGENTS.md - Bombo Games Discord Bot
 
-This file contains project-specific instructions for AI coding agents working on the Bob Kun Discord Bot. These rules are based on the actual repository structure and verified behavior.
+This file contains project-specific instructions for AI coding agents working on the Bombo Games Discord Bot. These rules are based on the actual repository structure and verified behavior.
 
 ## A. Project Architecture
 
@@ -73,8 +73,9 @@ Button interactions are routed in `discord/client.ts` by checking `customId` pre
 ### Channel Restrictions
 Some commands are restricted to specific channels (checked in `config/index.ts`):
 - `isGameFloorChannel()`: Commands like .bj, .hlow, .croulette, .bomb only work in game floor channels
-- `isTalentAgencyChannel()`: Talent Agency commands (.pscout, .precruit, .pwork, .pcollect, .plist) only work in talent agency channel
-- `isGoonEdgeChannel()`: .goon and .edge commands only work in goon/edge channel
+- `isTalentAgencyChannel()`: Talent Agency commands (.pscout, .precruit, .pwork, .pcollect, .plist) only work in talent agency channels
+- `isGoonEdgeChannel()`: .goon and .edge commands only work in goon/edge channels
+- Multiple channels can be configured for each channel type by adding their IDs to the respective arrays in config
 
 ### Game State Management
 - Games use in-memory Maps to track active games (e.g., `activeGames` Map in pisscomp.ts)

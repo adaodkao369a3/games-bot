@@ -13,8 +13,8 @@ export const config = {
     url: process.env.DATABASE_URL || '',
   },
   gameFloorChannelIds: ['1542311921007460542', '1535286802871623831'],
-  talentAgencyChannelId: '1556596417110220871',
-  goonEdgeChannelId: '1556970586767622287',
+  talentAgencyChannelIds: ['1556596417110220871', '1535286802871623831'],
+  goonEdgeChannelIds: ['1556970586767622287', '1535286802871623831'],
 };
 
 /**
@@ -25,17 +25,17 @@ export function isGameFloorChannel(channelId: string): boolean {
 }
 
 /**
- * Check if a channel ID is the talent agency channel
+ * Check if a channel ID is in the allowed talent agency channels
  */
 export function isTalentAgencyChannel(channelId: string): boolean {
-  return channelId === config.talentAgencyChannelId;
+  return config.talentAgencyChannelIds.includes(channelId);
 }
 
 /**
- * Check if a channel ID is the goon/edge channel
+ * Check if a channel ID is in the allowed goon/edge channels
  */
 export function isGoonEdgeChannel(channelId: string): boolean {
-  return channelId === config.goonEdgeChannelId;
+  return config.goonEdgeChannelIds.includes(channelId);
 }
 
 export function validateConfig(): void {

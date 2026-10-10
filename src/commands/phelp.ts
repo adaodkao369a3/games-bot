@@ -1,11 +1,12 @@
 import { Message, EmbedBuilder } from 'discord.js';
-import { config, isTalentAgencyChannel } from '../config/index.js';
+import { config, isTalentAgencyChannel, isGameFloorChannel, isGoonEdgeChannel } from '../config/index.js';
 
 const COIN = '<:bombocoin:1545139736312815840>';
 
 export async function handlePhelpCommand(message: Message): Promise<void> {
-  if (!isTalentAgencyChannel(message.channel.id)) {
-    await message.reply(`This command can only be used in <#${config.talentAgencyChannelId}>.`);
+  if (!isTalentAgencyChannel(message.channel.id) && !isGameFloorChannel(message.channel.id) && !isGoonEdgeChannel(message.channel.id)) {
+    const allChannels = [...config.talentAgencyChannelIds, ...config.gameFloorChannelIds, ...config.goonEdgeChannelIds];
+    await message.reply(`This command can only be used in ${allChannels.map(id => `<#${id}>`).join(', ')}.`);
     return;
   }
 
