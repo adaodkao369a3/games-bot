@@ -14,7 +14,8 @@ export async function handleHighscoreCommand(message: Message): Promise<void> {
   try {
     // Check if command is used in game floor channel or talent agency channel
     if (!isGameFloorChannel(message.channel.id) && !isTalentAgencyChannel(message.channel.id)) {
-      await message.reply(`This command can only be used in <#${config.gameFloorChannelIds[0]}> or <#${config.talentAgencyChannelId}>.`);
+      const allChannels = [...config.gameFloorChannelIds, ...config.talentAgencyChannelIds];
+      await message.reply(`This command can only be used in ${allChannels.map(id => `<#${id}>`).join(', ')}.`);
       return;
     }
 

@@ -6,7 +6,8 @@ import { config, isGameFloorChannel, isTalentAgencyChannel, isGoonEdgeChannel } 
 export async function handleWalletCommand(message: Message, args: string[] = []): Promise<void> {
   // Check if command is used in game floor channel, talent agency channel, or goon/edge channel
   if (!isGameFloorChannel(message.channel.id) && !isTalentAgencyChannel(message.channel.id) && !isGoonEdgeChannel(message.channel.id)) {
-    await message.reply(`This command can only be used in <#${config.gameFloorChannelIds[0]}>, <#${config.talentAgencyChannelId}>, or <#${config.goonEdgeChannelId}>.`);
+    const allChannels = [...config.gameFloorChannelIds, ...config.talentAgencyChannelIds, ...config.goonEdgeChannelIds];
+    await message.reply(`This command can only be used in ${allChannels.map(id => `<#${id}>`).join(', ')}.`);
     return;
   }
   let userId = message.author.id;

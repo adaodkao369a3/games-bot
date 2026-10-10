@@ -4,41 +4,35 @@ import { isStaff } from '../utils/permissions.js';
 
 /**
  * Handle the redirect command - Toggle quote redirect on/off
+ * Usage: .redirect on | .redirect off | .redirect (to check status)
  */
 export async function handleRedirectCommand(message: Message, args: string[]): Promise<void> {
   try {
     // Only staff can use this command
     if (!isStaff(message.member)) {
-      await message.reply('❌ Only staff members can use this command.');
+      await message.reply('<:cross:1558430092043096154> Only staff members can use this command.');
       return;
     }
 
     // Check if in a guild
     if (!message.guild) {
-      await message.reply('❌ This command can only be used in a server.');
+      await message.reply('<:cross:1558430092043096154> This command can only be used in a server.');
       return;
     }
 
-    // Check if argument is provided
+    // Check if argument is provided - if not, show current status
     if (args.length === 0) {
       const currentSettings = await getQuoteRedirectSettings(message.guild.id);
       const status = currentSettings.redirect_enabled ? 'ON' : 'OFF';
-      await message.reply(`📋 Quote redirect is currently **${status}** for this server.\n\nUsage: \`$redirect quote on\` or \`$redirect quote off\``);
+      await message.reply(`📋 Quote redirect is currently **${status}** for this server.\n\nUsage: \`.redirect on\` or \`.redirect off\``);
       return;
     }
 
     const action = args[0].toLowerCase();
-    const type = args[1]?.toLowerCase();
-
-    // Validate command format
-    if (type !== 'quote') {
-      await message.reply('❌ Invalid redirect type. Usage: `$redirect quote on` or `$redirect quote off`');
-      return;
-    }
 
     // Validate action
     if (action !== 'on' && action !== 'off') {
-      await message.reply('❌ Invalid action. Use `on` or `off`. Usage: `$redirect quote on` or `$redirect quote off`');
+      await message.reply('<:cross:1558430092043096154> Invalid action. Use `on` or `off`. Usage: `.redirect on` or `.redirect off`');
       return;
     }
 
@@ -47,12 +41,12 @@ export async function handleRedirectCommand(message: Message, args: string[]): P
 
     if (success) {
       const statusText = newStatus ? 'ON' : 'OFF';
-      await message.reply(`✅ Quote redirect has been turned **${statusText}** for this server.`);
+      await message.reply(`<:tick:1558430105120804884> Quote redirect has been turned **${statusText}** for this server.`);
     } else {
-      await message.reply('❌ Failed to update quote redirect settings. Please try again.');
+      await message.reply('<:cross:1558430092043096154> Failed to update quote redirect settings. Please try again.');
     }
   } catch (error) {
     console.error('[Redirect Command] Error:', error);
-    await message.reply('❌ There was an error processing the redirect command. Please try again.');
+    await message.reply('<:cross:1558430092043096154> There was an error processing the redirect command. Please try again.');
   }
 }

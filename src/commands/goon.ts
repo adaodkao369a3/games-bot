@@ -34,9 +34,10 @@ const GOON_RUSH_FLAVOR = '⚡ The power-up is doing WORK.';
 export async function handleGoonCommand(message: Message): Promise<void> {
   // Check if command is used in game floor channel, talent agency channel, or goon/edge channel
   if (!isGameFloorChannel(message.channel.id) && !isTalentAgencyChannel(message.channel.id) && !isGoonEdgeChannel(message.channel.id)) {
+    const allChannels = [...config.gameFloorChannelIds, ...config.talentAgencyChannelIds, ...config.goonEdgeChannelIds];
     const errorEmbed = new EmbedBuilder()
       .setTitle('❌ Wrong Channel')
-      .setDescription(`This command can only be used in <#${config.gameFloorChannelIds[0]}>, <#${config.talentAgencyChannelId}>, or <#${config.goonEdgeChannelId}>.`)
+      .setDescription(`This command can only be used in ${allChannels.map(id => `<#${id}>`).join(', ')}.`)
       .setColor(0xFF0000);
     await message.reply({ embeds: [errorEmbed] });
     return;
