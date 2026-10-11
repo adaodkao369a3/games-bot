@@ -1,7 +1,8 @@
-import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Guild, Client } from 'discord.js';
-import { awardCoins, removeCoins } from '../services/coins.js';
-import { getCoinBalanceInfo } from '../services/coins.js';
-import { getEmoji } from '../utils/emoji-resolver.js';
+import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Client } from 'discord.js';
+import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
+import { cardEmojiKey } from '../blackjack/CardDeck.js';
+import { CROSS, TICK, coins, signedCoins, mult, respond, nope } from '../utils/casino-ui.js';
 
 type HigherLowerState = 'idle' | 'playing' | 'complete' | 'cashout' | 'timeout';
 
@@ -15,6 +16,7 @@ interface Card {
 interface HigherLowerGameData {
   userId: string;
   username: string;
+  avatarUrl: string;
   channelId: string;
   guildId: string | undefined;
   betAmount: number;
@@ -87,7 +89,7 @@ function createDeck(): Card[] {
         rank: rank.name,
         suit: suit.name,
         value: rank.value,
-        emojiName: `${suit.emojiName}_${rank.name.toLowerCase()}`,
+        emojiName: cardEmojiKey(suit.emojiName, rank.name),
       });
     }
   }
@@ -120,15 +122,42 @@ function calculatePayout(bet: number, streak: number): number {
   return Math.floor(bet * multiplier);
 }
 
+const SUIT_SYMBOLS: Record<string, string> = {
+  Hearts: '♥',
+  Diamonds: '♦',
+  Clubs: '♣',
+  Spades: '♠',
+};
+
+const COLORS = {
+  playing: 0x3498db,
+  win: 0x2ecc71,
+  loss: 0xe74c3c,
+  push: 0xf1c40f,
+  cashout: 0xffd700,
+};
+
+function cardEmoji(card: Card): string {
+  return (EMOJIS as Record<string, string>)[card.emojiName] ?? '';
+}
+
+/** K♠ */
+function cardLabel(card: Card): string {
+  return `${card.rank}${SUIT_SYMBOLS[card.suit] ?? ''}`;
+}
+
 export class HigherLowerGame {
   private state: HigherLowerState = 'idle';
   private data: HigherLowerGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
+  // True while a click is being processed, so a double-click can't draw two cards
+  private busy = false;
 
-  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
+  constructor(userId: string, username: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null, avatarUrl: string = '') {
     this.data = {
       userId,
       username,
+      avatarUrl,
       channelId,
       guildId,
       betAmount,
@@ -156,11 +185,7 @@ export class HigherLowerGame {
     }
 
     if (coinInfo.balance < this.data.betAmount) {
-      const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
-      await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} ${coinEmoji}`
-      );
+      await message.reply(`Not enough coins. You need ${coins(this.data.betAmount)} (you have ${coins(coinInfo.balance)}).`);
       return;
     }
 
@@ -181,27 +206,19 @@ export class HigherLowerGame {
     }
 
     this.state = 'playing';
-    this.data.messageId = message.id;
-    this.data.message = message;
 
     // Draw first card
     this.data.currentCard = this.data.deck.pop()!;
 
-    const initialEmbed = await this.createGameEmbed('', this.data.client);
-    const row = this.createGameButtons();
-
     const sentMessage = await message.reply({
-      embeds: [initialEmbed],
-      components: [row],
+      embeds: [this.createGameEmbed()],
+      components: [this.createGameButtons()],
     });
 
     this.data.messageId = sentMessage.id;
     this.data.message = sentMessage;
 
-    // Set timeout
-    this.gameTimeout = setTimeout(() => {
-      this.timeoutGame(sentMessage);
-    }, GAME_CONFIG.timeoutMs);
+    this.armTimeout();
   }
 
   /**
@@ -210,30 +227,32 @@ export class HigherLowerGame {
   async handleInteraction(interaction: MessageComponentInteraction): Promise<void> {
     // Verify user
     if (interaction.user.id !== this.data.userId) {
-      await interaction.reply({
-        content: 'This is not your game!',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This is not your game!');
       return;
     }
 
-    const customId = interaction.customId;
+    if (this.busy) {
+      await interaction.deferUpdate().catch(() => {});
+      return;
+    }
 
-    switch (customId) {
-      case 'higherlower_higher':
-        await this.handlePrediction(interaction, 'higher');
-        break;
-      case 'higherlower_lower':
-        await this.handlePrediction(interaction, 'lower');
-        break;
-      case 'higherlower_cashout':
-        await this.handleCashout(interaction);
-        break;
-      default:
-        await interaction.reply({
-          content: 'Unknown action.',
-          ephemeral: true,
-        });
+    this.busy = true;
+    try {
+      switch (interaction.customId) {
+        case 'higherlower_higher':
+          await this.handlePrediction(interaction, 'higher');
+          break;
+        case 'higherlower_lower':
+          await this.handlePrediction(interaction, 'lower');
+          break;
+        case 'higherlower_cashout':
+          await this.handleCashout(interaction);
+          break;
+        default:
+          await nope(interaction, 'Unknown action.');
+      }
+    } finally {
+      this.busy = false;
     }
   }
 
@@ -242,59 +261,46 @@ export class HigherLowerGame {
    */
   private async handlePrediction(interaction: MessageComponentInteraction, prediction: 'higher' | 'lower'): Promise<void> {
     if (this.state !== 'playing') {
-      await interaction.reply({
-        content: 'Invalid action for current state.',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This game is over.');
+      return;
+    }
+
+    // Draw next card
+    const nextCard = this.data.deck.pop();
+    if (!nextCard) {
+      // Deck exhausted - auto cashout (or refund if nothing was won yet)
+      await this.handleCashout(interaction);
       return;
     }
 
     // Store previous card
     this.data.previousCard = this.data.currentCard;
-
-    // Draw next card
-    const nextCard = this.data.deck.pop();
-    if (!nextCard) {
-      // Deck exhausted - auto cashout
-      await this.handleCashout(interaction);
-      return;
-    }
-
     this.data.currentCard = nextCard;
 
     // Compare cards
     const result = this.compareCards(this.data.previousCard!, this.data.currentCard);
 
-    // Check for push (same rank)
+    // Same rank: nobody wins, nobody loses, carry on with the new card
     if (result === 'push') {
-      const embed = await this.createGameEmbed('Push! Same rank - continue with new card', this.data.client);
-      const row = this.createGameButtons();
-
-      await interaction.update({
-        embeds: [embed],
-        components: [row],
+      await respond(interaction, {
+        embeds: [this.createGameEmbed('push')],
+        components: [this.createGameButtons()],
       });
       return;
     }
 
-    // Check if prediction was correct
-    const correct = (prediction === 'higher' && result === 'higher') || (prediction === 'lower' && result === 'lower');
-
-    if (correct) {
+    if (prediction === result) {
       // Correct prediction
       this.data.streak++;
       this.data.currentPayout = calculatePayout(this.data.betAmount, this.data.streak);
 
-      const embed = await this.createGameEmbed('Correct!', this.data.client);
-      const row = this.createGameButtons();
-
-      await interaction.update({
-        embeds: [embed],
-        components: [row],
+      await respond(interaction, {
+        embeds: [this.createGameEmbed('correct')],
+        components: [this.createGameButtons()],
       });
     } else {
       // Incorrect prediction - game over
-      await this.endGame(interaction, false);
+      await this.endGame(interaction);
     }
   }
 
@@ -303,18 +309,12 @@ export class HigherLowerGame {
    */
   private async handleCashout(interaction: MessageComponentInteraction): Promise<void> {
     if (this.state !== 'playing') {
-      await interaction.reply({
-        content: 'Invalid action for current state.',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This game is over.');
       return;
     }
 
     if (this.data.streak < 1) {
-      await interaction.reply({
-        content: 'You need at least one correct prediction to cash out!',
-        ephemeral: true,
-      });
+      await nope(interaction, 'Get at least one right before cashing out!');
       return;
     }
 
@@ -334,17 +334,15 @@ export class HigherLowerGame {
     );
 
     if (awardResult === null) {
-      await interaction.update({
-        content: 'Failed to award winnings. Please contact support.',
-        components: [],
-      });
+      // Payout failed: put the game back so the player can try again instead of losing the bet.
+      this.state = 'playing';
+      this.armTimeout();
+      await nope(interaction, 'Could not pay out right now. Try cashing out again.');
       return;
     }
 
-    const embed = await this.createCashoutEmbed(this.data.client);
-
-    await interaction.update({
-      embeds: [embed],
+    await respond(interaction, {
+      embeds: [this.createCashoutEmbed()],
       components: [],
     });
   }
@@ -352,24 +350,21 @@ export class HigherLowerGame {
   /**
    * End the game (loss)
    */
-  private async endGame(interaction: MessageComponentInteraction, won: boolean): Promise<void> {
+  private async endGame(interaction: MessageComponentInteraction): Promise<void> {
     this.state = 'complete';
     this.clearTimeout();
 
-    if (!won) {
-      const embed = await this.createLossEmbed(this.data.client);
-
-      await interaction.update({
-        embeds: [embed],
-        components: [],
-      });
-    }
+    await respond(interaction, {
+      embeds: [this.createLossEmbed()],
+      components: [],
+    });
   }
 
   /**
    * Handle game timeout
    */
   private async timeoutGame(message: Message): Promise<void> {
+    if (this.state !== 'playing') return;
     this.state = 'timeout';
     this.clearTimeout();
 
@@ -384,12 +379,24 @@ export class HigherLowerGame {
       }
     );
 
-    const embed = this.createTimeoutEmbed();
+    const embed = new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl || undefined })
+      .setDescription(`${EMOJIS.alarm1} **Timed out** · ${coins(this.data.betAmount)} refunded`)
+      .setColor(COLORS.loss);
 
     await message.edit({
       embeds: [embed],
       components: [],
-    });
+    }).catch((error) => console.error('[HigherLower] Failed to edit timeout message:', error));
+  }
+
+  private armTimeout(): void {
+    this.clearTimeout();
+    this.gameTimeout = setTimeout(() => {
+      if (this.data.message) {
+        this.timeoutGame(this.data.message).catch((error) => console.error('[HigherLower] Timeout error:', error));
+      }
+    }, GAME_CONFIG.timeoutMs);
   }
 
   /**
@@ -411,86 +418,87 @@ export class HigherLowerGame {
   }
 
   /**
-   * Check if game is finished
+   * Check if game is finished. 'idle' counts too: if start() returned without
+   * dealing, the game never began and must not block the player.
    */
   isFinished(): boolean {
-    return this.state === 'complete' || this.state === 'cashout' || this.state === 'timeout';
+    return this.state === 'idle' || this.state === 'complete' || this.state === 'cashout' || this.state === 'timeout';
   }
 
   // Embed creation methods
 
-  private async createGameEmbed(statusMessage: string = '', client: Client | null = null): Promise<EmbedBuilder> {
-    const cardEmoji = await getEmoji(client, this.data.currentCard!.emojiName);
-    const multiplier = getMultiplier(this.data.streak);
-    const coinEmoji = await getEmoji(client, 'bombocoin');
-    
-    let description = `${cardEmoji}\n\n`;
-    description += `**${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji} • **Streak ${this.data.streak}** • **x${multiplier.toFixed(1)}**\n`;
-    description += `Win: **${this.data.currentPayout.toLocaleString('en-US')}** ${coinEmoji}`;
-
-    if (this.data.previousCard) {
-      const prevEmoji = await getEmoji(client, this.data.previousCard.emojiName);
-      description += `\n\n${prevEmoji}`;
+  /** previous + current card emojis and their labels, e.g. "<7♥><K♠> **7♥ → K♠**" */
+  private cardsLine(): string {
+    const cur = this.data.currentCard!;
+    const prev = this.data.previousCard;
+    if (!prev) {
+      return `${cardEmoji(cur)} **${cardLabel(cur)}**`;
     }
+    return `${cardEmoji(prev)}${cardEmoji(cur)} **${cardLabel(prev)} → ${cardLabel(cur)}**`;
+  }
 
-    if (statusMessage) {
-      description += `\n\n${statusMessage}`;
+  private createGameEmbed(status: 'correct' | 'push' | null = null): EmbedBuilder {
+    let description: string;
+    let color = COLORS.playing;
+
+    if (status === 'correct') {
+      description =
+        `${this.cardsLine()} ${TICK}\n` +
+        `${EMOJIS.fire} **${this.data.streak}** · ${mult(getMultiplier(this.data.streak))} · ${coins(this.data.currentPayout)}`;
+      color = COLORS.win;
+    } else if (status === 'push') {
+      description =
+        `${this.cardsLine()} ${EMOJIS.hand_emoji} same rank\n` +
+        `${EMOJIS.fire} **${this.data.streak}** · ${mult(getMultiplier(this.data.streak))} · ${coins(this.data.currentPayout)}`;
+      color = COLORS.push;
+    } else {
+      description = `${this.cardsLine()} · higher or lower?\n${coins(this.data.betAmount)}`;
     }
 
     return new EmbedBuilder()
-      .setTitle('🃏 HIGHER OR LOWER')
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl || undefined })
       .setDescription(description)
-      .setColor(0x3498db);
+      .setColor(color);
   }
 
-  private async createCashoutEmbed(client: Client | null = null): Promise<EmbedBuilder> {
+  private createCashoutEmbed(): EmbedBuilder {
     const netProfit = this.data.currentPayout - this.data.betAmount;
-    const coinEmoji = await getEmoji(client, 'bombocoin');
-    
+
     return new EmbedBuilder()
-      .setTitle('💰 CASHED OUT!')
-      .setDescription(`**Streak ${this.data.streak}**\n` +
-        `Won: **${this.data.currentPayout.toLocaleString('en-US')}** ${coinEmoji}\n` +
-        `Bet: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}\n` +
-        `Profit: **${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')}** ${coinEmoji}`)
-      .setColor(0xFFD700);
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl || undefined })
+      .setDescription(
+        `${EMOJIS.moneybag} **Cashed out** ${signedCoins(netProfit)}\n` +
+        `${this.cardsLine()} · ${EMOJIS.fire} **${this.data.streak}** · ${mult(getMultiplier(this.data.streak))}`
+      )
+      .setColor(COLORS.cashout);
   }
 
-  private async createLossEmbed(client: Client | null = null): Promise<EmbedBuilder> {
-    const cardEmoji = await getEmoji(client, this.data.currentCard!.emojiName);
-    const coinEmoji = await getEmoji(client, 'bombocoin');
-    
+  private createLossEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('💥 YOU LOST!')
-      .setDescription(`${cardEmoji}\n\n` +
-        `**Streak ${this.data.streak}**\n` +
-        `Lost: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}`)
-      .setColor(0xe74c3c);
-  }
-
-  private createTimeoutEmbed(): EmbedBuilder {
-    return new EmbedBuilder()
-      .setTitle('🃏 HIGHER OR LOWER')
-      .setDescription(`Game timed out. Your bet has been refunded.`)
-      .setColor(0xe74c3c);
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl || undefined })
+      .setDescription(
+        `${this.cardsLine()} ${CROSS}\n` +
+        `${signedCoins(-this.data.betAmount)}` +
+        (this.data.streak > 0 ? ` · ${EMOJIS.fire} **${this.data.streak}**` : '')
+      )
+      .setColor(COLORS.loss);
   }
 
   // Button creation methods
 
   private createGameButtons(): ActionRowBuilder<ButtonBuilder> {
     const row = new ActionRowBuilder<ButtonBuilder>();
-    
+
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('higherlower_higher')
-        .setLabel('HIGHER')
-        .setStyle(ButtonStyle.Primary)
-    );
-    
-    row.addComponents(
+        .setEmoji('⬆️')
+        .setLabel('Higher')
+        .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId('higherlower_lower')
-        .setLabel('LOWER')
+        .setEmoji('⬇️')
+        .setLabel('Lower')
         .setStyle(ButtonStyle.Primary)
     );
 
@@ -499,7 +507,8 @@ export class HigherLowerGame {
       row.addComponents(
         new ButtonBuilder()
           .setCustomId('higherlower_cashout')
-          .setLabel('CASH OUT')
+          .setEmoji(EMOJIS.moneybag)
+          .setLabel('Cash out')
           .setStyle(ButtonStyle.Success)
       );
     }

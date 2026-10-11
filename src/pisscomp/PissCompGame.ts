@@ -33,8 +33,12 @@ export interface PissCompResult {
 export class PissCompGame {
   private state: PissCompState;
   private currentMessage?: Message;
-  private onGameEnd?: () => void;
+  private onGameEnd?: (winnerId?: string) => void;
   private isPartOfMax: boolean = false;
+  // True during the 5 second pause after a draw. The game is NOT over then, it restarts.
+  private isResetting: boolean = false;
+  private idleTimeout?: NodeJS.Timeout;
+  private static readonly IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 
   // Game constants
   private static readonly MAX_METER = 100;
@@ -50,7 +54,7 @@ export class PissCompGame {
     guildId: string | undefined,
     player1: PissCompPlayer,
     player2: PissCompPlayer,
-    onGameEnd?: () => void,
+    onGameEnd?: (winnerId?: string) => void,
     isPartOfMax: boolean = false
   ) {
     this.state = {
@@ -77,13 +81,52 @@ export class PissCompGame {
     
     // Show initial game state
     await this.showGameState();
+    this.armIdleTimeout();
+  }
+
+  /**
+   * End the game if nobody pumps for a while, so the channel is never blocked forever.
+   */
+  private armIdleTimeout(): void {
+    if (this.idleTimeout) clearTimeout(this.idleTimeout);
+    this.idleTimeout = setTimeout(() => {
+      if (this.state.isGameOver) return;
+      this.state.isGameOver = true;
+      this.currentMessage?.edit({
+        embeds: [
+          new EmbedBuilder()
+            .setDescription('💤 Nobody pumped for a while, competition cancelled.')
+            .setColor(0x95a5a6),
+        ],
+        components: this.createDisabledPumpButtons(),
+      }).catch((error) => console.error('[PissCompGame] Failed to edit idle message:', error));
+      this.onGameEnd?.(undefined);
+    }, PissCompGame.IDLE_TIMEOUT_MS);
+  }
+
+  private clearIdleTimeout(): void {
+    if (this.idleTimeout) {
+      clearTimeout(this.idleTimeout);
+      this.idleTimeout = undefined;
+    }
   }
 
   /**
    * Handle button interaction
    */
   async handleInteraction(interaction: MessageComponentInteraction): Promise<void> {
-    if (this.state.isGameOver) return;
+    if (this.state.isGameOver) {
+      await interaction.reply({ content: 'This competition is over.', ephemeral: true }).catch(() => {});
+      return;
+    }
+
+    // Draw pause: acknowledge the click so Discord doesn't show "interaction failed", but ignore it.
+    if (this.isResetting) {
+      await interaction.deferUpdate().catch(() => {});
+      return;
+    }
+
+    this.armIdleTimeout();
 
     const userId = interaction.user.id;
     const customId = interaction.customId;
@@ -157,27 +200,30 @@ export class PissCompGame {
    * Handle a draw
    */
   private async handleDraw(interaction: MessageComponentInteraction): Promise<void> {
+    // A draw is NOT the end of the game: pause, then restart. Marking the game as "over" here
+    // made the command layer forget the game, so the restarted buttons did nothing.
     this.state.isDraw = true;
-    this.state.isGameOver = true;
-
-    const drawEmbed = this.createDrawEmbed();
+    this.isResetting = true;
 
     await interaction.update({
-      embeds: [drawEmbed],
+      embeds: [this.createDrawEmbed()],
       components: this.createDisabledPumpButtons(),
     });
 
     // Wait 5 seconds then restart
     await this.delay(5000);
 
-    // Reset game state
-    this.state.player1Meter = 0;
-    this.state.player2Meter = 0;
-    this.state.isGameOver = false;
-    this.state.isDraw = false;
+    try {
+      // Reset game state
+      this.state.player1Meter = 0;
+      this.state.player2Meter = 0;
+      this.state.isDraw = false;
 
-    // Restart the game
-    await this.showGameState();
+      // Restart the game
+      await this.showGameState();
+    } finally {
+      this.isResetting = false;
+    }
   }
 
   /**
@@ -186,25 +232,28 @@ export class PissCompGame {
   private async handleVictory(winnerId: string, loserId: string, interaction: MessageComponentInteraction): Promise<void> {
     this.state.winner = winnerId;
     this.state.isGameOver = true;
+    this.clearIdleTimeout();
 
-    const victoryEmbed = this.createVictoryEmbed(winnerId, loserId);
+    try {
+      const victoryEmbed = this.createVictoryEmbed(winnerId, loserId);
 
-    await interaction.update({
-      embeds: [victoryEmbed],
-      components: this.createDisabledPumpButtons(),
-    });
+      await interaction.update({
+        embeds: [victoryEmbed],
+        components: this.createDisabledPumpButtons(),
+      });
 
-    // Award Bombo Coins to the winner (only on victory, not on draw, and NOT if part of PissCompMax)
-    if (!this.isPartOfMax && this.currentMessage?.channel) {
-      console.log(`[PissCompGame] Awarding 900 coins to winner ${winnerId}`);
-      await awardGameReward(winnerId, 900, 'Piss Comp', this.currentMessage.channel as TextChannel, this.state.gameInstanceId);
-    } else {
-      console.log(`[PissCompGame] Skipping coin reward - isPartOfMax: ${this.isPartOfMax}`);
-    }
-
-    // Call cleanup callback to remove game from active games
-    if (this.onGameEnd) {
-      this.onGameEnd();
+      // Award Bombo Coins to the winner (only on victory, not on draw, and NOT if part of PissCompMax)
+      if (!this.isPartOfMax && this.currentMessage?.channel) {
+        console.log(`[PissCompGame] Awarding 900 coins to winner ${winnerId}`);
+        await awardGameReward(winnerId, 900, 'Piss Comp', this.currentMessage.channel as TextChannel, this.state.gameInstanceId);
+      } else {
+        console.log(`[PissCompGame] Skipping coin reward - isPartOfMax: ${this.isPartOfMax}`);
+      }
+    } finally {
+      // Always release the channel (and hand over to Piss Comp Max), even if Discord errored above
+      if (this.onGameEnd) {
+        this.onGameEnd(winnerId);
+      }
     }
   }
 

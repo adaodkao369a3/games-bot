@@ -1,8 +1,8 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Client } from 'discord.js';
-import { awardCoins, removeCoins } from '../services/coins.js';
-import { getCoinBalanceInfo } from '../services/coins.js';
-import { Card, createDeck, calculateHandTotal, isBlackjack, isBust, formatCard, formatHand } from './CardDeck.js';
-import { getEmoji } from '../utils/emoji-resolver.js';
+import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
+import { Card, createDeck, calculateHandTotal, isBlackjack, isBust, formatHand } from './CardDeck.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
+import { CROSS, TICK, coins, signedCoins, respond, nope } from '../utils/casino-ui.js';
 
 type BlackjackState = 'idle' | 'playing' | 'dealer_turn' | 'complete' | 'timeout';
 
@@ -31,10 +31,21 @@ const GAME_CONFIG = {
   timeoutMs: 5 * 60 * 1000, // 5 minutes
 };
 
+const COLORS = {
+  playing: 0x3498db,
+  win: 0x2ecc71,
+  lose: 0xe74c3c,
+  push: 0xffd700,
+};
+
+type BlackjackResult = 'win' | 'lose' | 'push' | 'bust';
+
 export class BlackjackGame {
   private state: BlackjackState = 'idle';
   private data: BlackjackGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
+  // True while a click is being processed, so a double-click can't draw two cards
+  private busy = false;
 
   constructor(userId: string, username: string, avatarUrl: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
     this.data = {
@@ -67,11 +78,7 @@ export class BlackjackGame {
     }
 
     if (coinInfo.balance < this.data.betAmount) {
-      const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
-      await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} ${coinEmoji}`
-      );
+      await message.reply(`Not enough coins. You need ${coins(this.data.betAmount)} (you have ${coins(coinInfo.balance)}).`);
       return;
     }
 
@@ -92,8 +99,6 @@ export class BlackjackGame {
     }
 
     this.state = 'playing';
-    this.data.messageId = message.id;
-    this.data.message = message;
 
     // Deal initial cards
     this.data.playerHand.push(this.data.deck.pop()!);
@@ -101,27 +106,24 @@ export class BlackjackGame {
     this.data.dealerHand.push(this.data.deck.pop()!);
     this.data.dealerHand.push(this.data.deck.pop()!);
 
-    const initialEmbed = await this.createGameEmbed();
-    const row = this.createGameButtons();
+    // Natural blackjack: settle straight away, no buttons, no timeout
+    if (isBlackjack(this.data.playerHand)) {
+      const sent = await this.settleNaturalBlackjack(message);
+      this.data.message = sent;
+      return;
+    }
 
     const sentMessage = await message.reply({
-      embeds: [initialEmbed],
-      components: [row],
+      embeds: [await this.createGameEmbed()],
+      components: [this.createGameButtons()],
     });
 
     this.data.messageId = sentMessage.id;
     this.data.message = sentMessage;
 
-    // Set timeout
     this.gameTimeout = setTimeout(() => {
-      this.timeoutGame(sentMessage);
+      this.timeoutGame(sentMessage).catch((error) => console.error('[Blackjack] Timeout error:', error));
     }, GAME_CONFIG.timeoutMs);
-
-    // Check for natural blackjack
-    if (isBlackjack(this.data.playerHand)) {
-      await this.handleNaturalBlackjack();
-      return;
-    }
   }
 
   /**
@@ -130,30 +132,32 @@ export class BlackjackGame {
   async handleInteraction(interaction: MessageComponentInteraction): Promise<void> {
     // Verify user
     if (interaction.user.id !== this.data.userId) {
-      await interaction.reply({
-        content: 'This is not your game!',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This is not your game!');
       return;
     }
 
-    const customId = interaction.customId;
+    if (this.busy) {
+      await interaction.deferUpdate().catch(() => {});
+      return;
+    }
 
-    switch (customId) {
-      case 'bj_hit':
-        await this.handleHit(interaction);
-        break;
-      case 'bj_stand':
-        await this.handleStand(interaction);
-        break;
-      case 'bj_double':
-        await this.handleDouble(interaction);
-        break;
-      default:
-        await interaction.reply({
-          content: 'Unknown action.',
-          ephemeral: true,
-        });
+    this.busy = true;
+    try {
+      switch (interaction.customId) {
+        case 'bj_hit':
+          await this.handleHit(interaction);
+          break;
+        case 'bj_stand':
+          await this.handleStand(interaction);
+          break;
+        case 'bj_double':
+          await this.handleDouble(interaction);
+          break;
+        default:
+          await nope(interaction, 'Unknown action.');
+      }
+    } finally {
+      this.busy = false;
     }
   }
 
@@ -162,10 +166,7 @@ export class BlackjackGame {
    */
   private async handleHit(interaction: MessageComponentInteraction): Promise<void> {
     if (this.state !== 'playing') {
-      await interaction.reply({
-        content: 'Invalid action for current state.',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This game is over.');
       return;
     }
 
@@ -176,9 +177,8 @@ export class BlackjackGame {
     if (isBust(this.data.playerHand)) {
       this.state = 'complete';
       this.clearTimeout();
-      const embed = await this.createBustEmbed(this.data.client);
-      await interaction.update({
-        embeds: [embed],
+      await respond(interaction, {
+        embeds: [await this.createResultEmbed('bust', 0)],
         components: [],
       });
       return;
@@ -191,11 +191,9 @@ export class BlackjackGame {
     }
 
     // Continue playing
-    const embed = await this.createGameEmbed(this.data.client);
-    const row = this.createGameButtons();
-    await interaction.update({
-      embeds: [embed],
-      components: [row],
+    await respond(interaction, {
+      embeds: [await this.createGameEmbed()],
+      components: [this.createGameButtons()],
     });
   }
 
@@ -204,10 +202,7 @@ export class BlackjackGame {
    */
   private async handleStand(interaction: MessageComponentInteraction): Promise<void> {
     if (this.state !== 'playing') {
-      await interaction.reply({
-        content: 'Invalid action for current state.',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This game is over.');
       return;
     }
 
@@ -220,29 +215,20 @@ export class BlackjackGame {
    */
   private async handleDouble(interaction: MessageComponentInteraction): Promise<void> {
     if (this.state !== 'playing') {
-      await interaction.reply({
-        content: 'Invalid action for current state.',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This game is over.');
       return;
     }
 
     // Only allow double on initial hand
     if (this.data.playerHand.length !== 2) {
-      await interaction.reply({
-        content: 'You can only double on your initial hand.',
-        ephemeral: true,
-      });
+      await nope(interaction, 'You can only double on your first two cards.');
       return;
     }
 
     // Check if user has enough coins for double
     const coinInfo = await getCoinBalanceInfo(this.data.userId);
     if (!coinInfo || coinInfo.balance < this.data.betAmount) {
-      await interaction.reply({
-        content: 'You don\'t have enough coins to double down.',
-        ephemeral: true,
-      });
+      await nope(interaction, "You don't have enough coins to double down.");
       return;
     }
 
@@ -258,10 +244,7 @@ export class BlackjackGame {
     );
 
     if (deduction === null) {
-      await interaction.reply({
-        content: 'Failed to process double down wager.',
-        ephemeral: true,
-      });
+      await nope(interaction, 'Failed to process the double down.');
       return;
     }
 
@@ -275,9 +258,8 @@ export class BlackjackGame {
     if (isBust(this.data.playerHand)) {
       this.state = 'complete';
       this.clearTimeout();
-      const embed = await this.createBustEmbed(this.data.client);
-      await interaction.update({
-        embeds: [embed],
+      await respond(interaction, {
+        embeds: [await this.createResultEmbed('bust', 0)],
         components: [],
       });
       return;
@@ -312,7 +294,7 @@ export class BlackjackGame {
     const playerBlackjack = isBlackjack(this.data.playerHand);
     const dealerBlackjack = isBlackjack(this.data.dealerHand);
 
-    let result: 'win' | 'lose' | 'push';
+    let result: BlackjackResult;
     let payout = 0;
 
     if (playerBlackjack && !dealerBlackjack) {
@@ -324,7 +306,7 @@ export class BlackjackGame {
       result = 'win';
       payout = this.data.betAmount * 2;
     } else if (isBust(this.data.playerHand)) {
-      result = 'lose';
+      result = 'bust';
     } else if (playerTotal > dealerTotal) {
       result = 'win';
       payout = this.data.betAmount * 2;
@@ -335,7 +317,7 @@ export class BlackjackGame {
       payout = this.data.betAmount;
     }
 
-    if (result === 'win' || result === 'push') {
+    if (payout > 0) {
       await awardCoins(
         this.data.userId,
         payout,
@@ -348,22 +330,21 @@ export class BlackjackGame {
       );
     }
 
-    const embed = await this.createResultEmbed(result, payout, playerTotal, dealerTotal, this.data.client);
-    await interaction.update({
-      embeds: [embed],
+    await respond(interaction, {
+      embeds: [await this.createResultEmbed(result, payout)],
       components: [],
     });
   }
 
   /**
-   * Handle natural blackjack
+   * Natural blackjack on the deal: pay out and show the result directly.
    */
-  private async handleNaturalBlackjack(): Promise<void> {
+  private async settleNaturalBlackjack(message: Message): Promise<Message> {
     this.state = 'complete';
 
     const dealerBlackjack = isBlackjack(this.data.dealerHand);
     let result: 'win' | 'push';
-    let payout = 0;
+    let payout: number;
 
     if (dealerBlackjack) {
       result = 'push';
@@ -384,9 +365,8 @@ export class BlackjackGame {
       }
     );
 
-    const embed = await this.createResultEmbed(result, payout, calculateHandTotal(this.data.playerHand), calculateHandTotal(this.data.dealerHand), this.data.client);
-    await this.data.message?.edit({
-      embeds: [embed],
+    return message.reply({
+      embeds: [await this.createResultEmbed(result, payout)],
       components: [],
     });
   }
@@ -395,6 +375,8 @@ export class BlackjackGame {
    * Handle game timeout
    */
   private async timeoutGame(message: Message): Promise<void> {
+    // Only an unfinished game may time out (never refund a game that already paid out)
+    if (this.state !== 'playing') return;
     this.state = 'timeout';
     this.clearTimeout();
 
@@ -411,17 +393,13 @@ export class BlackjackGame {
 
     const embed = new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('🃏 BLACKJACK')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Game timed out.**\n\n` +
-        `Your bet has been refunded.\n\n` +
-        `━━━━━━━━━━━━━━`)
-      .setColor(0xe74c3c);
+      .setDescription(`${EMOJIS.alarm1} **Timed out** · ${coins(this.data.betAmount)} refunded`)
+      .setColor(COLORS.lose);
 
     await message.edit({
       embeds: [embed],
       components: [],
-    });
+    }).catch((error) => console.error('[Blackjack] Failed to edit timeout message:', error));
   }
 
   /**
@@ -435,63 +413,69 @@ export class BlackjackGame {
   }
 
   /**
-   * Check if game is finished
+   * Check if game is finished. 'idle' counts too: if start() returned without
+   * dealing, the game never began and must not block the player.
    */
   isFinished(): boolean {
-    return this.state === 'complete' || this.state === 'timeout';
+    return this.state === 'idle' || this.state === 'complete' || this.state === 'timeout';
   }
 
   // Embed creation methods
 
-  private async createGameEmbed(client: Client | null = null): Promise<EmbedBuilder> {
+  private async createGameEmbed(): Promise<EmbedBuilder> {
     const playerTotal = calculateHandTotal(this.data.playerHand);
-    const dealerShowing = this.data.dealerHand[0].value;
-    const coinEmoji = await getEmoji(client, 'bombocoin');
+    const dealerShowing = this.data.dealerHand[0].value === 1 ? 11 : this.data.dealerHand[0].value;
+
+    const playerCards = await formatHand(this.data.playerHand, false);
+    const dealerCards = await formatHand(this.data.dealerHand, true);
+
+    const description =
+      `**You** · **${playerTotal}** · ${coins(this.data.betAmount)}\n` +
+      `${playerCards}\n` +
+      `**Dealer** · **${dealerShowing}**\n` +
+      `${dealerCards}`;
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('🃏 BLACKJACK')
-      .setDescription(`${await formatHand(this.data.playerHand, false, client)} **${playerTotal}**\n\n` +
-        `${await formatHand(this.data.dealerHand, true, client)} **${dealerShowing}**\n\n` +
-        `**${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}`)
-      .setColor(0x3498db);
+      .setDescription(description)
+      .setColor(COLORS.playing);
   }
 
-  private async createBustEmbed(client: Client | null = null): Promise<EmbedBuilder> {
+  private async createResultEmbed(result: BlackjackResult, payout: number): Promise<EmbedBuilder> {
     const playerTotal = calculateHandTotal(this.data.playerHand);
     const dealerTotal = calculateHandTotal(this.data.dealerHand);
-    const coinEmoji = await getEmoji(client, 'bombocoin');
+    const net = payout - this.data.betAmount;
 
-    return new EmbedBuilder()
-      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('💥 BUST')
-      .setDescription(`${await formatHand(this.data.playerHand, false, client)} **${playerTotal}**\n\n` +
-        `${await formatHand(this.data.dealerHand, false, client)} **${dealerTotal}**\n\n` +
-        `Lost: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}`)
-      .setColor(0xe74c3c);
-  }
-
-  private async createResultEmbed(result: 'win' | 'lose' | 'push', payout: number, playerTotal: number, dealerTotal: number, client: Client | null = null): Promise<EmbedBuilder> {
-    const title = result === 'win' ? '🎉 YOU WIN!' : result === 'lose' ? '💀 YOU LOSE' : '🤝 PUSH';
-    const color = result === 'win' ? 0x00ff00 : result === 'lose' ? 0xe74c3c : 0xFFD700;
-    const coinEmoji = await getEmoji(client, 'bombocoin');
-
-    let description = `${await formatHand(this.data.playerHand, false, client)} **${playerTotal}**\n\n` +
-      `${await formatHand(this.data.dealerHand, false, client)} **${dealerTotal}**\n\n`;
+    let headline: string;
+    let color: number;
 
     if (result === 'win') {
-      const netProfit = payout - this.data.betAmount;
-      description += `+${payout.toLocaleString('en-US')} ${coinEmoji}\n` +
-        `Profit: +${netProfit.toLocaleString('en-US')} ${coinEmoji}`;
-    } else if (result === 'lose') {
-      description += `Lost: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}`;
+      const label = isBlackjack(this.data.playerHand) ? 'BLACKJACK' : 'WIN';
+      headline = `${TICK} **${label}** ${signedCoins(net)}`;
+      color = COLORS.win;
+    } else if (result === 'push') {
+      headline = `${EMOJIS.hand_emoji} **PUSH** · ${coins(payout)} back`;
+      color = COLORS.push;
+    } else if (result === 'bust') {
+      headline = `${EMOJIS.fire} **BUST** ${signedCoins(-this.data.betAmount)}`;
+      color = COLORS.lose;
     } else {
-      description += `Returned: **${payout.toLocaleString('en-US')}** ${coinEmoji}`;
+      headline = `${CROSS} **LOSE** ${signedCoins(-this.data.betAmount)}`;
+      color = COLORS.lose;
     }
+
+    const playerCards = await formatHand(this.data.playerHand, false);
+    const dealerCards = await formatHand(this.data.dealerHand, false);
+
+    const description =
+      `${headline}\n` +
+      `**You** · **${playerTotal}**\n` +
+      `${playerCards}\n` +
+      `**Dealer** · **${dealerTotal}**\n` +
+      `${dealerCards}`;
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle(title)
       .setDescription(description)
       .setColor(color);
   }
@@ -500,19 +484,18 @@ export class BlackjackGame {
 
   private createGameButtons(): ActionRowBuilder<ButtonBuilder> {
     const row = new ActionRowBuilder<ButtonBuilder>();
-    
+
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('bj_hit')
-        .setLabel('HIT')
-        .setStyle(ButtonStyle.Primary)
-    );
-    
-    row.addComponents(
+        .setEmoji(EMOJIS.cards)
+        .setLabel('Hit')
+        .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId('bj_stand')
-        .setLabel('STAND')
-        .setStyle(ButtonStyle.Primary)
+        .setEmoji(EMOJIS.tick)
+        .setLabel('Stand')
+        .setStyle(ButtonStyle.Secondary)
     );
 
     // Only allow double on initial hand
@@ -520,7 +503,8 @@ export class BlackjackGame {
       row.addComponents(
         new ButtonBuilder()
           .setCustomId('bj_double')
-          .setLabel('DOUBLE')
+          .setEmoji(EMOJIS.two)
+          .setLabel('Double')
           .setStyle(ButtonStyle.Success)
       );
     }

@@ -3,6 +3,8 @@ import { getCoinBalanceInfo, removeCoins, awardCoins } from '../services/coins.j
 import { ErrorHandler } from '../utils/error-handler.js';
 import { parseWagerAmount } from '../utils/wager-parser.js';
 import { config, isGameFloorChannel } from '../config/index.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
+import { CROSS, TICK, coins, signedCoins } from '../utils/casino-ui.js';
 
 const SLOT_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>', '<:slotsstrawberry:1545161917834993804>'];
 const WIN_SYMBOL = '<:slotsseven:1545161915649753119>';
@@ -86,11 +88,16 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
   // Check if user has enough coins
   if (coinInfo.balance < wager) {
     await message.reply(
-      `You don't have enough Bombo Coins! Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
+      `Not enough coins. You have ${coins(coinInfo.balance)}.\n` +
       `Tip: use \`.gamble all\` to wager your entire balance.`
     );
     return;
   }
+
+  // Money tracking, so the error handler only refunds a wager that was really taken
+  // and not yet settled (no free coins if the first message fails, no double pay after a win).
+  let charged = false;
+  let settled = false;
 
   try {
     const balanceBefore = coinInfo.balance;
@@ -138,10 +145,11 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
 
     if (deductionResult === null) {
       console.error(`[GAMBLE] Failed to deduct wager for user ${userId}. Amount: ${wager}`);
-      await message.reply('Failed to process your wager. This may be due to a database connection issue. Please try again in a moment.');
+      await initialMessage.edit({ content: 'Failed to process your wager (not enough coins, or a database hiccup). Please try again.' });
       return;
     }
 
+    charged = true;
     const balanceAfterDeduction = deductionResult;
 
     await initialMessage.edit(progressiveReelFrame(symbol1, null, null));
@@ -191,36 +199,46 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
           await message.reply('Failed to process your winnings due to a database issue. Your wager has been refunded. Please try again.');
         }
 
+        settled = true;
         return;
       }
 
+      settled = true;
       const balanceAfter = balanceAfterDeduction + payout;
 
-      // Edit message with win result embed
+      // Edit message with win result embed (net profit; the reels move into the embed)
+      const net = payout - wager;
       const winResultEmbed = new EmbedBuilder()
         .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
-        .setTitle('The results are...')
-        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n${jackpot ? '🎰 **JACKPOT!!!** 🎰' : '<a:win:1545165325614583888> **YOU WON!!**'}\n\n**Bet:** ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n**Total Payout:** +${payout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>${jackpot ? '\n\n🌟 **10X MULTIPLIER!** 🌟' : ''}`)
-        .setColor(jackpot ? 0xFFD700 : 0x00FF00);
+        .setDescription(
+          `${symbol1} ${symbol2} ${symbol3}\n` +
+          (jackpot
+            ? `${EMOJIS.win} **JACKPOT x10** ${signedCoins(net)}`
+            : `${TICK} **WIN** ${signedCoins(net)}`)
+        )
+        .setColor(jackpot ? 0xFFD700 : 0x2ecc71);
 
-      await initialMessage.edit({ embeds: [winResultEmbed] });
+      await initialMessage.edit({ content: null, embeds: [winResultEmbed] });
     } else {
       // LOSE: User gets nothing back (wager already deducted)
+      settled = true;
       // Edit message with lose result embed
       const loseResultEmbed = new EmbedBuilder()
         .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
-        .setTitle('The results are...')
-        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n\n<:lotteryslots:1545161895261241454> **YOU LOST...**\n\n**Bet:** ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n**Total Loss:** -${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`)
-        .setColor(0xFF0000);
+        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n${CROSS} **LOSS** ${signedCoins(-wager)}`)
+        .setColor(0xe74c3c);
 
-      await initialMessage.edit({ embeds: [loseResultEmbed] });
+      await initialMessage.edit({ content: null, embeds: [loseResultEmbed] });
     }
 
   } catch (error) {
     console.error(`[GAMBLE] Unexpected error for user ${userId}. Wager: ${wager}. Error:`, error);
 
-    // Attempt to refund the wager on any unexpected error
+    // Attempt to refund the wager, but only if it was taken and the game was not settled yet
     try {
+      if (!charged || settled) {
+        throw new Error('no refund needed');
+      }
       const refundResult = await awardCoins(
         userId,
         wager,
@@ -235,10 +253,15 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
         console.error(`[GAMBLE] CRITICAL: Failed to refund wager for user ${userId} after unexpected error. Amount: ${wager}`);
       }
     } catch (refundError) {
-      console.error(`[GAMBLE] CRITICAL: Exception during refund attempt for user ${userId}:`, refundError);
+      if (charged && !settled) {
+        console.error(`[GAMBLE] CRITICAL: Exception during refund attempt for user ${userId}:`, refundError);
+      }
     }
 
-    await message.reply('An unexpected error occurred during gambling. Your wager may be refunded automatically. If you experience issues, please try again.');
-    await ErrorHandler.handleMessageError(message, error, 'gamble command');
+    await message.reply(
+      charged && !settled
+        ? 'Something broke during the spin, your wager was refunded. Please try again.'
+        : 'Something broke, please try again.'
+    ).catch(() => {});
   }
 }

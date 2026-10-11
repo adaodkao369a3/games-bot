@@ -7,6 +7,20 @@ import { config, isGameFloorChannel } from '../config/index.js';
 
 // Active games keyed by user ID
 const activeGames = new Map<string, HigherLowerGame>();
+// Games whose start() has finished. Only those may be swept away as "finished":
+// a game still being set up reports finished too, and must keep blocking a second one.
+const startedGames = new WeakSet<HigherLowerGame>();
+
+/** True if this user has a live game. A finished game is cleared right away (no 1s wait). */
+function isBusy(id: string): boolean {
+  const game = activeGames.get(id);
+  if (!game) return false;
+  if (startedGames.has(game) && game.isFinished()) {
+    activeGames.delete(id);
+    return false;
+  }
+  return true;
+}
 
 /**
  * Handle the higherlower command
@@ -49,7 +63,7 @@ export async function handleHigherLowerCommand(message: Message, args: string[],
   }
 
   // Check if user already has an active game
-  if (activeGames.has(userId)) {
+  if (isBusy(userId)) {
     await message.reply('You already have an active Higher or Lower game in progress!');
     return;
   }
@@ -69,13 +83,18 @@ export async function handleHigherLowerCommand(message: Message, args: string[],
     const username = message.author.username;
 
     // Create new game instance
-    const game = new HigherLowerGame(userId, username, wager, channelId, guildId, client);
+    const game = new HigherLowerGame(userId, username, wager, channelId, guildId, client, message.author.displayAvatarURL());
     
     // Store in active games
     activeGames.set(userId, game);
     
     // Start the game
     await game.start(message);
+    startedGames.add(game);
+    if (game.isFinished()) {
+      activeGames.delete(userId);
+      return;
+    }
     
     // Clean up when game is finished
     const checkInterval = setInterval(() => {
@@ -87,6 +106,7 @@ export async function handleHigherLowerCommand(message: Message, args: string[],
     
   } catch (error) {
     console.error('[Higher Lower Command] Error:', error);
+    activeGames.delete(userId);
     await message.reply('An error occurred while starting Higher or Lower. Please try again.');
     await ErrorHandler.handleMessageError(message, error, 'higherlower command');
   }
@@ -111,9 +131,6 @@ export async function handleHigherLowerInteraction(interaction: MessageComponent
     await game.handleInteraction(interaction);
   } catch (error) {
     console.error('[Higher Lower Interaction] Error:', error);
-    await interaction.reply({
-      content: 'An error occurred during Higher or Lower.',
-      ephemeral: true,
-    });
+    await ErrorHandler.handleInteractionError(interaction, error, 'higherlower interaction');
   }
 }

@@ -1,5 +1,5 @@
 import { Message, MessageComponentInteraction } from 'discord.js';
-import { PissCompGame } from '../pisscomp/PissCompGame.js';
+import { PissCompGame, PissCompPlayer } from '../pisscomp/PissCompGame.js';
 import { PissCompMaxGame } from '../pisscomp/PissCompMaxGame.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 
@@ -7,236 +7,155 @@ import { ErrorHandler } from '../utils/error-handler.js';
 const activeGames = new Map<string, PissCompGame>();
 const activeMaxGames = new Map<string, PissCompMaxGame>();
 
+/** True while a Piss Comp or Piss Comp Max game owns this channel. */
+function channelBusy(channelId: string): boolean {
+  return activeGames.has(channelId) || activeMaxGames.has(channelId);
+}
+
+interface ChallengeSetup {
+  guildId: string;
+  player1: PissCompPlayer;
+  player2: PissCompPlayer;
+}
+
+/**
+ * Validate a ".pisscomp @user" style command. Replies with the problem and returns null if invalid.
+ */
+async function parseChallenge(message: Message, label: string, usage: string): Promise<ChallengeSetup | null> {
+  if (channelBusy(message.channel.id)) {
+    await message.reply({ content: 'A Piss Competition is already in progress in this channel!' });
+    return null;
+  }
+
+  if (!message.guild) {
+    await message.reply({ content: `${label} can only be played in a server.` });
+    return null;
+  }
+
+  const mentionedUser = message.mentions.users.first();
+  if (!mentionedUser) {
+    await message.reply({ content: `You need to mention another user to challenge! Usage: \`${usage}\`` });
+    return null;
+  }
+
+  if (mentionedUser.id === message.author.id) {
+    await message.reply({ content: 'You cannot challenge yourself!' });
+    return null;
+  }
+
+  if (mentionedUser.bot) {
+    await message.reply({ content: 'You cannot challenge a bot!' });
+    return null;
+  }
+
+  return {
+    guildId: message.guild.id,
+    player1: {
+      id: message.author.id,
+      name: message.author.displayName || message.author.username,
+      avatar: message.author.displayAvatarURL({ size: 256 }) || message.author.defaultAvatarURL,
+    },
+    player2: {
+      id: mentionedUser.id,
+      name: mentionedUser.displayName || mentionedUser.username,
+      avatar: mentionedUser.displayAvatarURL({ size: 256 }) || mentionedUser.defaultAvatarURL,
+    },
+  };
+}
+
 /**
  * Handle the Piss Comp command to start a competition
  */
 export async function handlePissCompCommand(message: Message, args: string[]): Promise<void> {
+  const channelId = message.channel.id;
+
   try {
-    const channelId = message.channel.id;
-    const guildId = message.guild?.id;
-    
-    // Check if a game is already running in this channel
-    if (activeGames.has(channelId)) {
-      await message.reply({
-        content: 'A Piss Competition is already in progress in this channel!',
-      });
-      return;
-    }
-    
-    if (!message.guild) {
-      await message.reply({
-        content: 'Piss Comp can only be played in a server.',
-      });
-      return;
-    }
-    
-    // Validate command: need a mentioned user
-    if (message.mentions.users.size === 0) {
-      await message.reply({
-        content: 'You need to mention another user to challenge! Usage: `.pisscomp @user`',
-      });
-      return;
-    }
-    
-    const mentionedUser = message.mentions.users.first();
-    if (!mentionedUser) {
-      await message.reply({
-        content: 'Invalid user mentioned.',
-      });
-      return;
-    }
-    
-    // Validate: cannot challenge yourself
-    if (mentionedUser.id === message.author.id) {
-      await message.reply({
-        content: 'You cannot challenge yourself!',
-      });
-      return;
-    }
-    
-    // Validate: bots cannot participate
-    if (mentionedUser.bot) {
-      await message.reply({
-        content: 'You cannot challenge a bot!',
-      });
-      return;
-    }
-    
-    const player1Id = message.author.id;
-    const player1Name = message.author.displayName || message.author.username;
-    const player1Avatar = message.author.displayAvatarURL({ size: 256 }) || message.author.defaultAvatarURL;
-    const player2Id = mentionedUser.id;
-    const player2Name = mentionedUser.displayName || mentionedUser.username;
-    const player2Avatar = mentionedUser.displayAvatarURL({ size: 256 }) || mentionedUser.defaultAvatarURL;
-    
-    // Create new game instance
+    const setup = await parseChallenge(message, 'Piss Comp', '.pisscomp @user');
+    if (!setup) return;
+
     const game = new PissCompGame(
       channelId,
-      guildId,
-      { id: player1Id, name: player1Name, avatar: player1Avatar },
-      { id: player2Id, name: player2Name, avatar: player2Avatar },
+      setup.guildId,
+      setup.player1,
+      setup.player2,
       () => {
-        // Cleanup callback: remove game from active games when finished
+        // Game finished (win or idle timeout): free the channel
         activeGames.delete(channelId);
       }
     );
 
-    // Store in active games
     activeGames.set(channelId, game);
 
-    // Send initial message
-    const initialMessage = await message.reply({
-      content: '💦 Setting up the competition...',
-    });
-
-    // Start the game
+    const initialMessage = await message.reply({ content: '💦 Setting up the competition...' });
     await game.start(initialMessage);
-
-    // Clean up when game is finished (fallback cleanup)
-    const checkInterval = setInterval(() => {
-      if (game.isFinished()) {
-        activeGames.delete(channelId);
-        clearInterval(checkInterval);
-      }
-    }, 1000);
-
   } catch (error) {
     console.error('[Piss Comp Command] Error:', error);
+    activeGames.delete(channelId);
     await ErrorHandler.handleMessageError(message, error, 'Piss Comp command');
   }
 }
 
 /**
- * Handle the Piss Comp Max command to start a JJK fight sequence
+ * Handle the Piss Comp Max command: a normal Piss Comp first, then the JJK fight sequence.
  */
 export async function handlePissCompMaxCommand(message: Message, args: string[]): Promise<void> {
+  const channelId = message.channel.id;
+
   try {
-    const channelId = message.channel.id;
-    const guildId = message.guild?.id;
+    const setup = await parseChallenge(message, 'Piss Comp Max', '.pisscompmax @user');
+    if (!setup) return;
 
-    // Check if a game is already running in this channel
-    if (activeGames.has(channelId) || activeMaxGames.has(channelId)) {
-      await message.reply({
-        content: 'A Piss Competition is already in progress in this channel!',
-      });
-      return;
-    }
+    // The fight sequence is created up front so the channel stays "busy" the whole time,
+    // including the moment between the normal game ending and the fight starting.
+    const maxGame = new PissCompMaxGame(
+      channelId,
+      setup.guildId,
+      setup.player1,
+      setup.player2,
+      () => {
+        activeMaxGames.delete(channelId);
+      }
+    );
 
-    if (!message.guild) {
-      await message.reply({
-        content: 'Piss Comp Max can only be played in a server.',
-      });
-      return;
-    }
-
-    // Validate command: need a mentioned user
-    if (message.mentions.users.size === 0) {
-      await message.reply({
-        content: 'You need to mention another user to challenge! Usage: `.pisscompmax @user`',
-      });
-      return;
-    }
-
-    const mentionedUser = message.mentions.users.first();
-    if (!mentionedUser) {
-      await message.reply({
-        content: 'Invalid user mentioned.',
-      });
-      return;
-    }
-
-    // Validate: cannot challenge yourself
-    if (mentionedUser.id === message.author.id) {
-      await message.reply({
-        content: 'You cannot challenge yourself!',
-      });
-      return;
-    }
-
-    // Validate: bots cannot participate
-    if (mentionedUser.bot) {
-      await message.reply({
-        content: 'You cannot challenge a bot!',
-      });
-      return;
-    }
-
-    const player1Id = message.author.id;
-    const player1Name = message.author.displayName || message.author.username;
-    const player1Avatar = message.author.displayAvatarURL({ size: 256 }) || message.author.defaultAvatarURL;
-    const player2Id = mentionedUser.id;
-    const player2Name = mentionedUser.displayName || mentionedUser.username;
-    const player2Avatar = mentionedUser.displayAvatarURL({ size: 256 }) || mentionedUser.defaultAvatarURL;
+    let initialMessage: Message | undefined;
 
     // First, run the normal Piss Comp game (part of PissCompMax, so no coins awarded)
     const normalGame = new PissCompGame(
       channelId,
-      guildId,
-      { id: player1Id, name: player1Name, avatar: player1Avatar },
-      { id: player2Id, name: player2Name, avatar: player2Avatar },
-      () => {
-        // Cleanup callback: remove game from active games when finished
+      setup.guildId,
+      setup.player1,
+      setup.player2,
+      (winnerId) => {
         activeGames.delete(channelId);
+
+        if (!winnerId || !initialMessage) {
+          // Normal game ended without a winner (idle timeout): nothing to continue with
+          activeMaxGames.delete(channelId);
+          return;
+        }
+
+        activeMaxGames.set(channelId, maxGame);
+
+        // Let people see who won the first round for a moment, then start the fight
+        setTimeout(() => {
+          maxGame.start(initialMessage!, winnerId).catch((error) => {
+            console.error('[Piss Comp Max] Error starting JJK fight:', error);
+            maxGame.cleanup();
+            activeMaxGames.delete(channelId);
+          });
+        }, 2500);
       },
       true // isPartOfMax = true, so no coins will be awarded
     );
 
-    // Store in active games
     activeGames.set(channelId, normalGame);
 
-    // Send initial message
-    const initialMessage = await message.reply({
-      content: '💦 Setting up the competition...',
-    });
-
-    // Start the normal game
+    initialMessage = await message.reply({ content: '💦 Setting up the competition...' });
     await normalGame.start(initialMessage);
-
-    // Wait for normal game to finish, then start JJK fight sequence
-    const checkInterval = setInterval(() => {
-      if (normalGame.isFinished()) {
-        clearInterval(checkInterval);
-        activeGames.delete(channelId);
-
-        // Get the winner
-        const gameState = normalGame.getState();
-        const winner = gameState.winner;
-
-        if (winner) {
-          // Start JJK fight sequence
-          const maxGame = new PissCompMaxGame(
-            channelId,
-            guildId,
-            { id: player1Id, name: player1Name, avatar: player1Avatar },
-            { id: player2Id, name: player2Name, avatar: player2Avatar },
-            () => {
-              // Cleanup callback: remove game from active games when finished
-              activeMaxGames.delete(channelId);
-            }
-          );
-
-          // Store in active games
-          activeMaxGames.set(channelId, maxGame);
-
-          // Start the JJK fight sequence
-          maxGame.start(initialMessage, winner).catch((error) => {
-            console.error('[Piss Comp Max] Error starting JJK fight:', error);
-            activeMaxGames.delete(channelId);
-          });
-
-          // Clean up when game is finished (fallback cleanup)
-          const maxCheckInterval = setInterval(() => {
-            if (maxGame.isFinished()) {
-              activeMaxGames.delete(channelId);
-              clearInterval(maxCheckInterval);
-            }
-          }, 1000);
-        }
-      }
-    }, 1000);
-
   } catch (error) {
     console.error('[Piss Comp Max Command] Error:', error);
+    activeGames.delete(channelId);
+    activeMaxGames.delete(channelId);
     await ErrorHandler.handleMessageError(message, error, 'Piss Comp Max command');
   }
 }
@@ -246,9 +165,7 @@ export async function handlePissCompMaxCommand(message: Message, args: string[])
  */
 export async function handlePissCompInteraction(interaction: MessageComponentInteraction): Promise<void> {
   try {
-    if (!interaction.channel) return;
-
-    const channelId = interaction.channel.id;
+    const channelId = interaction.channelId;
     const customId = interaction.customId;
 
     console.log(`[Piss Comp Interaction] customId: ${customId}, channelId: ${channelId}`);

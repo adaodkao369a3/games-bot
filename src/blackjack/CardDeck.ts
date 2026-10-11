@@ -1,5 +1,5 @@
 import { Client, Guild } from 'discord.js';
-import { getEmoji, getCardBackEmoji } from '../utils/emoji-resolver.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
 
 // Card suits and emoji names
 const SUITS = [
@@ -8,6 +8,30 @@ const SUITS = [
   { name: 'Clubs', emojiName: 'clubs' },
   { name: 'Spades', emojiName: 'spades' },
 ];
+
+// Suit symbols for the short text label (e.g. K♠)
+const SUIT_SYMBOLS: Record<string, string> = {
+  hearts: '♥',
+  diamonds: '♦',
+  clubs: '♣',
+  spades: '♠',
+};
+
+/** Rank as it appears in the emoji names: A -> ace, J -> jack, Q -> queen, K -> king, 2..10 stay. */
+export function rankEmojiKey(rank: string): string {
+  switch (rank.toUpperCase()) {
+    case 'A': return 'ace';
+    case 'J': return 'jack';
+    case 'Q': return 'queen';
+    case 'K': return 'king';
+    default: return rank.toLowerCase();
+  }
+}
+
+/** Registry key of a card emoji, e.g. hearts_ace, spades_10 */
+export function cardEmojiKey(suit: string, rank: string): string {
+  return `${suit.toLowerCase()}_${rankEmojiKey(rank)}`;
+}
 
 // Card ranks and values
 const RANKS = [
@@ -45,7 +69,7 @@ export function createDeck(): Card[] {
         rank: rank.name,
         suit: suit.name,
         value: rank.value,
-        emojiName: `${suit.emojiName}_${rank.name.toLowerCase()}`,
+        emojiName: cardEmojiKey(suit.emojiName, rank.name),
       });
     }
   }
@@ -101,23 +125,28 @@ export function isBust(cards: Card[]): boolean {
   return calculateHandTotal(cards) > 21;
 }
 
-/**
- * Format a card for display
- */
-export async function formatCard(card: Card, client: Client | Guild | null = null): Promise<string> {
-  const emoji = await getEmoji(client, card.emojiName);
-  return emoji ? emoji : `${card.rank}`;
+/** Short text label, e.g. K♠ or 10♥ */
+export function cardLabel(card: Card): string {
+  return `${card.rank}${SUIT_SYMBOLS[card.suit.toLowerCase()] ?? ''}`;
 }
 
 /**
- * Format a hand for display
+ * Card emoji from the registry. Never calls the Discord API (the old lookup did a
+ * network fetch per card). Falls back to the text label if an emoji is missing.
  */
-export async function formatHand(cards: Card[], hideSecond: boolean = false, client: Client | Guild | null = null): Promise<string> {
+export function cardEmoji(card: Card): string {
+  return (EMOJIS as Record<string, string>)[card.emojiName] ?? `**${cardLabel(card)}**`;
+}
+
+/** Kept async + client param so existing callers keep working. */
+export async function formatCard(card: Card, _client: Client | Guild | null = null): Promise<string> {
+  return cardEmoji(card);
+}
+
+/** A hand as one tight row of card emojis. hideSecond shows the first card + a card back. */
+export async function formatHand(cards: Card[], hideSecond: boolean = false, _client: Client | Guild | null = null): Promise<string> {
   if (hideSecond && cards.length > 1) {
-    const firstCard = await formatCard(cards[0], client);
-    const cardBack = await getCardBackEmoji(client);
-    return `${firstCard} ${cardBack || '❓'}`;
+    return `${cardEmoji(cards[0])}${EMOJIS.card_back}`;
   }
-  const formattedCards = await Promise.all(cards.map(card => formatCard(card, client)));
-  return formattedCards.join('');
+  return cards.map(cardEmoji).join('');
 }

@@ -1,13 +1,24 @@
 import { Message, MessageComponentInteraction, ModalSubmitInteraction } from 'discord.js';
-import { RouletteGame } from '../roulette/RouletteGame.js';
+import { RouletteGame, parseRouletteId } from '../roulette/RouletteGame.js';
 import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { parseWagerAmount } from '../utils/wager-parser.js';
 import { config, isGameFloorChannel } from '../config/index.js';
 import { RouletteBet } from '../roulette/roulette-logic.js';
+import { coins, nope } from '../utils/casino-ui.js';
 
-// Active games keyed by user ID
+// Open roulette tables keyed by user ID (one table per player)
 const activeGames = new Map<string, RouletteGame>();
+
+/** Find the table a button/modal belongs to by the game id inside its customId. */
+function findGame(customId: string): RouletteGame | null {
+  const parsed = parseRouletteId(customId);
+  if (!parsed) return null;
+  for (const game of activeGames.values()) {
+    if (game.gameId === parsed.gameId) return game;
+  }
+  return null;
+}
 
 export async function handleRltCommand(message: Message, args: string[]): Promise<void> {
   // Check if command is used in game floor channel
@@ -34,8 +45,7 @@ export async function handleRltCommand(message: Message, args: string[]): Promis
     return;
   }
 
-  const betArg = args[0];
-  const wager = parseWagerAmount(betArg, coinInfo.balance);
+  const wager = parseWagerAmount(args[0], coinInfo.balance);
 
   // Validate wager is a valid positive number
   if (wager === null || isNaN(wager) || wager <= 0) {
@@ -46,16 +56,9 @@ export async function handleRltCommand(message: Message, args: string[]): Promis
     return;
   }
 
-  // Check if user already has an active game
-  if (activeGames.has(userId)) {
-    await message.reply('You already have an active Roulette game in progress!');
-    return;
-  }
-
   if (coinInfo.balance < wager) {
     await message.reply(
-      `You don't have enough Bombo Coins for this bet! You need ${wager.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
-      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n` +
+      `Not enough coins. You need ${coins(wager)} (you have ${coins(coinInfo.balance)}).\n` +
       `Tip: use \`.rlt all\` to bet your entire balance.`
     );
     return;
@@ -65,7 +68,7 @@ export async function handleRltCommand(message: Message, args: string[]): Promis
   let exactNumberBet: RouletteBet | null = null;
   if (args.length >= 2) {
     const numberArg = args[1];
-    
+
     // Validate number format
     if (!/^\d+$/.test(numberArg)) {
       await message.reply('Invalid number. Please use a number between 0 and 36 (e.g., `.rlt 500 17`).');
@@ -87,45 +90,49 @@ export async function handleRltCommand(message: Message, args: string[]): Promis
     return;
   }
 
-  try {
-    const channelId = message.channel.id;
-    const guildId = message.guild?.id;
-    const username = message.author.username;
-    const avatarUrl = message.author.displayAvatarURL();
+  // One table per player. A wheel that is really spinning blocks a new table;
+  // anything else (an old picker, a finished result) is simply replaced.
+  const existing = activeGames.get(userId);
+  if (existing) {
+    if (existing.isSpinning()) {
+      await message.reply('Your wheel is still spinning, one sec!');
+      return;
+    }
+    activeGames.delete(userId);
+    await existing.close();
+  }
 
-    // Create new game instance
-    const game = new RouletteGame(userId, username, avatarUrl, wager, channelId, guildId, message.client);
-    
-    // Store in active games
-    activeGames.set(userId, game);
-    
-    // Start the game
-    await game.start(message, exactNumberBet);
-    
-    // Clean up when game is finished
-    const checkInterval = setInterval(() => {
-      if (game.isFinished()) {
-        activeGames.delete(userId);
-        clearInterval(checkInterval);
+  try {
+    const game = new RouletteGame(
+      userId,
+      message.author.username,
+      message.author.displayAvatarURL(),
+      wager,
+      message.channel.id,
+      message.guild?.id,
+      message.client,
+      () => {
+        // Only remove the entry if it still points at this game (a newer table may have replaced it)
+        if (activeGames.get(userId) === game) {
+          activeGames.delete(userId);
+        }
       }
-    }, 1000);
-    
+    );
+
+    activeGames.set(userId, game);
+    await game.start(message, exactNumberBet ?? undefined);
   } catch (error) {
     console.error('[Roulette Command] Error:', error);
-    await message.reply('An error occurred while starting Roulette. Please try again.');
+    activeGames.delete(userId);
     await ErrorHandler.handleMessageError(message, error, 'rlt command');
   }
 }
 
 export async function handleRltInteraction(interaction: MessageComponentInteraction): Promise<void> {
-  const userId = interaction.user.id;
-  const game = activeGames.get(userId);
+  const game = findGame(interaction.customId);
 
   if (!game) {
-    await interaction.reply({
-      content: 'No active Roulette game found.',
-      ephemeral: true,
-    });
+    await nope(interaction, 'This roulette table is closed. Start a new one with `.rlt`.');
     return;
   }
 
@@ -133,22 +140,15 @@ export async function handleRltInteraction(interaction: MessageComponentInteract
     await game.handleInteraction(interaction);
   } catch (error) {
     console.error('[Roulette Interaction] Error:', error);
-    await interaction.reply({
-      content: 'An error occurred during Roulette.',
-      ephemeral: true,
-    });
+    await ErrorHandler.handleInteractionError(interaction, error, 'roulette interaction');
   }
 }
 
 export async function handleRltModalSubmit(interaction: ModalSubmitInteraction): Promise<void> {
-  const userId = interaction.user.id;
-  const game = activeGames.get(userId);
+  const game = findGame(interaction.customId);
 
   if (!game) {
-    await interaction.reply({
-      content: 'No active Roulette game found.',
-      ephemeral: true,
-    });
+    await nope(interaction, 'This roulette table is closed. Start a new one with `.rlt`.');
     return;
   }
 
@@ -156,9 +156,6 @@ export async function handleRltModalSubmit(interaction: ModalSubmitInteraction):
     await game.handleModalSubmit(interaction);
   } catch (error) {
     console.error('[Roulette Modal Submit] Error:', error);
-    await interaction.reply({
-      content: 'An error occurred processing your bet.',
-      ephemeral: true,
-    });
+    await ErrorHandler.handleInteractionError(interaction, error, 'roulette bet');
   }
 }

@@ -1,6 +1,7 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
-import { awardCoins, removeCoins } from '../services/coins.js';
-import { getCoinBalanceInfo } from '../services/coins.js';
+import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
+import { COIN, CROSS, TICK, coins, signedCoins, mult, respond, nope } from '../utils/casino-ui.js';
 
 type CoinFlipState = 'idle' | 'playing' | 'complete' | 'cashout' | 'timeout';
 
@@ -52,6 +53,13 @@ const GAME_CONFIG = {
   timeoutMs: 5 * 60 * 1000, // 5 minutes
 };
 
+const COLORS = {
+  playing: 0x3498db,
+  win: 0x2ecc71,
+  loss: 0xe74c3c,
+  cashout: 0xffd700,
+};
+
 /**
  * Get multiplier for current streak
  */
@@ -77,10 +85,16 @@ function flipCoin(): CoinSide {
   return Math.random() < 0.5 ? 'HEADS' : 'TAILS';
 }
 
+function sideEmoji(side: CoinSide): string {
+  return side === 'HEADS' ? EMOJIS.heads : EMOJIS.tails;
+}
+
 export class CoinFlipGame {
   private state: CoinFlipState = 'idle';
   private data: CoinFlipGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
+  // True while a click is being processed, so a double-click can't flip twice
+  private busy = false;
 
   constructor(userId: string, username: string, avatarUrl: string, betAmount: number, channelId: string, guildId: string | undefined) {
     this.data = {
@@ -113,10 +127,7 @@ export class CoinFlipGame {
     }
 
     if (coinInfo.balance < this.data.betAmount) {
-      await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
-      );
+      await message.reply(`Not enough coins. You need ${coins(this.data.betAmount)} (you have ${coins(coinInfo.balance)}).`);
       return;
     }
 
@@ -137,24 +148,16 @@ export class CoinFlipGame {
     }
 
     this.state = 'playing';
-    this.data.messageId = message.id;
-    this.data.message = message;
-
-    const initialEmbed = this.createGameEmbed();
-    const row = this.createGameButtons();
 
     const sentMessage = await message.reply({
-      embeds: [initialEmbed],
-      components: [row],
+      embeds: [this.createGameEmbed()],
+      components: [this.createGameButtons()],
     });
 
     this.data.messageId = sentMessage.id;
     this.data.message = sentMessage;
 
-    // Set timeout
-    this.gameTimeout = setTimeout(() => {
-      this.timeoutGame(sentMessage);
-    }, GAME_CONFIG.timeoutMs);
+    this.armTimeout();
   }
 
   /**
@@ -163,24 +166,29 @@ export class CoinFlipGame {
   async handleInteraction(interaction: MessageComponentInteraction): Promise<void> {
     // Verify user
     if (interaction.user.id !== this.data.userId) {
-      await interaction.reply({
-        content: 'This is not your game!',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This is not your game!');
       return;
     }
 
-    const customId = interaction.customId;
+    if (this.busy) {
+      // A previous click is still being handled; just acknowledge this one.
+      await interaction.deferUpdate().catch(() => {});
+      return;
+    }
 
-    if (customId === 'cf_heads' || customId === 'cf_tails') {
-      await this.handleFlip(interaction, customId === 'cf_heads' ? 'HEADS' : 'TAILS');
-    } else if (customId === 'cf_cashout') {
-      await this.handleCashout(interaction);
-    } else {
-      await interaction.reply({
-        content: 'Unknown action.',
-        ephemeral: true,
-      });
+    this.busy = true;
+    try {
+      const customId = interaction.customId;
+
+      if (customId === 'cf_heads' || customId === 'cf_tails') {
+        await this.handleFlip(interaction, customId === 'cf_heads' ? 'HEADS' : 'TAILS');
+      } else if (customId === 'cf_cashout') {
+        await this.handleCashout(interaction);
+      } else {
+        await nope(interaction, 'Unknown action.');
+      }
+    } finally {
+      this.busy = false;
     }
   }
 
@@ -189,10 +197,7 @@ export class CoinFlipGame {
    */
   private async handleFlip(interaction: MessageComponentInteraction, call: CoinSide): Promise<void> {
     if (this.state !== 'playing') {
-      await interaction.reply({
-        content: 'Invalid action for current state.',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This game is over.');
       return;
     }
 
@@ -204,25 +209,20 @@ export class CoinFlipGame {
     this.data.lastFlip = result;
 
     // Record flip in history
-    const roundNumber = this.data.flipHistory.length + 1;
     this.data.flipHistory.push({
-      round: roundNumber,
+      round: this.data.flipHistory.length + 1,
       call,
       result,
       won: correct,
     });
 
     if (correct) {
-      // Correct prediction
       this.data.streak++;
       this.data.currentPayout = calculatePayout(this.data.betAmount, this.data.streak);
 
-      const embed = this.createGameEmbed();
-      const row = this.createGameButtons();
-
-      await interaction.update({
-        embeds: [embed],
-        components: [row],
+      await respond(interaction, {
+        embeds: [this.createGameEmbed()],
+        components: [this.createGameButtons()],
       });
     } else {
       // Wrong prediction - end game immediately
@@ -235,18 +235,12 @@ export class CoinFlipGame {
    */
   private async handleCashout(interaction: MessageComponentInteraction): Promise<void> {
     if (this.state !== 'playing') {
-      await interaction.reply({
-        content: 'Invalid action for current state.',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This game is over.');
       return;
     }
 
     if (this.data.streak < 1) {
-      await interaction.reply({
-        content: 'You need at least one correct prediction to cash out!',
-        ephemeral: true,
-      });
+      await nope(interaction, 'Win at least one flip before cashing out!');
       return;
     }
 
@@ -266,17 +260,15 @@ export class CoinFlipGame {
     );
 
     if (awardResult === null) {
-      await interaction.update({
-        content: 'Failed to award winnings. Please contact support.',
-        components: [],
-      });
+      // Payout failed: put the game back so the player can try again instead of losing the bet.
+      this.state = 'playing';
+      this.armTimeout();
+      await nope(interaction, 'Could not pay out right now. Try cashing out again.');
       return;
     }
 
-    const embed = this.createCashoutEmbed();
-
-    await interaction.update({
-      embeds: [embed],
+    await respond(interaction, {
+      embeds: [this.createCashoutEmbed()],
       components: [],
     });
   }
@@ -288,39 +280,21 @@ export class CoinFlipGame {
     this.state = 'complete';
     this.clearTimeout();
 
-    const flipEmoji = this.data.lastFlip === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
+    const flip = this.data.lastFlip!;
+    const call = this.data.lastCall!;
 
-    // GAME OVER EMBED
-    let description = `**GAME OVER**\n\n`;
-    description += `${flipEmoji} **${this.data.lastFlip}**\n\n`;
-    description += `You called **${this.data.lastCall}**.\n\n`;
-    description += `─────────────────\n\n`;
-    description += `**WIN STREAK:** ${this.data.streak}\n\n`;
-    description += `**ORIGINAL BET:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `**AMOUNT LOST:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `─────────────────\n\n`;
-
-    // FLIP HISTORY
-    description += `📜 **FLIP HISTORY**\n\n`;
-    if (this.data.flipHistory.length === 0) {
-      description += `No flips yet.\n\n`;
-    } else {
-      const recentHistory = this.data.flipHistory.slice(-8).reverse();
-      recentHistory.forEach((flip) => {
-        const flipEmoji = flip.result === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
-        const resultText = flip.won ? '✅ WIN' : '❌ LOSS';
-        description += `R${flip.round} | ${flip.call} → ${flipEmoji} | ${resultText}\n`;
-      });
-      description += `\n`;
-    }
+    const description =
+      `${sideEmoji(flip)} **${flip}** ${CROSS} · called **${call}**\n` +
+      `${signedCoins(-this.data.betAmount)}` +
+      (this.data.streak > 0 ? ` · ${EMOJIS.fire} **${this.data.streak}**` : '') +
+      this.historyLine();
 
     const embed = new EmbedBuilder()
-      .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() })
-      .setTitle('💥 WRONG!')
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setDescription(description)
-      .setColor(0xe74c3c);
+      .setColor(COLORS.loss);
 
-    await interaction.update({
+    await respond(interaction, {
       embeds: [embed],
       components: [],
     });
@@ -330,6 +304,7 @@ export class CoinFlipGame {
    * Handle game timeout
    */
   private async timeoutGame(message: Message): Promise<void> {
+    if (this.state !== 'playing') return;
     this.state = 'timeout';
     this.clearTimeout();
 
@@ -345,17 +320,23 @@ export class CoinFlipGame {
     );
 
     const embed = new EmbedBuilder()
-      .setTitle('🪙 COIN FLIP')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Game timed out.\n\n` +
-        `Your bet has been refunded.\n\n` +
-        `━━━━━━━━━━━━━━`)
-      .setColor(0xe74c3c);
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
+      .setDescription(`${EMOJIS.alarm1} **Timed out** · ${coins(this.data.betAmount)} refunded`)
+      .setColor(COLORS.loss);
 
     await message.edit({
       embeds: [embed],
       components: [],
-    });
+    }).catch((error) => console.error('[CoinFlip] Failed to edit timeout message:', error));
+  }
+
+  private armTimeout(): void {
+    this.clearTimeout();
+    this.gameTimeout = setTimeout(() => {
+      if (this.data.message) {
+        this.timeoutGame(this.data.message).catch((error) => console.error('[CoinFlip] Timeout error:', error));
+      }
+    }, GAME_CONFIG.timeoutMs);
   }
 
   /**
@@ -369,107 +350,69 @@ export class CoinFlipGame {
   }
 
   /**
-   * Check if game is finished
+   * Check if game is finished. 'idle' counts too: if start() returned without
+   * ever moving to 'playing', the game never began and must not block the player.
    */
   isFinished(): boolean {
-    return this.state === 'complete' || this.state === 'cashout' || this.state === 'timeout';
+    return this.state === 'idle' || this.state === 'complete' || this.state === 'cashout' || this.state === 'timeout';
   }
 
   // Embed creation methods
 
-  private createGameEmbed(statusMessage: string = '', resultMessage: string = ''): EmbedBuilder {
-    const multiplier = getMultiplier(this.data.streak);
+  /** One row of coin emojis, oldest to newest. Only shown once there are 2+ flips. */
+  private historyLine(): string {
+    if (this.data.flipHistory.length < 2) return '';
+    const recent = this.data.flipHistory.slice(-10).map((f) => sideEmoji(f.result)).join('');
+    return `\n${recent}`;
+  }
 
-    // TOP - CURRENT GAME STATS
-    let description = `**WIN STREAK**\n${this.data.streak}\n\n`;
-    description += `**CURRENT BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `─────────────────\n\n`;
+  private createGameEmbed(): EmbedBuilder {
+    let description: string;
 
-    // MIDDLE - FLIP AREA
-    if (this.data.lastFlip !== null) {
-      const flipEmoji = this.data.lastFlip === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
-      description += `${flipEmoji}\n\n`;
-      description += `**YOUR CALL:** ${this.data.lastCall}\n\n`;
-      description += `**RESULT:** ${statusMessage}\n\n`;
-      if (resultMessage) {
-        description += `${resultMessage}\n\n`;
-      }
+    if (this.data.lastFlip === null) {
+      description = `${EMOJIS.coinflip} **Heads or tails?**\n${coins(this.data.betAmount)}`;
     } else {
-      description += `<a:coinflip:1555521942205767711>\n\n`;
-      description += `**CALL YOUR SIDE**\n\n`;
-    }
-
-    description += `─────────────────\n\n`;
-
-    // BOTTOM - FLIP HISTORY
-    description += `📜 **FLIP HISTORY**\n\n`;
-    if (this.data.flipHistory.length === 0) {
-      description += `No flips yet.\n\n`;
-    } else {
-      const recentHistory = this.data.flipHistory.slice(-8).reverse();
-      recentHistory.forEach((flip) => {
-        const flipEmoji = flip.result === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
-        const resultText = flip.won ? '✅ WIN' : '❌ LOSS';
-        description += `R${flip.round} | ${flip.call} → ${flipEmoji} | ${resultText}\n`;
-      });
-      description += `\n`;
+      description =
+        `${sideEmoji(this.data.lastFlip)} **${this.data.lastFlip}** ${TICK}\n` +
+        `${EMOJIS.fire} **${this.data.streak}** · ${mult(getMultiplier(this.data.streak))} · ${coins(this.data.currentPayout)}` +
+        this.historyLine();
     }
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('🪙 COIN FLIP')
       .setDescription(description)
-      .setColor(0x3498db);
+      .setColor(this.data.lastFlip === null ? COLORS.playing : COLORS.win);
   }
 
   private createCashoutEmbed(): EmbedBuilder {
     const netProfit = this.data.currentPayout - this.data.betAmount;
-    const multiplier = getMultiplier(this.data.streak);
 
-    let description = `**WIN STREAK**\n${this.data.streak}\n\n`;
-    description += `**ORIGINAL BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `**PAYOUT**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `**NET PROFIT**\n${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `─────────────────\n\n`;
-
-    // FLIP HISTORY
-    description += `📜 **FLIP HISTORY**\n\n`;
-    if (this.data.flipHistory.length === 0) {
-      description += `No flips yet.\n\n`;
-    } else {
-      const recentHistory = this.data.flipHistory.slice(-8).reverse();
-      recentHistory.forEach((flip) => {
-        const flipEmoji = flip.result === 'HEADS' ? '<:heads:1555524163853226025>' : '<:tails:1555524166264823891>';
-        const resultText = flip.won ? '✅ WIN' : '❌ LOSS';
-        description += `R${flip.round} | ${flip.call} → ${flipEmoji} | ${resultText}\n`;
-      });
-      description += `\n`;
-    }
+    const description =
+      `${EMOJIS.moneybag} **Cashed out** ${signedCoins(netProfit)}\n` +
+      `${EMOJIS.fire} **${this.data.streak}** · ${mult(getMultiplier(this.data.streak))}` +
+      this.historyLine();
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('💰 CASHED OUT!')
       .setDescription(description)
-      .setColor(0xFFD700);
+      .setColor(COLORS.cashout);
   }
 
   // Button creation methods
 
   private createGameButtons(): ActionRowBuilder<ButtonBuilder> {
     const row = new ActionRowBuilder<ButtonBuilder>();
-    
+
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('cf_heads')
-        .setLabel('HEADS')
-        .setStyle(ButtonStyle.Primary)
-    );
-    
-    row.addComponents(
+        .setEmoji(EMOJIS.heads)
+        .setLabel('Heads')
+        .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId('cf_tails')
-        .setLabel('TAILS')
+        .setEmoji(EMOJIS.tails)
+        .setLabel('Tails')
         .setStyle(ButtonStyle.Primary)
     );
 
@@ -478,7 +421,8 @@ export class CoinFlipGame {
       row.addComponents(
         new ButtonBuilder()
           .setCustomId('cf_cashout')
-          .setLabel('💰 CASH OUT')
+          .setEmoji(EMOJIS.moneybag)
+          .setLabel('Cash out')
           .setStyle(ButtonStyle.Success)
       );
     }

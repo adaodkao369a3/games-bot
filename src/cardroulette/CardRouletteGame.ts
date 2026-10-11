@@ -1,7 +1,7 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Client } from 'discord.js';
-import { awardCoins, removeCoins } from '../services/coins.js';
-import { getCoinBalanceInfo } from '../services/coins.js';
-import { getEmoji } from '../utils/emoji-resolver.js';
+import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
+import { CROSS, coins, signedCoins, mult, respond, nope } from '../utils/casino-ui.js';
 
 type CardRouletteState = 'idle' | 'playing' | 'complete' | 'cashout' | 'timeout';
 
@@ -63,8 +63,8 @@ const CARD_OUTCOMES: CardOutcome[] = [
   {
     id: 'safe_1',
     name: 'Safe',
-    emoji: '🟢',
-    description: 'Nothing bad happens. You survive.',
+    emoji: '<:tick:1558430105120804884>',
+    description: '',
     type: 'safe',
     weight: 50,
     payoutModifier: 1.0,
@@ -73,8 +73,8 @@ const CARD_OUTCOMES: CardOutcome[] = [
   {
     id: 'lose_turn',
     name: 'Lose Turn',
-    emoji: '⏭️',
-    description: 'You lose your next draw.',
+    emoji: '<:rightarrow:1558430102755213405>',
+    description: 'next draw skipped',
     type: 'lose_turn',
     weight: 15,
     payoutModifier: 1.0,
@@ -83,8 +83,8 @@ const CARD_OUTCOMES: CardOutcome[] = [
   {
     id: 'double_turn',
     name: 'Double Turn',
-    emoji: '🔁',
-    description: 'You get an extra draw!',
+    emoji: '<:two:1545379099394969660>',
+    description: 'free extra draw',
     type: 'double_turn',
     weight: 10,
     payoutModifier: 1.0,
@@ -93,8 +93,8 @@ const CARD_OUTCOMES: CardOutcome[] = [
   {
     id: 'elimination',
     name: 'Elimination',
-    emoji: '💀',
-    description: 'You have been eliminated!',
+    emoji: '<:cross:1558430092043096154>',
+    description: '',
     type: 'elimination',
     weight: 25,
     payoutModifier: 0.0,
@@ -142,10 +142,20 @@ function calculatePayout(bet: number, drawsSurvived: number): number {
   return Math.floor(bet * multiplier);
 }
 
+const COLORS = {
+  playing: 0x3498db,
+  safe: 0x2ecc71,
+  loss: 0xe74c3c,
+  cashout: 0xffd700,
+};
+
 export class CardRouletteGame {
   private state: CardRouletteState = 'idle';
   private data: CardRouletteGameData;
   private gameTimeout: NodeJS.Timeout | null = null;
+  private autoDrawTimer: NodeJS.Timeout | null = null;
+  // True while a click is being processed (or an automatic extra draw is pending)
+  private busy = false;
 
   constructor(userId: string, username: string, avatarUrl: string, betAmount: number, channelId: string, guildId: string | undefined, client: Client | null = null) {
     this.data = {
@@ -181,11 +191,7 @@ export class CardRouletteGame {
     }
 
     if (coinInfo.balance < this.data.betAmount) {
-      const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
-      await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} ${coinEmoji}.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} ${coinEmoji}`
-      );
+      await message.reply(`Not enough coins. You need ${coins(this.data.betAmount)} (you have ${coins(coinInfo.balance)}).`);
       return;
     }
 
@@ -206,24 +212,16 @@ export class CardRouletteGame {
     }
 
     this.state = 'playing';
-    this.data.messageId = message.id;
-    this.data.message = message;
-
-    const initialEmbed = await this.createGameEmbed();
-    const row = this.createGameButtons();
 
     const sentMessage = await message.reply({
-      embeds: [initialEmbed],
-      components: [row],
+      embeds: [this.createGameEmbed()],
+      components: [this.createGameButtons()],
     });
 
     this.data.messageId = sentMessage.id;
     this.data.message = sentMessage;
 
-    // Set timeout
-    this.gameTimeout = setTimeout(() => {
-      this.timeoutGame(sentMessage);
-    }, GAME_CONFIG.timeoutMs);
+    this.armTimeout();
   }
 
   /**
@@ -232,53 +230,67 @@ export class CardRouletteGame {
   async handleInteraction(interaction: MessageComponentInteraction): Promise<void> {
     // Verify user
     if (interaction.user.id !== this.data.userId) {
-      await interaction.reply({
-        content: 'This is not your game!',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This is not your game!');
       return;
     }
 
-    const customId = interaction.customId;
+    if (this.busy) {
+      await interaction.deferUpdate().catch(() => {});
+      return;
+    }
 
-    switch (customId) {
-      case 'croulette_draw':
-        await this.handleDraw(interaction);
-        break;
-      case 'croulette_cashout':
-        await this.handleCashout(interaction);
-        break;
-      default:
-        await interaction.reply({
-          content: 'Unknown action.',
-          ephemeral: true,
-        });
+    this.busy = true;
+    try {
+      switch (interaction.customId) {
+        case 'croulette_draw':
+          await this.handleDraw(interaction);
+          break;
+        case 'croulette_cashout':
+          await this.handleCashout(interaction);
+          break;
+        default:
+          await nope(interaction, 'Unknown action.');
+      }
+    } finally {
+      // An automatic extra draw keeps the game locked until it has happened
+      this.busy = this.autoDrawTimer !== null;
     }
   }
 
   /**
-   * Handle draw button
+   * Show a new screen. Uses the interaction when there is a fresh one, otherwise edits the
+   * game message directly (needed for the automatic extra draw, which has no new click).
    */
-  private async handleDraw(interaction: MessageComponentInteraction): Promise<void> {
+  private async show(
+    interaction: MessageComponentInteraction | null,
+    embed: EmbedBuilder,
+    components: ActionRowBuilder<ButtonBuilder>[]
+  ): Promise<void> {
+    if (interaction && !interaction.replied && !interaction.deferred) {
+      await respond(interaction, { embeds: [embed], components });
+      return;
+    }
+    if (interaction && (interaction.replied || interaction.deferred)) {
+      await interaction.editReply({ embeds: [embed], components });
+      return;
+    }
+    await this.data.message?.edit({ embeds: [embed], components });
+  }
+
+  /**
+   * Handle draw button (interaction is null for the automatic extra draw)
+   */
+  private async handleDraw(interaction: MessageComponentInteraction | null): Promise<void> {
     if (this.state !== 'playing') {
-      await interaction.reply({
-        content: 'Invalid action for current state.',
-        ephemeral: true,
-      });
+      if (interaction) await nope(interaction, 'This game is over.');
       return;
     }
 
     // Check if player should skip this turn
     if (this.data.skipNextDraw) {
       this.data.skipNextDraw = false;
-      
-      const embed = await this.createGameEmbed('⏭️ Turn skipped! Draw again.');
-      const row = this.createGameButtons();
-
-      await interaction.update({
-        embeds: [embed],
-        components: [row],
-      });
+      this.data.currentCard = null;
+      await this.show(interaction, this.createGameEmbed('skipped'), [this.createGameButtons()]);
       return;
     }
 
@@ -286,70 +298,60 @@ export class CardRouletteGame {
     const card = this.data.deck.pop();
     if (!card) {
       // Deck exhausted - auto cashout
-      await this.handleCashout(interaction);
+      if (interaction) {
+        await this.handleCashout(interaction);
+      }
       return;
     }
 
     this.data.currentCard = card;
     this.data.cardsDrawn.push(card);
 
-    // Handle card outcome
     await this.handleCardOutcome(interaction, card);
   }
 
   /**
    * Handle card outcome
    */
-  private async handleCardOutcome(interaction: MessageComponentInteraction, card: CardOutcome): Promise<void> {
-    // Update payout based on card modifier
-    this.data.currentPayout = calculatePayout(this.data.betAmount, this.data.drawsSurvived);
-
+  private async handleCardOutcome(interaction: MessageComponentInteraction | null, card: CardOutcome): Promise<void> {
     if (card.terminal) {
       // Elimination - game over
-      this.data.drawsSurvived++;
-      await this.endGame(interaction, false);
+      this.state = 'complete';
+      this.clearTimeout();
+      await this.show(interaction, this.createEliminationEmbed(), []);
       return;
     }
 
-    // Non-terminal outcomes
+    // Survived this card: the payout follows the multiplier shown on screen
     this.data.drawsSurvived++;
+    this.data.currentPayout = calculatePayout(this.data.betAmount, this.data.drawsSurvived);
 
     if (card.type === 'lose_turn') {
       this.data.skipNextDraw = true;
-      const embed = await this.createGameEmbed(`${card.emoji} ${card.name}: ${card.description}`);
-      const row = this.createGameButtons();
-
-      await interaction.update({
-        embeds: [embed],
-        components: [row],
-      });
-    } else if (card.type === 'double_turn') {
-      this.data.extraDraw = true;
-      const embed = await this.createGameEmbed(`${card.emoji} ${card.name}: ${card.description}`);
-      const row = this.createGameButtons();
-
-      await interaction.update({
-        embeds: [embed],
-        components: [row],
-      });
-
-      // Auto-draw again after a short delay
-      setTimeout(async () => {
-        if (this.state === 'playing' && this.data.extraDraw) {
-          this.data.extraDraw = false;
-          await this.handleDraw(interaction);
-        }
-      }, 1000);
-    } else {
-      // Safe card
-      const embed = await this.createGameEmbed(`${card.emoji} ${card.name}: ${card.description}`);
-      const row = this.createGameButtons();
-
-      await interaction.update({
-        embeds: [embed],
-        components: [row],
-      });
     }
+
+    if (card.type === 'double_turn') {
+      // Show the card with buttons locked, then draw again by itself
+      this.data.extraDraw = true;
+      await this.show(interaction, this.createGameEmbed(), [this.createGameButtons(true)]);
+
+      this.autoDrawTimer = setTimeout(async () => {
+        this.autoDrawTimer = null;
+        try {
+          if (this.state === 'playing' && this.data.extraDraw) {
+            this.data.extraDraw = false;
+            await this.handleDraw(null);
+          }
+        } catch (error) {
+          console.error('[CardRoulette] Extra draw error:', error);
+        } finally {
+          this.busy = false;
+        }
+      }, 1200);
+      return;
+    }
+
+    await this.show(interaction, this.createGameEmbed(), [this.createGameButtons()]);
   }
 
   /**
@@ -357,18 +359,12 @@ export class CardRouletteGame {
    */
   private async handleCashout(interaction: MessageComponentInteraction): Promise<void> {
     if (this.state !== 'playing') {
-      await interaction.reply({
-        content: 'Invalid action for current state.',
-        ephemeral: true,
-      });
+      await nope(interaction, 'This game is over.');
       return;
     }
 
     if (this.data.drawsSurvived < 1) {
-      await interaction.reply({
-        content: 'You need to survive at least one draw to cash out!',
-        ephemeral: true,
-      });
+      await nope(interaction, 'Survive at least one card before cashing out!');
       return;
     }
 
@@ -388,44 +384,27 @@ export class CardRouletteGame {
     );
 
     if (awardResult === null) {
-      await interaction.update({
-        content: 'Failed to award winnings. Please contact support.',
-        components: [],
-      });
+      // Payout failed: put the game back so the player can try again instead of losing the bet.
+      this.state = 'playing';
+      this.armTimeout();
+      await nope(interaction, 'Could not pay out right now. Try cashing out again.');
       return;
     }
 
-    const embed = await this.createCashoutEmbed();
-
-    await interaction.update({
-      embeds: [embed],
-      components: [],
-    });
-  }
-
-  /**
-   * End the game (elimination)
-   */
-  private async endGame(interaction: MessageComponentInteraction, won: boolean): Promise<void> {
-    this.state = 'complete';
-    this.clearTimeout();
-
-    if (!won) {
-      const embed = await this.createEliminationEmbed();
-
-      await interaction.update({
-        embeds: [embed],
-        components: [],
-      });
-    }
+    await this.show(interaction, this.createCashoutEmbed(), []);
   }
 
   /**
    * Handle game timeout
    */
   private async timeoutGame(message: Message): Promise<void> {
+    if (this.state !== 'playing') return;
     this.state = 'timeout';
     this.clearTimeout();
+    if (this.autoDrawTimer) {
+      clearTimeout(this.autoDrawTimer);
+      this.autoDrawTimer = null;
+    }
 
     // Refund bet on timeout
     await awardCoins(
@@ -438,12 +417,24 @@ export class CardRouletteGame {
       }
     );
 
-    const embed = await this.createTimeoutEmbed();
+    const embed = new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
+      .setDescription(`${EMOJIS.alarm1} **Timed out** · ${coins(this.data.betAmount)} refunded`)
+      .setColor(COLORS.loss);
 
     await message.edit({
       embeds: [embed],
       components: [],
-    });
+    }).catch((error) => console.error('[CardRoulette] Failed to edit timeout message:', error));
+  }
+
+  private armTimeout(): void {
+    this.clearTimeout();
+    this.gameTimeout = setTimeout(() => {
+      if (this.data.message) {
+        this.timeoutGame(this.data.message).catch((error) => console.error('[CardRoulette] Timeout error:', error));
+      }
+    }, GAME_CONFIG.timeoutMs);
   }
 
   /**
@@ -457,88 +448,81 @@ export class CardRouletteGame {
   }
 
   /**
-   * Check if game is finished
+   * Check if game is finished. 'idle' counts too: if start() returned without
+   * posting the game, it never began and must not block the player.
    */
   isFinished(): boolean {
-    return this.state === 'complete' || this.state === 'cashout' || this.state === 'timeout';
+    return this.state === 'idle' || this.state === 'complete' || this.state === 'cashout' || this.state === 'timeout';
   }
 
   // Embed creation methods
 
-  private async createGameEmbed(statusMessage: string = ''): Promise<EmbedBuilder> {
-    const multiplier = getMultiplier(this.data.drawsSurvived);
-    const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
+  /** Everything drawn so far as a row of emojis (shown once there are 2+ cards) */
+  private historyLine(): string {
+    if (this.data.cardsDrawn.length < 2) return '';
+    return `\n${this.data.cardsDrawn.slice(-12).map((c) => c.emoji).join('')}`;
+  }
 
-    let description = `**${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji} • **${this.data.drawsSurvived}** cards • **x${multiplier.toFixed(2)}**\n`;
-    description += `Win: **${this.data.currentPayout.toLocaleString('en-US')}** ${coinEmoji}\n\n`;
+  private createGameEmbed(status: 'skipped' | null = null): EmbedBuilder {
+    const stats = `${EMOJIS.cards} **${this.data.drawsSurvived}** · ${mult(getMultiplier(this.data.drawsSurvived))} · ${coins(this.data.currentPayout)}`;
 
-    if (this.data.currentCard) {
-      description += `${this.data.currentCard.emoji}\n\n`;
-      description += `**${this.data.currentCard.name}**\n${this.data.currentCard.description}\n\n`;
+    let description: string;
+    let color = COLORS.playing;
+
+    if (status === 'skipped') {
+      description = `${EMOJIS.arrow_right} **Turn skipped** · draw again\n${stats}${this.historyLine()}`;
+    } else if (this.data.currentCard) {
+      const card = this.data.currentCard;
+      description =
+        `${card.emoji} **${card.name}**${card.description ? ` · ${card.description}` : ''}\n` +
+        `${stats}${this.historyLine()}`;
+      color = COLORS.safe;
     } else {
-      description += `<:card_back:1549652972219277372> Draw a card\n\n`;
-    }
-
-    if (statusMessage) {
-      description += `${statusMessage}\n\n`;
+      description = `${EMOJIS.card_back} **Draw a card**\n${coins(this.data.betAmount)}`;
     }
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('🃏🔫 CARD ROULETTE')
       .setDescription(description)
-      .setColor(0x3498db);
+      .setColor(color);
   }
 
-  private async createCashoutEmbed(): Promise<EmbedBuilder> {
+  private createCashoutEmbed(): EmbedBuilder {
     const netProfit = this.data.currentPayout - this.data.betAmount;
-    const multiplier = getMultiplier(this.data.drawsSurvived);
-    const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
-
-    let description = `**${this.data.drawsSurvived}** cards survived • **x${multiplier.toFixed(2)}**\n\n`;
-    description += `Cards: ${this.data.cardsDrawn.map(card => card.emoji).join(' ')}\n\n`;
-    description += `Won: **${this.data.currentPayout.toLocaleString('en-US')}** ${coinEmoji}\n`;
-    description += `Bet: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}\n`;
-    description += `Profit: **${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')}** ${coinEmoji}`;
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('💰 CASHED OUT!')
-      .setDescription(description)
-      .setColor(0xFFD700);
+      .setDescription(
+        `${EMOJIS.moneybag} **Cashed out** ${signedCoins(netProfit)}\n` +
+        `${EMOJIS.cards} **${this.data.drawsSurvived}** · ${mult(getMultiplier(this.data.drawsSurvived))}${this.historyLine()}`
+      )
+      .setColor(COLORS.cashout);
   }
 
-  private async createEliminationEmbed(): Promise<EmbedBuilder> {
+  private createEliminationEmbed(): EmbedBuilder {
     const card = this.data.currentCard!;
-    const coinEmoji = await getEmoji(this.data.client, 'bombocoin');
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('💀 ELIMINATED')
-      .setDescription(`${card.emoji}\n\n` +
-        `**${card.name}**\n${card.description}\n\n` +
-        `**${this.data.drawsSurvived}** cards survived\n` +
-        `Lost: **${this.data.betAmount.toLocaleString('en-US')}** ${coinEmoji}`)
-      .setColor(0xe74c3c);
-  }
-
-  private async createTimeoutEmbed(): Promise<EmbedBuilder> {
-    return new EmbedBuilder()
-      .setTitle('🃏🔫 CARD ROULETTE')
-      .setDescription(`Game timed out. Your bet has been refunded.`)
-      .setColor(0xe74c3c);
+      .setDescription(
+        `${card.emoji} **${card.name.toUpperCase()}** ${CROSS} ${signedCoins(-this.data.betAmount)}\n` +
+        `${EMOJIS.cards} survived **${this.data.drawsSurvived}**${this.historyLine()}`
+      )
+      .setColor(COLORS.loss);
   }
 
   // Button creation methods
 
-  private createGameButtons(): ActionRowBuilder<ButtonBuilder> {
+  private createGameButtons(disabled: boolean = false): ActionRowBuilder<ButtonBuilder> {
     const row = new ActionRowBuilder<ButtonBuilder>();
-    
+
     row.addComponents(
       new ButtonBuilder()
         .setCustomId('croulette_draw')
-        .setLabel('🎲 DRAW')
+        .setEmoji(EMOJIS.cards)
+        .setLabel('Draw')
         .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled)
     );
 
     // Add cash out button if at least one draw survived
@@ -546,8 +530,10 @@ export class CardRouletteGame {
       row.addComponents(
         new ButtonBuilder()
           .setCustomId('croulette_cashout')
-          .setLabel('💰 CASH OUT')
+          .setEmoji(EMOJIS.moneybag)
+          .setLabel('Cash out')
           .setStyle(ButtonStyle.Success)
+          .setDisabled(disabled)
       );
     }
 

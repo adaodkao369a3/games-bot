@@ -315,7 +315,7 @@ export class DiscordClient {
   private async handleButtonInteraction(interaction: any): Promise<void> {
     const customId = interaction.customId;
 
-    if (customId.startsWith('pisscomp_')) {
+    if (customId.startsWith('pisscomp_') || customId.startsWith('pisscompmax_')) {
       await handlePissCompInteraction(interaction);
       return;
     }
