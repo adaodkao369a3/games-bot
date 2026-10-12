@@ -440,10 +440,10 @@ export class RouletteGame {
     const net = won ? payout - this.data.betAmount : -this.data.betAmount;
 
     const description =
-      `${COLOR_EMOJI[color]} **${result}** · ${color.toUpperCase()}\n` +
+      `${COLOR_EMOJI[color]}  **${result}**  ·  ${color.toUpperCase()}\n\n` +
       (won
-        ? `${TICK} **WIN** ${signedCoins(net)} · ${describeBet(bet)}`
-        : `${CROSS} **LOSS** ${signedCoins(net)} · ${describeBet(bet)}`);
+        ? `${TICK}  **WIN**  ${signedCoins(net)}  ·  ${describeBet(bet)}`
+        : `${CROSS}  **LOSS**  ${signedCoins(net)}  ·  ${describeBet(bet)}`);
 
     const name = `wheel_${this.data.gameId}_final.png`;
     const embed = new EmbedBuilder()
@@ -494,7 +494,7 @@ export class RouletteGame {
   private createSelectionEmbed(note?: string): EmbedBuilder {
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setDescription(`${EMOJIS.slot_static} **Roulette** · ${coins(this.data.betAmount)}\n${note ?? 'Pick your bet'}`)
+      .setDescription(`${EMOJIS.slot_static}  **Roulette**  ·  ${coins(this.data.betAmount)}\n\n${note ?? 'Pick your bet'}`)
       .setColor(COLORS.select);
   }
 

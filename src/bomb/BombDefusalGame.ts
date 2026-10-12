@@ -292,7 +292,7 @@ export class BombDefusalGame {
       // Generate next challenge
       this.data.currentChallenge = generateChallenge(this.data.currentStage);
 
-      const embed = this.createGameEmbed('✅ DEFUSED!');
+      const embed = this.createGameEmbed('<:tick:1558430105120804884> DEFUSED!');
       const row = this.createChallengeButtons();
 
       await interaction.update({
@@ -406,7 +406,7 @@ export class BombDefusalGame {
 
     const embed = new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('💣 BOMB DEFUSAL')
+      .setTitle('<a:purplebomb:1545149042378407986> BOMB DEFUSAL')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Game timed out.\n\n` +
         `Your bet has been refunded.\n\n` +
@@ -455,7 +455,7 @@ export class BombDefusalGame {
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('💣 BOMB DEFUSAL')
+      .setTitle('<a:purplebomb:1545149042378407986> BOMB DEFUSAL')
       .setDescription(description)
       .setColor(0x3498db);
   }
@@ -466,7 +466,7 @@ export class BombDefusalGame {
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('💰 CASHED OUT!')
+      .setTitle('<:moneybag:1545149026528268308> CASHED OUT!')
       .setDescription(`━━━━━━━━━━━━━━\n\n` +
         `**Stages Defused:** ${this.data.stagesDefused}\n\n` +
         `**Final Multiplier:** x${multiplier.toFixed(2)}\n\n` +
@@ -499,7 +499,8 @@ export class BombDefusalGame {
       cashOutRow.addComponents(
         new ButtonBuilder()
           .setCustomId('bomb_cashout')
-          .setLabel('💰 CASH OUT')
+          .setEmoji('<:moneybag:1545149026528268308>')
+          .setLabel('CASH OUT')
           .setStyle(ButtonStyle.Success)
       );
       return cashOutRow;

@@ -1,4 +1,5 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, TextChannel, User } from 'discord.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
 
 type ImpostorState = 'idle' | 'lobby' | 'clue_submission' | 'voting' | 'kill_phase' | 'complete' | 'timeout';
 
@@ -621,7 +622,7 @@ export class ImpostorGame {
     const channel = this.data.message?.channel as TextChannel;
 
     const embed = new EmbedBuilder()
-      .setTitle(winner === 'impostor' ? '🕵️ IMPOSTOR WINS!' : '🎉 CREW WINS!')
+      .setTitle(winner === 'impostor' ? '🕵️ IMPOSTOR WINS!' : `${EMOJIS.confettipopper} CREW WINS!`)
       .setDescription(`**The Impostor was:** ${impostor?.username}\n\n` +
         `**Secret Word:** ${this.data.secretWord}\n\n` +
         `**Rounds Played:** ${this.data.currentRound}`)

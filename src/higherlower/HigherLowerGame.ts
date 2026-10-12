@@ -210,10 +210,21 @@ export class HigherLowerGame {
     // Draw first card
     this.data.currentCard = this.data.deck.pop()!;
 
-    const sentMessage = await message.reply({
-      embeds: [this.createGameEmbed()],
-      components: [this.createGameButtons()],
-    });
+    let sentMessage: Message;
+    try {
+      sentMessage = await message.reply({
+        embeds: [this.createGameEmbed()],
+        components: [this.createGameButtons()],
+      });
+    } catch (error) {
+      // The game could not be posted: give the wager back so nothing is lost.
+      this.state = 'complete';
+      await awardCoins(this.data.userId, this.data.betAmount, 'higherlower', {
+        reason: 'Higher or Lower refund',
+        description: 'Could not post the game',
+      }).catch((refundError) => console.error('[Refund] Failed:', refundError));
+      throw error;
+    }
 
     this.data.messageId = sentMessage.id;
     this.data.message = sentMessage;
@@ -434,7 +445,7 @@ export class HigherLowerGame {
     if (!prev) {
       return `${cardEmoji(cur)} **${cardLabel(cur)}**`;
     }
-    return `${cardEmoji(prev)}${cardEmoji(cur)} **${cardLabel(prev)} → ${cardLabel(cur)}**`;
+    return `${cardEmoji(prev)}${cardEmoji(cur)}  **${cardLabel(prev)} → ${cardLabel(cur)}**`;
   }
 
   private createGameEmbed(status: 'correct' | 'push' | null = null): EmbedBuilder {
@@ -443,16 +454,16 @@ export class HigherLowerGame {
 
     if (status === 'correct') {
       description =
-        `${this.cardsLine()} ${TICK}\n` +
-        `${EMOJIS.fire} **${this.data.streak}** · ${mult(getMultiplier(this.data.streak))} · ${coins(this.data.currentPayout)}`;
+        `${this.cardsLine()}  ${TICK}\n\n` +
+        `${EMOJIS.fire} **${this.data.streak}**  ·  ${mult(getMultiplier(this.data.streak))}  ·  ${coins(this.data.currentPayout)}`;
       color = COLORS.win;
     } else if (status === 'push') {
       description =
-        `${this.cardsLine()} ${EMOJIS.hand_emoji} same rank\n` +
-        `${EMOJIS.fire} **${this.data.streak}** · ${mult(getMultiplier(this.data.streak))} · ${coins(this.data.currentPayout)}`;
+        `${this.cardsLine()}  ${EMOJIS.hand_emoji}  same rank\n\n` +
+        `${EMOJIS.fire} **${this.data.streak}**  ·  ${mult(getMultiplier(this.data.streak))}  ·  ${coins(this.data.currentPayout)}`;
       color = COLORS.push;
     } else {
-      description = `${this.cardsLine()} · higher or lower?\n${coins(this.data.betAmount)}`;
+      description = `${this.cardsLine()}  ·  higher or lower?\n\n${coins(this.data.betAmount)}`;
     }
 
     return new EmbedBuilder()
@@ -467,8 +478,8 @@ export class HigherLowerGame {
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl || undefined })
       .setDescription(
-        `${EMOJIS.moneybag} **Cashed out** ${signedCoins(netProfit)}\n` +
-        `${this.cardsLine()} · ${EMOJIS.fire} **${this.data.streak}** · ${mult(getMultiplier(this.data.streak))}`
+        `${EMOJIS.moneybag}  **Cashed out**  ${signedCoins(netProfit)}\n\n` +
+        `${this.cardsLine()}\n\n${EMOJIS.fire} **${this.data.streak}**  ·  ${mult(getMultiplier(this.data.streak))}`
       )
       .setColor(COLORS.cashout);
   }
@@ -477,9 +488,9 @@ export class HigherLowerGame {
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl || undefined })
       .setDescription(
-        `${this.cardsLine()} ${CROSS}\n` +
+        `${this.cardsLine()}  ${CROSS}\n\n` +
         `${signedCoins(-this.data.betAmount)}` +
-        (this.data.streak > 0 ? ` · ${EMOJIS.fire} **${this.data.streak}**` : '')
+        (this.data.streak > 0 ? `  ·  ${EMOJIS.fire} **${this.data.streak}**` : '')
       )
       .setColor(COLORS.loss);
   }

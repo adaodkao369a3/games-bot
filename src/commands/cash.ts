@@ -6,7 +6,7 @@ import { parseWagerAmount } from '../utils/wager-parser.js';
 export async function handleCashCommand(message: Message, args: string[]): Promise<void> {
   // Check if user is staff
   if (!isStaff(message.member)) {
-    await message.reply('❌ You do not have permission to use this command.');
+    await message.reply('<:cross:1558430092043096154> You do not have permission to use this command.');
     return;
   }
 

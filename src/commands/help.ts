@@ -1,68 +1,201 @@
-import { Message, EmbedBuilder } from 'discord.js';
-import { isStaff } from '../utils/permissions.js';
+import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Interaction } from 'discord.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
 
 /**
- * Handle the help command
+ * Help menu: a main page (currency, everyday commands, quotes) plus one page per
+ * category, reached with buttons. Staff/admin commands are deliberately not listed.
+ *
+ * Button ids: help_<page>_<ownerUserId>. Only the person who opened the menu can use it.
  */
-export async function handleHelpCommand(message: Message): Promise<void> {
-  try {
-    const staffMember = isStaff(message.member);
 
-    const embed = new EmbedBuilder()
-      .setTitle('<:bob:1545141387656302663> Bob Kun — Commands')
-      .setColor('#5865F2')
-      .setDescription('Here are all the commands you can use:');
+type HelpPage = 'main' | 'casino' | 'agency' | 'games' | 'titles';
 
-    // User-facing commands
-    embed.addFields([
+const COLOR = 0xe06550;
+
+/** One command entry: bold command on the first line, what it does underneath. */
+function entry(command: string, text: string): string {
+  return `**\`${command}\`**\n${text}`;
+}
+
+/** Blank line between entries so the page can breathe. */
+function list(...entries: string[]): string {
+  return entries.join('\n\n');
+}
+
+function mainEmbed(): EmbedBuilder {
+  return new EmbedBuilder()
+    .setTitle(`${EMOJIS.bob}  Bob Kun  ·  Commands`)
+    .setColor(COLOR)
+    .setDescription('Pick a category with the buttons below.')
+    .addFields([
       {
-        name: '<:controller:1545149011894210642> **Games**',
-        value: '`.trial @user [accusation]` — Hold a courtroom trial\n`.gamble [amount]` — Play Bob\'s slot machine gamble *(game floor only)*\n`.diceduel @user [amount]` — Challenge someone to a dice duel *(game floor only)*\n`.hlow [amount]` — Predict if the next card is higher or lower *(game floor only)*\n`.croulette [amount]` — Draw mystery cards and survive *(game floor only)*\n`.bomb [amount]` — Defuse the bomb before it explodes *(game floor only)*\n`.wordbomb` — Fast-paced multiplayer word game\n`.bj [amount]` — Single-player Blackjack vs dealer *(game floor only)*\n`.bj2 @user [amount]` — 2-player Blackjack vs dealer *(game floor only)*\n`.cf [amount]` — Predict coin flips and build streaks *(game floor only)*\n`.impostor` — Find the Impostor among the crew\n`.numguess` — Guess the hidden number closest\n`.simonsays` — Follow the commands and survive\n`.mog [@user]` — Generate a MOG Archive classification card\n`.moglb` — View the MOG Files leaderboard',
+        name: `${EMOJIS.moneybag}  Currency`,
+        value: list(
+          entry('.wallet', 'Check your Bombo Coin balance'),
+          entry('.highscore', 'The Bombo Coin leaderboard (also `.hs`)'),
+          entry('.goon', 'Claim coins on a cooldown *(goon channel)*'),
+          entry('.edge', 'Build an edge streak for bonus coins *(goon channel)*'),
+        ),
         inline: false,
       },
       {
-        name: '👑 **Titles**',
-        value: '`.quiz jjk` — Take the JJK quiz to claim the Lord of the Heian Era title\n`.challenge @user jjk` — Challenge the current title holder for JJK\n`.roles` — View and forfeit your earned roles for 2k coins',
+        name: `${EMOJIS.pin}  Everyday`,
+        value: list(
+          entry('.av [@user]', "Show someone's avatar (also `.avatar`)"),
+          entry('.mog [@user]', 'Generate a MOG Archive classification card'),
+          entry('.moglb', 'The MOG Files leaderboard'),
+        ),
         inline: false,
       },
       {
-        name: '<:pixelsymbolupside:1545149037135536168> **Quotes** <:pixelsymboltop:1545149034593910886>',
-        value: '`.quote` — Create a quote card from a replied message (themes: classic, white, sunset, purple, aurora, gold, cherry, midnight, plasma, emerald, rose, ember, sapphire, coral, lime)',
-        inline: false,
-      },
-      {
-        name: '🕴️ **Talent Agency**',
-        value: '`.pscout` — Scout new talent (free, every 30 min)\n`.precruit <name>` — Sign talent you scouted\n`.pwork <name>` — Send a talent out to work\n`.pcollect` — Collect earnings from working talent\n`.plist` — Your agency hub: roster, care, training',
-        inline: false,
-      },
-      {
-        name: '<:moneybag:1545149026528268308> **Currency**',
-        value: '`.wallet` — Check your Bombo Coin balance\n`.highscore` / `.hs` — View the Bombo Coin leaderboard',
+        name: `${EMOJIS.chat}  Quotes`,
+        value: list(
+          entry('.quote', 'Reply to a message to turn it into a quote card'),
+          'Themes: classic, white, sunset, purple, aurora, gold, cherry, midnight, plasma, emerald, rose, ember, sapphire, coral, lime',
+        ),
         inline: false,
       },
     ]);
+}
 
-    // Staff-only section
-    if (staffMember) {
-      embed.addFields([
-        {
-          name: '<a:staff:1545149054936289345> **Staff Commands**',
-          value: '`.cash @user [amount]` — Give Bombo Coins to a user',
-          inline: false,
-        },
-      ]);
-    }
+function casinoEmbed(): EmbedBuilder {
+  return new EmbedBuilder()
+    .setTitle(`${EMOJIS.cash}  Casino`)
+    .setColor(COLOR)
+    .setDescription(
+      'Everything here costs Bombo Coins and only works on the game floor.\n' +
+      'Amounts accept `500`, `10k`, `1.5m` or `all`.\n\n' +
+      list(
+        entry('.gamble <amount>', "Bob's slot machine"),
+        entry('.cf <amount>', 'Call heads or tails, build a streak, cash out'),
+        entry('.rlt <amount> [number]', 'Roulette: colours, odd/even, dozens or an exact number'),
+        entry('.bj <amount>', 'Blackjack against the dealer'),
+        entry('.bj2 @user <amount>', 'Two-player blackjack against the dealer'),
+        entry('.hlow <amount>', 'Higher or lower: guess the next card'),
+        entry('.croulette <amount>', 'Draw mystery cards and survive'),
+        entry('.bomb <amount>', 'Defuse the bomb before it explodes'),
+        entry('.diceduel @user <amount>', 'Dice duel, first to the winning score'),
+      )
+    );
+}
 
-    embed.setFooter({ text: 'Bob Kun v1.0' });
-    embed.setTimestamp();
+function agencyEmbed(): EmbedBuilder {
+  return new EmbedBuilder()
+    .setTitle(`${EMOJIS.people}  Talent Agency`)
+    .setColor(COLOR)
+    .setDescription(
+      'Scout talent, send them to work and collect coins.\n\n' +
+      list(
+        entry('.pscout', 'Scout new talent (free, every 30 minutes)'),
+        entry('.precruit <name>', 'Sign talent you have scouted'),
+        entry('.pwork <name>', 'Send a character out to work'),
+        entry('.pcollect', 'Collect earnings from everyone who finished'),
+        entry('.plist', 'Your agency hub: roster, care and training'),
+        entry('.phelp', 'The full Talent Agency guide'),
+      )
+    );
+}
 
+function gamesEmbed(): EmbedBuilder {
+  return new EmbedBuilder()
+    .setTitle(`${EMOJIS.controller}  Games`)
+    .setColor(COLOR)
+    .setDescription(
+      list(
+        entry('.trial @user [accusation]', 'Put someone on trial in a courtroom'),
+        entry('.wordbomb', 'Fast word game, do not be holding the bomb'),
+        entry('.impostor', 'Find the impostor among the crew'),
+        entry('.numguess', 'Guess the hidden number'),
+        entry('.simonsays', 'Follow the commands and survive'),
+        entry('.pisscomp @user', 'Fill your meter first'),
+        entry('.pisscompmax @user', 'Piss comp, then a fight to the finish'),
+      )
+    );
+}
+
+function titlesEmbed(): EmbedBuilder {
+  return new EmbedBuilder()
+    .setTitle(`${EMOJIS.dcrown}  Titles`)
+    .setColor(COLOR)
+    .setDescription(
+      list(
+        entry('.quiz jjk', 'Take the JJK quiz to claim Lord of the Heian Era'),
+        entry('.challenge @user jjk', 'Challenge the current title holder'),
+        entry('.roles', 'See your earned roles and forfeit them for coins'),
+      )
+    );
+}
+
+function embedFor(page: HelpPage): EmbedBuilder {
+  switch (page) {
+    case 'casino': return casinoEmbed();
+    case 'agency': return agencyEmbed();
+    case 'games': return gamesEmbed();
+    case 'titles': return titlesEmbed();
+    default: return mainEmbed();
+  }
+}
+
+/** Five buttons in one row. The page you are on is highlighted and locked. */
+function buttonsFor(current: HelpPage, ownerId: string): ActionRowBuilder<ButtonBuilder>[] {
+  const make = (page: HelpPage, label: string, emoji: string) =>
+    new ButtonBuilder()
+      .setCustomId(`help_${page}_${ownerId}`)
+      .setEmoji(emoji)
+      .setLabel(label)
+      .setStyle(page === current ? ButtonStyle.Success : ButtonStyle.Secondary)
+      .setDisabled(page === current);
+
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      make('main', 'Home', EMOJIS.bob),
+      make('casino', 'Casino', EMOJIS.cash),
+      make('agency', 'Talent Agency', EMOJIS.people),
+      make('games', 'Games', EMOJIS.controller),
+      make('titles', 'Titles', EMOJIS.dcrown)
+    ),
+  ];
+}
+
+export async function handleHelpCommand(message: Message): Promise<void> {
+  try {
     await message.reply({
-      embeds: [embed],
+      embeds: [embedFor('main')],
+      components: buttonsFor('main', message.author.id),
     });
   } catch (error) {
     console.error('[Help Command] Error:', error);
-    await message.reply({
-      content: '❌ There was an error showing the help message.',
+    await message.reply({ content: `${EMOJIS.cross} There was an error showing the help message.` }).catch(() => {});
+  }
+}
+
+export async function handleHelpInteraction(interaction: Interaction): Promise<void> {
+  if (!interaction.isButton()) return;
+
+  try {
+    // help_<page>_<ownerId>
+    const match = /^help_(main|casino|agency|games|titles)_(\d+)$/.exec(interaction.customId);
+    if (!match) {
+      await interaction.deferUpdate().catch(() => {});
+      return;
+    }
+
+    const page = match[1] as HelpPage;
+    const ownerId = match[2];
+
+    if (interaction.user.id !== ownerId) {
+      await interaction.reply({ content: 'This is not your help menu. Type `.qhelp` to open your own.', ephemeral: true });
+      return;
+    }
+
+    await interaction.update({
+      embeds: [embedFor(page)],
+      components: buttonsFor(page, ownerId),
     });
+  } catch (error) {
+    console.error('[Help Interaction] Error:', error);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: `${EMOJIS.cross} There was an error updating the help menu.`, ephemeral: true }).catch(() => {});
+    }
   }
 }

@@ -118,7 +118,7 @@ export async function handleMoglbCommand(message: Message): Promise<void> {
 
     if (allProfiles.length === 0) {
       const emptyEmbed = new EmbedBuilder()
-        .setTitle('🏆 THE MOG FILES — LEADERBOARD')
+        .setTitle('<:trophy:1545135066148118628> THE MOG FILES — LEADERBOARD')
         .setDescription('No MOG profiles have been recorded yet. Run `.mog` to create the first file.')
         .setColor(0x4A90E2)
         .setFooter({ text: 'BOMBO PRODUCTIONS' });
@@ -195,7 +195,7 @@ function generateLeaderboardPage(
   }
 
   const embed = new EmbedBuilder()
-    .setTitle('🏆 THE MOG FILES — LEADERBOARD')
+    .setTitle('<:trophy:1545135066148118628> THE MOG FILES — LEADERBOARD')
     .setDescription('Server classifications, ranked by rank, stars, and total attributes.')
     .setColor(0x4A90E2)
     .addFields({ name: 'Leaderboard', value: description || 'No entries' })

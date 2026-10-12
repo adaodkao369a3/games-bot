@@ -113,10 +113,21 @@ export class BlackjackGame {
       return;
     }
 
-    const sentMessage = await message.reply({
-      embeds: [await this.createGameEmbed()],
-      components: [this.createGameButtons()],
-    });
+    let sentMessage: Message;
+    try {
+      sentMessage = await message.reply({
+        embeds: [await this.createGameEmbed()],
+        components: [this.createGameButtons()],
+      });
+    } catch (error) {
+      // The game could not be posted: give the wager back so nothing is lost.
+      this.state = 'complete';
+      await awardCoins(this.data.userId, this.data.betAmount, 'bj', {
+        reason: 'Blackjack refund',
+        description: 'Could not post the game',
+      }).catch((refundError) => console.error('[Refund] Failed:', refundError));
+      throw error;
+    }
 
     this.data.messageId = sentMessage.id;
     this.data.message = sentMessage;
@@ -430,9 +441,9 @@ export class BlackjackGame {
     const dealerCards = await formatHand(this.data.dealerHand, true);
 
     const description =
-      `**You** · **${playerTotal}** · ${coins(this.data.betAmount)}\n` +
-      `${playerCards}\n` +
-      `**Dealer** · **${dealerShowing}**\n` +
+      `**You**  ·  **${playerTotal}**  ·  ${coins(this.data.betAmount)}\n` +
+      `${playerCards}\n\n` +
+      `**Dealer**  ·  **${dealerShowing}**\n` +
       `${dealerCards}`;
 
     return new EmbedBuilder()
@@ -468,10 +479,10 @@ export class BlackjackGame {
     const dealerCards = await formatHand(this.data.dealerHand, false);
 
     const description =
-      `${headline}\n` +
-      `**You** · **${playerTotal}**\n` +
-      `${playerCards}\n` +
-      `**Dealer** · **${dealerTotal}**\n` +
+      `${headline}\n\n` +
+      `**You**  ·  **${playerTotal}**\n` +
+      `${playerCards}\n\n` +
+      `**Dealer**  ·  **${dealerTotal}**\n` +
       `${dealerCards}`;
 
     return new EmbedBuilder()

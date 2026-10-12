@@ -40,7 +40,7 @@ export async function handleRolesCommand(message: Message): Promise<void> {
 
     if (userRoles.length === 0) {
       const noRolesEmbed = new EmbedBuilder()
-        .setTitle('👑 Your Roles')
+        .setTitle('<:dcrown:1545829050847862784> Your Roles')
         .setDescription('You don\'t have any roles yet. Complete quizzes to earn titles!')
         .setColor(0x00BFFF)
         .setFooter({ text: 'Use `.quiz jjk` to start earning roles!' });
@@ -51,13 +51,13 @@ export async function handleRolesCommand(message: Message): Promise<void> {
 
     // Build embed
     const embed = new EmbedBuilder()
-      .setTitle('👑 Your Roles')
+      .setTitle('<:dcrown:1545829050847862784> Your Roles')
       .setDescription('View and manage your earned roles')
       .setColor(0x00BFFF);
 
     const roleList = userRoles.map((role, index) => {
-      const status = role.forfeited ? '~~Stripped~~' : (role.hasRole ? '✅ Active' : '❌ Lost');
-      const forfeitButton = role.hasRole && !role.forfeited ? `\n💰 Forfeit for ${FORFEIT_COST.toLocaleString()} coins` : '';
+      const status = role.forfeited ? '~~Stripped~~' : (role.hasRole ? '<:tick:1558430105120804884> Active' : '<:cross:1558430092043096154> Lost');
+      const forfeitButton = role.hasRole && !role.forfeited ? `\n<:moneybag:1545149026528268308> Forfeit for ${FORFEIT_COST.toLocaleString()} coins` : '';
       return `${index + 1}. **${role.name}** - ${status}${forfeitButton}`;
     }).join('\n');
 
@@ -170,7 +170,7 @@ export async function handleRolesInteraction(interaction: MessageComponentIntera
     });
 
     await interaction.reply({
-      content: `✅ You have forfeited the **${category.name}** role and received ${FORFEIT_COST.toLocaleString()} <:bombocoin:1545139736312815840>!\nNew balance: ${newBalance?.toLocaleString('en-US') || 0} <:bombocoin:1545139736312815840>`,
+      content: `<:tick:1558430105120804884> You have forfeited the **${category.name}** role and received ${FORFEIT_COST.toLocaleString()} <:bombocoin:1545139736312815840>!\nNew balance: ${newBalance?.toLocaleString('en-US') || 0} <:bombocoin:1545139736312815840>`,
       ephemeral: true,
     });
 

@@ -51,7 +51,11 @@ const GAME_CONFIG = {
   defaultMultiplier: 12.0,
   // Timeout in milliseconds
   timeoutMs: 5 * 60 * 1000, // 5 minutes
+  // How long the spinning coin is shown before the result
+  spinMs: 1800,
 };
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const COLORS = {
   playing: 0x3498db,
@@ -149,10 +153,21 @@ export class CoinFlipGame {
 
     this.state = 'playing';
 
-    const sentMessage = await message.reply({
-      embeds: [this.createGameEmbed()],
-      components: [this.createGameButtons()],
-    });
+    let sentMessage: Message;
+    try {
+      sentMessage = await message.reply({
+        embeds: [this.createGameEmbed()],
+        components: [this.createGameButtons()],
+      });
+    } catch (error) {
+      // The game could not be posted: give the wager back so nothing is lost.
+      this.state = 'complete';
+      await awardCoins(this.data.userId, this.data.betAmount, 'cf', {
+        reason: 'Coin Flip refund',
+        description: 'Could not post the game',
+      }).catch((refundError) => console.error('[Refund] Failed:', refundError));
+      throw error;
+    }
 
     this.data.messageId = sentMessage.id;
     this.data.message = sentMessage;
@@ -201,7 +216,39 @@ export class CoinFlipGame {
       return;
     }
 
-    // Flip the coin
+    // 1) The player picked a side: show the spinning coin straight away, buttons locked.
+    //    Nothing is decided yet, so if this fails the game is untouched.
+    this.clearTimeout();
+    try {
+      await interaction.update({
+        embeds: [this.createSpinEmbed(call)],
+        components: [this.createGameButtons(true)],
+      });
+    } catch (error) {
+      console.error('[CoinFlip] Could not show the spinning coin:', error);
+      this.armTimeout();
+      return;
+    }
+
+    try {
+      await this.landCoin(interaction, call);
+    } catch (error) {
+      // The spinning coin is already on screen: never leave the game frozen behind locked buttons.
+      console.error('[CoinFlip] Error while landing the coin:', error);
+      if (this.state === 'playing') {
+        this.armTimeout();
+        await interaction
+          .editReply({ embeds: [this.createGameEmbed()], components: [this.createGameButtons()] })
+          .catch(() => {});
+      }
+    }
+  }
+
+  /** The coin lands: decide the result and show it. */
+  private async landCoin(interaction: MessageComponentInteraction, call: CoinSide): Promise<void> {
+    await sleep(GAME_CONFIG.spinMs);
+
+    // 2) The coin lands
     const result = flipCoin();
     const correct = call === result;
 
@@ -219,6 +266,7 @@ export class CoinFlipGame {
     if (correct) {
       this.data.streak++;
       this.data.currentPayout = calculatePayout(this.data.betAmount, this.data.streak);
+      this.armTimeout();
 
       await respond(interaction, {
         embeds: [this.createGameEmbed()],
@@ -284,9 +332,9 @@ export class CoinFlipGame {
     const call = this.data.lastCall!;
 
     const description =
-      `${sideEmoji(flip)} **${flip}** ${CROSS} · called **${call}**\n` +
+      `${sideEmoji(flip)}  **${flip}**  ${CROSS}  ·  called **${call}**\n\n` +
       `${signedCoins(-this.data.betAmount)}` +
-      (this.data.streak > 0 ? ` · ${EMOJIS.fire} **${this.data.streak}**` : '') +
+      (this.data.streak > 0 ? `  ·  ${EMOJIS.fire} **${this.data.streak}**` : '') +
       this.historyLine();
 
     const embed = new EmbedBuilder()
@@ -363,18 +411,19 @@ export class CoinFlipGame {
   private historyLine(): string {
     if (this.data.flipHistory.length < 2) return '';
     const recent = this.data.flipHistory.slice(-10).map((f) => sideEmoji(f.result)).join('');
-    return `\n${recent}`;
+    return `\n\n${recent}`;
   }
 
   private createGameEmbed(): EmbedBuilder {
     let description: string;
 
     if (this.data.lastFlip === null) {
-      description = `${EMOJIS.coinflip} **Heads or tails?**\n${coins(this.data.betAmount)}`;
+      // The coin rests on heads until somebody picks a side
+      description = `${EMOJIS.heads}  **Heads or tails?**\n\n${coins(this.data.betAmount)}`;
     } else {
       description =
-        `${sideEmoji(this.data.lastFlip)} **${this.data.lastFlip}** ${TICK}\n` +
-        `${EMOJIS.fire} **${this.data.streak}** · ${mult(getMultiplier(this.data.streak))} · ${coins(this.data.currentPayout)}` +
+        `${sideEmoji(this.data.lastFlip)}  **${this.data.lastFlip}**  ${TICK}\n\n` +
+        `${EMOJIS.fire} **${this.data.streak}**  ·  ${mult(getMultiplier(this.data.streak))}  ·  ${coins(this.data.currentPayout)}` +
         this.historyLine();
     }
 
@@ -384,12 +433,20 @@ export class CoinFlipGame {
       .setColor(this.data.lastFlip === null ? COLORS.playing : COLORS.win);
   }
 
+  /** The coin is in the air: animated coin, plus what the player called */
+  private createSpinEmbed(call: CoinSide): EmbedBuilder {
+    return new EmbedBuilder()
+      .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
+      .setDescription(`${EMOJIS.coinflip}  **Flipping…**\n\ncalled ${sideEmoji(call)} **${call}**`)
+      .setColor(COLORS.playing);
+  }
+
   private createCashoutEmbed(): EmbedBuilder {
     const netProfit = this.data.currentPayout - this.data.betAmount;
 
     const description =
-      `${EMOJIS.moneybag} **Cashed out** ${signedCoins(netProfit)}\n` +
-      `${EMOJIS.fire} **${this.data.streak}** · ${mult(getMultiplier(this.data.streak))}` +
+      `${EMOJIS.moneybag}  **Cashed out**  ${signedCoins(netProfit)}\n\n` +
+      `${EMOJIS.fire} **${this.data.streak}**  ·  ${mult(getMultiplier(this.data.streak))}` +
       this.historyLine();
 
     return new EmbedBuilder()
@@ -400,7 +457,7 @@ export class CoinFlipGame {
 
   // Button creation methods
 
-  private createGameButtons(): ActionRowBuilder<ButtonBuilder> {
+  private createGameButtons(disabled: boolean = false): ActionRowBuilder<ButtonBuilder> {
     const row = new ActionRowBuilder<ButtonBuilder>();
 
     row.addComponents(
@@ -408,12 +465,14 @@ export class CoinFlipGame {
         .setCustomId('cf_heads')
         .setEmoji(EMOJIS.heads)
         .setLabel('Heads')
-        .setStyle(ButtonStyle.Primary),
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled),
       new ButtonBuilder()
         .setCustomId('cf_tails')
         .setEmoji(EMOJIS.tails)
         .setLabel('Tails')
         .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled)
     );
 
     // Add cash out button if at least one correct prediction
@@ -424,6 +483,7 @@ export class CoinFlipGame {
           .setEmoji(EMOJIS.moneybag)
           .setLabel('Cash out')
           .setStyle(ButtonStyle.Success)
+          .setDisabled(disabled)
       );
     }
 

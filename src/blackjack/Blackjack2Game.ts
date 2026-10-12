@@ -609,8 +609,9 @@ export class Blackjack2Game {
   private createChallengeEmbed(): EmbedBuilder {
     return new EmbedBuilder()
       .setDescription(
-        `${EMOJIS.cards} **${this.data.player1Name}** ${EMOJIS.swords} **${this.data.player2Name}**\n` +
-        `${coins(this.data.betAmount)} each · ${this.data.player2Name}, accept?`
+        `${EMOJIS.cards}  **${this.data.player1Name}**  ${EMOJIS.swords}  **${this.data.player2Name}**\n\n` +
+        `${coins(this.data.betAmount)} each\n\n` +
+        `${this.data.player2Name}, accept?`
       )
       .setColor(COLORS.playing);
   }
@@ -626,12 +627,12 @@ export class Blackjack2Game {
     const dealerShowing = this.data.dealerHand[0].value === 1 ? 11 : this.data.dealerHand[0].value;
     const dealerCards = await formatHand(this.data.dealerHand, true);
 
-    let description = `**Dealer** · **${dealerShowing}**\n${dealerCards}\n`;
+    let description = `**Dealer**  ·  **${dealerShowing}**\n${dealerCards}\n\n`;
 
     for (const [key, hand] of [['player1', this.data.player1Hand], ['player2', this.data.player2Hand]] as const) {
       const total = calculateHandTotal(hand.hand);
       const cards = await formatHand(hand.hand, false);
-      description += `${this.playerStatus(hand, key)} **${hand.username}** · **${hand.result === 'bust' ? 'BUST' : total}** · ${coins(hand.betAmount)}\n${cards}\n`;
+      description += `${this.playerStatus(hand, key)} **${hand.username}**  ·  **${hand.result === 'bust' ? 'BUST' : total}**  ·  ${coins(hand.betAmount)}\n${cards}\n\n`;
     }
 
     return new EmbedBuilder()
@@ -643,7 +644,7 @@ export class Blackjack2Game {
     const dealerTotal = calculateHandTotal(this.data.dealerHand);
     const dealerCards = await formatHand(this.data.dealerHand, false);
 
-    let description = `**Dealer** · **${isBust(this.data.dealerHand) ? 'BUST' : dealerTotal}**\n${dealerCards}\n`;
+    let description = `**Dealer**  ·  **${isBust(this.data.dealerHand) ? 'BUST' : dealerTotal}**\n${dealerCards}\n\n`;
 
     for (const hand of [this.data.player1Hand, this.data.player2Hand]) {
       const total = calculateHandTotal(hand.hand);
@@ -667,7 +668,7 @@ export class Blackjack2Game {
         outcome = `**-${num(hand.betAmount)}** ${COIN}`;
       }
 
-      description += `${icon} **${hand.username}** · **${hand.result === 'bust' ? 'BUST' : total}** · ${outcome}\n${cards}\n`;
+      description += `${icon} **${hand.username}**  ·  **${hand.result === 'bust' ? 'BUST' : total}**  ·  ${outcome}\n${cards}\n\n`;
     }
 
     return new EmbedBuilder()

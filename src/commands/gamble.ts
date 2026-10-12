@@ -18,26 +18,26 @@ function randomSymbol(exclude?: string): string {
 }
 
 function randomReelFrame(): string {
-  return `<a:slots:1545149049328640120> <a:slots:1545149049328640120> <a:slots:1545149049328640120>`;
+  return `<a:slots:1545149049328640120>  <a:slots:1545149049328640120>  <a:slots:1545149049328640120>`;
 }
 
 function progressiveReelFrame(stopped1: string | null, stopped2: string | null, stopped3: string | null): string {
   const reel1 = stopped1 || '<a:slots:1545149049328640120>';
   const reel2 = stopped2 || '<a:slots:1545149049328640120>';
   const reel3 = stopped3 || '<a:slots:1545149049328640120>';
-  return `${reel1} ${reel2} ${reel3}`;
+  return `${reel1}  ${reel2}  ${reel3}`;
 }
 
 // Landing frame: 3-of-a-kind on the win symbol for a win, a guaranteed
 // non-matching combo for a loss.
 function finalReelFrame(won: boolean): string {
   if (won) {
-    return `${WIN_SYMBOL} ${WIN_SYMBOL} ${WIN_SYMBOL}`;
+    return `${WIN_SYMBOL}  ${WIN_SYMBOL}  ${WIN_SYMBOL}`;
   }
   const a = randomSymbol();
   const b = randomSymbol(a);
   const c = randomSymbol(b);
-  return `${a} ${b} ${c}`;
+  return `${a}  ${b}  ${c}`;
 }
 
 function buildLoadingMessage(): string {
@@ -211,10 +211,10 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       const winResultEmbed = new EmbedBuilder()
         .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
         .setDescription(
-          `${symbol1} ${symbol2} ${symbol3}\n` +
+          `${symbol1}  ${symbol2}  ${symbol3}\n\n` +
           (jackpot
-            ? `${EMOJIS.win} **JACKPOT x10** ${signedCoins(net)}`
-            : `${TICK} **WIN** ${signedCoins(net)}`)
+            ? `${EMOJIS.win}  **JACKPOT x10**  ${signedCoins(net)}`
+            : `${TICK}  **WIN**  ${signedCoins(net)}`)
         )
         .setColor(jackpot ? 0xFFD700 : 0x2ecc71);
 
@@ -225,7 +225,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       // Edit message with lose result embed
       const loseResultEmbed = new EmbedBuilder()
         .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
-        .setDescription(`${symbol1} ${symbol2} ${symbol3}\n${CROSS} **LOSS** ${signedCoins(-wager)}`)
+        .setDescription(`${symbol1}  ${symbol2}  ${symbol3}\n\n${CROSS}  **LOSS**  ${signedCoins(-wager)}`)
         .setColor(0xe74c3c);
 
       await initialMessage.edit({ content: null, embeds: [loseResultEmbed] });

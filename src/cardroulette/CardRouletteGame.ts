@@ -213,10 +213,21 @@ export class CardRouletteGame {
 
     this.state = 'playing';
 
-    const sentMessage = await message.reply({
-      embeds: [this.createGameEmbed()],
-      components: [this.createGameButtons()],
-    });
+    let sentMessage: Message;
+    try {
+      sentMessage = await message.reply({
+        embeds: [this.createGameEmbed()],
+        components: [this.createGameButtons()],
+      });
+    } catch (error) {
+      // The game could not be posted: give the wager back so nothing is lost.
+      this.state = 'complete';
+      await awardCoins(this.data.userId, this.data.betAmount, 'croulette', {
+        reason: 'Card Roulette refund',
+        description: 'Could not post the game',
+      }).catch((refundError) => console.error('[Refund] Failed:', refundError));
+      throw error;
+    }
 
     this.data.messageId = sentMessage.id;
     this.data.message = sentMessage;
@@ -460,25 +471,25 @@ export class CardRouletteGame {
   /** Everything drawn so far as a row of emojis (shown once there are 2+ cards) */
   private historyLine(): string {
     if (this.data.cardsDrawn.length < 2) return '';
-    return `\n${this.data.cardsDrawn.slice(-12).map((c) => c.emoji).join('')}`;
+    return `\n\n${this.data.cardsDrawn.slice(-12).map((c) => c.emoji).join('')}`;
   }
 
   private createGameEmbed(status: 'skipped' | null = null): EmbedBuilder {
-    const stats = `${EMOJIS.cards} **${this.data.drawsSurvived}** · ${mult(getMultiplier(this.data.drawsSurvived))} · ${coins(this.data.currentPayout)}`;
+    const stats = `${EMOJIS.cards} **${this.data.drawsSurvived}**  ·  ${mult(getMultiplier(this.data.drawsSurvived))}  ·  ${coins(this.data.currentPayout)}`;
 
     let description: string;
     let color = COLORS.playing;
 
     if (status === 'skipped') {
-      description = `${EMOJIS.arrow_right} **Turn skipped** · draw again\n${stats}${this.historyLine()}`;
+      description = `${EMOJIS.arrow_right}  **Turn skipped**  ·  draw again\n\n${stats}${this.historyLine()}`;
     } else if (this.data.currentCard) {
       const card = this.data.currentCard;
       description =
-        `${card.emoji} **${card.name}**${card.description ? ` · ${card.description}` : ''}\n` +
+        `${card.emoji}  **${card.name}**${card.description ? `  ·  ${card.description}` : ''}\n\n` +
         `${stats}${this.historyLine()}`;
       color = COLORS.safe;
     } else {
-      description = `${EMOJIS.card_back} **Draw a card**\n${coins(this.data.betAmount)}`;
+      description = `${EMOJIS.card_back}  **Draw a card**\n\n${coins(this.data.betAmount)}`;
     }
 
     return new EmbedBuilder()
@@ -493,8 +504,8 @@ export class CardRouletteGame {
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setDescription(
-        `${EMOJIS.moneybag} **Cashed out** ${signedCoins(netProfit)}\n` +
-        `${EMOJIS.cards} **${this.data.drawsSurvived}** · ${mult(getMultiplier(this.data.drawsSurvived))}${this.historyLine()}`
+        `${EMOJIS.moneybag}  **Cashed out**  ${signedCoins(netProfit)}\n\n` +
+        `${EMOJIS.cards} **${this.data.drawsSurvived}**  ·  ${mult(getMultiplier(this.data.drawsSurvived))}${this.historyLine()}`
       )
       .setColor(COLORS.cashout);
   }
@@ -505,7 +516,7 @@ export class CardRouletteGame {
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setDescription(
-        `${card.emoji} **${card.name.toUpperCase()}** ${CROSS} ${signedCoins(-this.data.betAmount)}\n` +
+        `${card.emoji}  **${card.name.toUpperCase()}**  ${CROSS}  ${signedCoins(-this.data.betAmount)}\n\n` +
         `${EMOJIS.cards} survived **${this.data.drawsSurvived}**${this.historyLine()}`
       )
       .setColor(COLORS.loss);

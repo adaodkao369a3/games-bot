@@ -3,7 +3,7 @@ import { config, validateConfig } from '../config/index.js';
 import { BobKunPersonality } from '../services/bob-kun-personality.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { ChatRewardsService } from '../services/chat-rewards.js';
-import { handleHelpCommand } from '../commands/help.js';
+import { handleHelpCommand, handleHelpInteraction } from '../commands/help.js';
 import { handleBobkunCommand } from '../commands/bobkun.js';
 import { handlePissCompCommand, handlePissCompMaxCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
 import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } from '../commands/trial.js';
@@ -314,6 +314,11 @@ export class DiscordClient {
 
   private async handleButtonInteraction(interaction: any): Promise<void> {
     const customId = interaction.customId;
+
+    if (customId.startsWith('help_')) {
+      await handleHelpInteraction(interaction);
+      return;
+    }
 
     if (customId.startsWith('pisscomp_') || customId.startsWith('pisscompmax_')) {
       await handlePissCompInteraction(interaction);

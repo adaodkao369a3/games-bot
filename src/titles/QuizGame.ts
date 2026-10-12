@@ -220,7 +220,7 @@ export class QuizGame {
       embed = new EmbedBuilder()
         .setTitle('JJK QUIZ COMPLETE')
         .setDescription(`${this.data.score} / ${this.data.questions.length}\n\n` +
-          `👑 You have mastered the Jujutsu Kaisen quiz.\n\n` +
+          `<:dcrown:1545829050847862784> You have mastered the Jujutsu Kaisen quiz.\n\n` +
           `You are now the ${category?.name || 'Lord of the Heian Era'}.`)
         .setColor(0x00ff00);
     } else {

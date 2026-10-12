@@ -99,9 +99,9 @@ export class TitleDuelGame {
 
     const category = TitleSystem.getCategory(this.data.categoryId);
     const embed = new EmbedBuilder()
-      .setTitle('⚔️ TITLE CHALLENGE')
+      .setTitle('<:swords:1545829039074320564> TITLE CHALLENGE')
       .setDescription(`<@${this.data.challengerId}> has challenged <@${this.data.holderId}> for\n\n` +
-        `👑 ${category?.name || 'Lord of the Heian Era'}`)
+        `<:dcrown:1545829050847862784> ${category?.name || 'Lord of the Heian Era'}`)
       .setColor(0xFFD700);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -214,7 +214,7 @@ export class TitleDuelGame {
     this.clearTimeout();
 
     const embed = new EmbedBuilder()
-      .setTitle('⚔️ TITLE CHALLENGE')
+      .setTitle('<:swords:1545829039074320564> TITLE CHALLENGE')
       .setDescription(`Challenge declined.`)
       .setColor(0xe74c3c);
 
@@ -382,14 +382,14 @@ export class TitleDuelGame {
       );
 
       embed = new EmbedBuilder()
-        .setTitle('👑 NEW LORD OF THE HEIAN ERA')
+        .setTitle('<:dcrown:1545829050847862784> NEW LORD OF THE HEIAN ERA')
         .setDescription(`<@${this.data.challengerId}> defeated <@${this.data.holderId}>\n\n` +
           `${this.data.challengerScore} — ${this.data.holderScore}\n\n` +
           `The title has a new owner.`)
         .setColor(0x00ff00);
     } else {
       embed = new EmbedBuilder()
-        .setTitle('👑 LORD OF THE HEIAN ERA')
+        .setTitle('<:dcrown:1545829050847862784> LORD OF THE HEIAN ERA')
         .setDescription(`<@${this.data.holderId}> defended their title.\n\n` +
           `${this.data.holderScore} — ${this.data.challengerScore}\n\n` +
           `The title remains theirs.`)
@@ -411,7 +411,7 @@ export class TitleDuelGame {
     this.clearQuestionTimeout();
 
     const embed = new EmbedBuilder()
-      .setTitle('⚔️ TITLE DUEL')
+      .setTitle('<:swords:1545829039074320564> TITLE DUEL')
       .setDescription(`Duel timed out.`)
       .setColor(0xe74c3c);
 
@@ -461,7 +461,7 @@ export class TitleDuelGame {
     const roundText = suddenDeath ? 'SUDDEN DEATH' : `ROUND ${this.data.currentQuestionIndex + 1} / ${GAME_CONFIG.maxRounds}`;
     
     return new EmbedBuilder()
-      .setTitle('👑 JJK TITLE DUEL')
+      .setTitle('<:dcrown:1545829050847862784> JJK TITLE DUEL')
       .setDescription(`<@${this.data.challengerId}>  ${this.data.challengerScore}\n` +
         `<@${this.data.holderId}>  ${this.data.holderScore}\n\n` +
         `**${roundText}**\n\n` +

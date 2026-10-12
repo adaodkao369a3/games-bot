@@ -454,8 +454,9 @@ export class DiceDuelGame {
   private createChallengeEmbed(): EmbedBuilder {
     return new EmbedBuilder()
       .setDescription(
-        `${EMOJIS.dice} **${this.data.player1Name}** ${EMOJIS.swords} **${this.data.player2Name}**\n` +
-        `${coins(this.data.betAmount)} each · first to ${this.WINNING_SCORE} · ${this.data.player2Name}, accept?`
+        `${EMOJIS.dice}  **${this.data.player1Name}**  ${EMOJIS.swords}  **${this.data.player2Name}**\n\n` +
+        `${coins(this.data.betAmount)} each  ·  first to ${this.WINNING_SCORE}\n\n` +
+        `${this.data.player2Name}, accept?`
       )
       .setColor(COLORS.playing);
   }
@@ -464,15 +465,15 @@ export class DiceDuelGame {
     const turnName = this.state === 'rolling_p1' ? this.data.player1Name : this.data.player2Name;
 
     let description =
-      `**${this.data.player1Name}** **${this.data.player1Score}** – **${this.data.player2Score}** **${this.data.player2Name}**\n`;
+      `**${this.data.player1Name}**  **${this.data.player1Score}** – **${this.data.player2Score}**  **${this.data.player2Name}**\n\n`;
 
     if (this.lastRound && this.data.player1Roll === null) {
-      description += `${this.lastRound}\n`;
+      description += `${this.lastRound}\n\n`;
     }
 
     description +=
-      `${EMOJIS.dice} ${face(this.data.player1Roll)} vs ${face(this.data.player2Roll)}\n` +
-      `${EMOJIS.arrow_right} **${turnName}** rolls`;
+      `${EMOJIS.dice}  ${face(this.data.player1Roll)}  vs  ${face(this.data.player2Roll)}\n\n` +
+      `${EMOJIS.arrow_right}  **${turnName}** rolls`;
 
     return new EmbedBuilder()
       .setDescription(description)
@@ -484,8 +485,8 @@ export class DiceDuelGame {
 
     return new EmbedBuilder()
       .setDescription(
-        `${EMOJIS.trophy} **${winnerName}** wins ${coins(winnings)}\n` +
-        `**${this.data.player1Name}** **${this.data.player1Score}** – **${this.data.player2Score}** **${this.data.player2Name}**\n` +
+        `${EMOJIS.trophy}  **${winnerName}** wins ${coins(winnings)}\n\n` +
+        `**${this.data.player1Name}**  **${this.data.player1Score}** – **${this.data.player2Score}**  **${this.data.player2Name}**\n\n` +
         `${this.lastRound}`
       )
       .setColor(COLORS.done);

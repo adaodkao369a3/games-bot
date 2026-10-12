@@ -74,7 +74,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
   if (!isStaff(message.member) && now < quoteCooldownUntil) {
     const remainingTime = Math.ceil((quoteCooldownUntil - now) / 1000);
     await message.reply({
-      content: `⏳ Please wait ${remainingTime} second${remainingTime !== 1 ? 's' : ''} before creating another quote.`,
+      content: `<:cargando:1545149001983197364> Please wait ${remainingTime} second${remainingTime !== 1 ? 's' : ''} before creating another quote.`,
     });
     return;
   }

@@ -40,7 +40,7 @@ export async function handleWalletCommand(message: Message, args: string[] = [])
     .addFields(
       { name: 'Balance', value: `${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`, inline: true }
     )
-    .setFooter({ text: '💵 Bombo Coins are the currency of the realm.' });
+    .setFooter({ text: 'Bombo Coins are the currency of the realm.' });
 
   await message.reply({ embeds: [walletEmbed] });
 }

@@ -24,8 +24,8 @@ const GOON_FLAVOR_LINES = [
   '📉 Edge streak: deleted. Goon: secured.',
   '💸 Financially irresponsible. Spiritually committed.',
   '👁️ The temptation won.',
-  '🔥 Bro hit the emergency goon button.',
-  '🏆 Congratulations, you gooned. Society is proud.',
+  '<:fire:1558430096807952384> Bro hit the emergency goon button.',
+  '<:trophy:1545135066148118628> Congratulations, you gooned. Society is proud.',
 ];
 
 const GOON_LIMIT_FLAVOR = '💸 Bro used up the premium goon package.';
@@ -36,7 +36,7 @@ export async function handleGoonCommand(message: Message): Promise<void> {
   if (!isGameFloorChannel(message.channel.id) && !isTalentAgencyChannel(message.channel.id) && !isGoonEdgeChannel(message.channel.id)) {
     const allChannels = [...config.gameFloorChannelIds, ...config.talentAgencyChannelIds, ...config.goonEdgeChannelIds];
     const errorEmbed = new EmbedBuilder()
-      .setTitle('❌ Wrong Channel')
+      .setTitle('<:cross:1558430092043096154> Wrong Channel')
       .setDescription(`This command can only be used in ${allChannels.map(id => `<#${id}>`).join(', ')}.`)
       .setColor(0xFF0000);
     await message.reply({ embeds: [errorEmbed] });
@@ -62,7 +62,7 @@ export async function handleGoonCommand(message: Message): Promise<void> {
     if (timeSinceLastUse < cooldownMs) {
       const remainingTime = Math.ceil((cooldownMs - timeSinceLastUse) / 1000 / 60);
       const cooldownEmbed = new EmbedBuilder()
-        .setTitle('⏰ Cooldown Active')
+        .setTitle('<:alarm1:1545148991782518844> Cooldown Active')
         .setDescription(`You need to wait ${remainingTime} more minutes before gooning again.${powerupActive ? '\n⚡ Power-up is active!' : ''}`)
         .setColor(0xFFA500);
       await message.reply({ embeds: [cooldownEmbed] });
@@ -90,7 +90,7 @@ export async function handleGoonCommand(message: Message): Promise<void> {
   const claimed = await claimTracking(userId, t, after, ['last_goon_used', 'goon_daily_count']);
   if (!claimed) {
     const errorEmbed = new EmbedBuilder()
-      .setTitle('⚠️ Slow Down')
+      .setTitle('<:warning:1558430107087933511> Slow Down')
       .setDescription('Easy there, one .goon at a time!')
       .setColor(0xFFA500);
     await message.reply({ embeds: [errorEmbed] });
@@ -107,7 +107,7 @@ export async function handleGoonCommand(message: Message): Promise<void> {
     // Give the use back so a failed payout doesn't burn the cooldown
     await claimTracking(userId, after, t, ['last_goon_used']).catch(() => undefined);
     const errorEmbed = new EmbedBuilder()
-      .setTitle('❌ Error')
+      .setTitle('<:cross:1558430092043096154> Error')
       .setDescription('Failed to award coins. Please try again later.')
       .setColor(0xFF0000);
     await message.reply({ embeds: [errorEmbed] });
@@ -126,7 +126,7 @@ export async function handleGoonCommand(message: Message): Promise<void> {
 
   // Build fields for embed
   const fields = [
-    { name: '💰 Reward', value: `+${reward} ${COIN}`, inline: true },
+    { name: '<:moneybag:1545149026528268308> Reward', value: `+${reward} ${COIN}`, inline: true },
     { name: '🍆 Goon Count', value: `${dailyGoonCount}${dailyGoonCount <= GOON_DAILY_FREE_USES ? `/${GOON_DAILY_FREE_USES}` : '+'} today`, inline: true },
   ];
 

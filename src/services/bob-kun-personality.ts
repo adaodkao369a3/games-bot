@@ -12,8 +12,8 @@ export class BobKunPersonality {
     thinking: '🤔',
     wave: '👋',
     heart: '❤️',
-    star: '⭐',
-    trophy: '🏆',
+    star: '<:fullstar:1553909316581593228>',
+    trophy: '<:trophy:1545135066148118628>',
   };
 
   private static readonly MESSAGES = {

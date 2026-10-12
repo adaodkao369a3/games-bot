@@ -1,4 +1,5 @@
 import { Message, EmbedBuilder, TextChannel } from 'discord.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
 
 /**
  * Handle the bobkun command - Server guide with arcade theme
@@ -45,7 +46,7 @@ export async function handleBobkunCommand(message: Message): Promise<void> {
   } catch (error) {
     console.error('[Bobkun Command] Error:', error);
     await message.reply({
-      content: '❌ There was an error showing the server guide. Please try again!',
+      content: `${EMOJIS.cross} There was an error showing the server guide. Please try again!`,
     });
   }
 }

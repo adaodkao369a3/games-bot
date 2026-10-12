@@ -310,7 +310,7 @@ function collectEmbed(lines: CollectLine[], stillWorking: CollectLine[], total: 
   );
   const embed = new EmbedBuilder()
     .setColor(GOLD)
-    .setTitle('💰 Payday')
+    .setTitle('<:moneybag:1545149026528268308> Payday')
     .setDescription(`${pick(LINES.collect)}\n\n${body.join('\n')}`.slice(0, 4000));
   if (alreadyPaid) {
     embed.addFields({ name: 'Heads up', value: 'This shift was already paid out earlier (a hiccup interrupted it). Nobody was charged or paid twice.' });
@@ -471,7 +471,7 @@ export async function handlePcollectCommand(message: Message): Promise<void> {
     if (failed(result)) {
       if (result.code === 'nothing_ready' && result.stillWorking?.length) {
         await message.reply(
-          '⏳ Nobody has finished a full 30-minute block yet.\n' +
+          '<:cargando:1545149001983197364> Nobody has finished a full 30-minute block yet.\n' +
             result.stillWorking.map((s) => `• **${s.name}**: first pay in ${formatDuration(s.msUntilFirstBlock ?? 0)}`).join('\n')
         );
       } else {

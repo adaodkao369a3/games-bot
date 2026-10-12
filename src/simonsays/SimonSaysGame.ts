@@ -476,13 +476,13 @@ export class SimonSaysGame {
     let embed: EmbedBuilder;
     if (winner) {
       embed = new EmbedBuilder()
-        .setTitle('🏆 SIMON SAYS')
+        .setTitle('<:trophy:1545135066148118628> SIMON SAYS')
         .setDescription(`**WINNER**\n${winner.username}\n\n` +
           `**Commands Survived:** ${this.data.commandNumber}`)
         .setColor(0x00ff00);
     } else {
       embed = new EmbedBuilder()
-        .setTitle('🏆 SIMON SAYS')
+        .setTitle('<:trophy:1545135066148118628> SIMON SAYS')
         .setDescription(`**NO WINNER**\n\nAll players were eliminated.`)
         .setColor(0xe74c3c);
     }

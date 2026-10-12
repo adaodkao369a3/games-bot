@@ -23,7 +23,7 @@ const EDGE_FLAVOR_LINES = [
   '⚡ The grind never ends. Neither does the edge.',
   '🫡 Bro clocked in for another shift.',
   '📈 Your priorities are questionable, but profitable.',
-  '🔥 That\'s not an edge streak, that\'s a lifestyle.',
+  '<:fire:1558430096807952384> That\'s not an edge streak, that\'s a lifestyle.',
   '💀 Bro has transcended normal decision-making.',
   '🏃‍♂️ Another one for the edge economy.',
   '👁️ The council has noticed your dedication.',
@@ -34,7 +34,7 @@ export async function handleEdgeCommand(message: Message): Promise<void> {
   if (!isGameFloorChannel(message.channel.id) && !isTalentAgencyChannel(message.channel.id) && !isGoonEdgeChannel(message.channel.id)) {
     const allChannels = [...config.gameFloorChannelIds, ...config.talentAgencyChannelIds, ...config.goonEdgeChannelIds];
     const errorEmbed = new EmbedBuilder()
-      .setTitle('❌ Wrong Channel')
+      .setTitle('<:cross:1558430092043096154> Wrong Channel')
       .setDescription(`This command can only be used in ${allChannels.map(id => `<#${id}>`).join(', ')}.`)
       .setColor(0xFF0000);
     await message.reply({ embeds: [errorEmbed] });
@@ -55,7 +55,7 @@ export async function handleEdgeCommand(message: Message): Promise<void> {
     if (timeSinceLastUse < EDGE_COOLDOWN_MS) {
       const remainingTime = Math.ceil((EDGE_COOLDOWN_MS - timeSinceLastUse) / 1000 / 60);
       const cooldownEmbed = new EmbedBuilder()
-        .setTitle('⏰ Cooldown Active')
+        .setTitle('<:alarm1:1545148991782518844> Cooldown Active')
         .setDescription(`You need to wait ${remainingTime} more minutes before edging again.`)
         .setColor(0xFFA500);
       await message.reply({ embeds: [cooldownEmbed] });
@@ -82,7 +82,7 @@ export async function handleEdgeCommand(message: Message): Promise<void> {
   const claimed = await claimTracking(userId, t, after, ['last_edge_used', 'edge_streak']);
   if (!claimed) {
     const errorEmbed = new EmbedBuilder()
-      .setTitle('⚠️ Slow Down')
+      .setTitle('<:warning:1558430107087933511> Slow Down')
       .setDescription('Easy there, one .edge at a time!')
       .setColor(0xFFA500);
     await message.reply({ embeds: [errorEmbed] });
@@ -99,7 +99,7 @@ export async function handleEdgeCommand(message: Message): Promise<void> {
     // Give the use back so a failed payout doesn't burn the cooldown or the streak
     await claimTracking(userId, after, t, ['last_edge_used']).catch(() => undefined);
     const errorEmbed = new EmbedBuilder()
-      .setTitle('❌ Error')
+      .setTitle('<:cross:1558430092043096154> Error')
       .setDescription('Failed to award coins. Please try again later.')
       .setColor(0xFF0000);
     await message.reply({ embeds: [errorEmbed] });
@@ -111,8 +111,8 @@ export async function handleEdgeCommand(message: Message): Promise<void> {
 
   // Build fields for embed
   const fields = [
-    { name: '💰 Reward', value: `+${streakReward} ${COIN}`, inline: true },
-    { name: '🔥 Streak', value: `${streak}`, inline: true },
+    { name: '<:moneybag:1545149026528268308> Reward', value: `+${streakReward} ${COIN}`, inline: true },
+    { name: '<:fire:1558430096807952384> Streak', value: `${streak}`, inline: true },
   ];
 
   if (bonusPct > 0) {

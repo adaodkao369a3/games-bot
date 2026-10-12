@@ -158,7 +158,7 @@ export class WordBombGame {
       // Not enough players
       this.state = 'complete';
       const embed = new EmbedBuilder()
-        .setTitle('💣 WORD BOMB')
+        .setTitle('<a:purplebomb:1545149042378407986> WORD BOMB')
         .setDescription('Not enough players joined. Game cancelled.')
         .setColor(0xe74c3c);
 
@@ -280,7 +280,7 @@ export class WordBombGame {
       const channel = this.data.message?.channel as TextChannel;
       if (channel) {
         await channel.send({
-          content: `❌ ${validation.reason}`,
+          content: `<:cross:1558430092043096154> ${validation.reason}`,
         }).catch(() => {});
       }
       return;
@@ -290,8 +290,8 @@ export class WordBombGame {
     this.clearRoundTimeout();
 
     const embed = new EmbedBuilder()
-      .setTitle('💣 WORD BOMB')
-      .setDescription(`✅ SAFE!\n\n<@!${userId}> used **${word.toUpperCase()}**.`)
+      .setTitle('<a:purplebomb:1545149042378407986> WORD BOMB')
+      .setDescription(`<:tick:1558430105120804884> SAFE!\n\n<@!${userId}> used **${word.toUpperCase()}**.`)
       .setColor(0x00ff00);
 
     await this.data.message?.edit({
@@ -417,7 +417,7 @@ export class WordBombGame {
       );
 
       const embed = new EmbedBuilder()
-        .setTitle('🏆 WORD BOMB CHAMPION')
+        .setTitle('<:trophy:1545135066148118628> WORD BOMB CHAMPION')
         .setDescription(`━━━━━━━━━━━━━━\n\n` +
           `**Winner:** <@!${winner}>\n\n` +
           `**Players Eliminated:** ${this.data.eliminatedPlayers.size}\n\n` +
@@ -432,7 +432,7 @@ export class WordBombGame {
       });
     } else {
       const embed = new EmbedBuilder()
-        .setTitle('💣 WORD BOMB')
+        .setTitle('<a:purplebomb:1545149042378407986> WORD BOMB')
         .setDescription('Game ended with no winner.')
         .setColor(0xe74c3c);
 
@@ -480,7 +480,7 @@ export class WordBombGame {
 
   private createJoiningEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('💣 WORD BOMB')
+      .setTitle('<a:purplebomb:1545149042378407986> WORD BOMB')
       .setDescription('The bomb is armed.\nJoin the game before the countdown ends!\n\n' +
         `**PLAYERS**\n${this.data.players.size}\n\n` +
         `**JOINING**\n${GAME_CONFIG.joinDuration} seconds`)
@@ -489,7 +489,7 @@ export class WordBombGame {
 
   private createRoundEmbed(): EmbedBuilder {
     return new EmbedBuilder()
-      .setTitle('💣 WORD BOMB')
+      .setTitle('<a:purplebomb:1545149042378407986> WORD BOMB')
       .setDescription(`**LETTER COMBINATION**\n\n### \`${this.data.currentCombination}\`\n\n` +
         `**TIME LEFT**\n${this.data.timeLeft} seconds\n\n` +
         `**💥 CURRENT PLAYER**\n<@!${this.data.currentPlayer}>\n\n` +

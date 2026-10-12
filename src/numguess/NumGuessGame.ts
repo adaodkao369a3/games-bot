@@ -386,9 +386,9 @@ export class NumGuessGame {
     }
 
     if (winners.length === 1) {
-      description += `\n🏆 ${winners[0].username} WINS!`;
+      description += `\n<:trophy:1545135066148118628> ${winners[0].username} WINS!`;
     } else {
-      description += `\n🏆 TIE: ${winners.map(w => w.username).join(', ')}`;
+      description += `\n<:trophy:1545135066148118628> TIE: ${winners.map(w => w.username).join(', ')}`;
     }
 
     return new EmbedBuilder()

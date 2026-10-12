@@ -1,6 +1,7 @@
 import { Message, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, EmbedBuilder } from 'discord.js';
 import { getGifDuration } from '../utils/gif-duration.js';
-import { PissCompGame, PissCompPlayer } from './PissCompGame.js';
+import { PissCompPlayer } from './PissCompGame.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
 
 /**
  * JJK Fight Sequence GIF URLs
@@ -72,6 +73,9 @@ export class PissCompMaxGame {
   private onGameEnd?: () => void;
   private roundTimeout?: NodeJS.Timeout;
   private disableDelayTimeout?: NodeJS.Timeout;
+  // Bumped whenever a round starts or is decided. Timers and slow edits from an older round
+  // compare against it and do nothing, so a stale timer can never end a fight that is still going.
+  private roundToken = 0;
 
   // Game constants
   private static readonly ROUNDS_PER_STAGE = 4;
@@ -110,8 +114,35 @@ export class PissCompMaxGame {
     this.state.message = message;
     this.state.normalGameWinner = normalGameWinner;
 
-    // Show transition sequence
-    await this.showTransitionSequence();
+    try {
+      // Show transition sequence
+      await this.showTransitionSequence();
+    } catch (error) {
+      console.error('[PissCompMax] Fight sequence failed:', error);
+      await this.abort();
+    }
+  }
+
+  /**
+   * Something went wrong: end the fight cleanly so the channel is never left blocked
+   * and nobody is left staring at a dead button.
+   */
+  private async abort(): Promise<void> {
+    if (this.state.isGameOver) return;
+    this.state.isGameOver = true;
+    this.state.isButtonEnabled = false;
+    this.clearTimeouts();
+
+    await this.updateEmbed(
+      'FIGHT CANCELLED',
+      GIFS.STAGE_1_INTRO,
+      'Something broke, the fight was cancelled.',
+      false
+    );
+
+    if (this.onGameEnd) {
+      this.onGameEnd();
+    }
   }
 
   /**
@@ -174,44 +205,40 @@ export class PissCompMaxGame {
    */
   private async startRound(): Promise<void> {
     console.log(`[PissCompMax] Starting round ${this.state.currentRound}`);
+    // Kill anything left over from the previous round before arming new timers
+    this.clearTimeouts();
+    const token = ++this.roundToken;
     this.state.isButtonEnabled = false;
     this.state.roundStartTime = Date.now();
 
     const stage = this.state.currentStage;
     const opponentName = stage === 1 ? 'Choso' : 'Maki';
-    const description = `Round ${this.state.currentRound}/4\n\nNaoya Zenin: ${this.state.player1Score}\n${opponentName}: ${this.state.player2Score}\n\nGet ready to dodge!`;
+    const description = `Round ${this.state.currentRound}/4 · **Naoya** ${this.state.player1Score} – ${this.state.player2Score} **${opponentName}**\nGet ready…`;
+    const stageName = stage === 1 ? 'STAGE 1 — NAOYA VS CHOSO' : 'STAGE 2 — NAOYA VS MAKI';
+    const gif = stage === 1 ? GIFS.STAGE_1_INTRO : GIFS.STAGE_2_INTRO;
 
     // Show waiting GIF with disabled button
-    console.log('[PissCompMax] Showing waiting embed with disabled button');
-    await this.updateEmbed(
-      stage === 1 ? 'STAGE 1 — NAOYA VS CHOSO' : 'STAGE 2 — NAOYA VS MAKI',
-      stage === 1 ? GIFS.STAGE_1_INTRO : GIFS.STAGE_2_INTRO,
-      description,
-      false // Button disabled
-    );
+    await this.updateEmbed(stageName, gif, description, false);
 
-    // Enable button after 3 seconds
-    console.log(`[PissCompMax] Setting button enable timeout for ${PissCompMaxGame.BUTTON_DISABLE_DELAY_MS}ms`);
+    // The fight may have ended / moved on while that edit was in flight
+    if (this.state.isGameOver || token !== this.roundToken) return;
+
+    // Enable button after a short delay
     this.disableDelayTimeout = setTimeout(async () => {
-      console.log('[PissCompMax] Button enable timeout fired');
-      if (this.state.isGameOver) {
-        console.log('[PissCompMax] Game over, skipping button enable');
-        return;
-      }
+      this.disableDelayTimeout = undefined;
+      if (this.state.isGameOver || token !== this.roundToken) return;
 
       this.state.isButtonEnabled = true;
-      console.log('[PissCompMax] Button enabled, updating embed');
-      await this.updateEmbed(
-        stage === 1 ? 'STAGE 1 — NAOYA VS CHOSO' : 'STAGE 2 — NAOYA VS MAKI',
-        stage === 1 ? GIFS.STAGE_1_INTRO : GIFS.STAGE_2_INTRO,
-        description + '\n\n🔴 DODGE THIS!',
-        true // Button enabled
-      );
+      await this.updateEmbed(stageName, gif, description + `\n${EMOJIS.swords} **ATTACK!**`, true);
 
-      // Set round timeout (20 seconds total, so 17 seconds remaining after 3s delay)
+      // Someone may have clicked while the enable edit was in flight: then this round is
+      // already decided and must not get a timeout.
+      if (this.state.isGameOver || token !== this.roundToken || !this.state.isButtonEnabled) return;
+
       this.roundTimeout = setTimeout(() => {
-        console.log('[PissCompMax] Round timeout fired');
-        this.handleTimeout();
+        this.roundTimeout = undefined;
+        if (token !== this.roundToken || !this.state.isButtonEnabled) return;
+        this.handleTimeout().catch((error) => console.error('[PissCompMax] Timeout error:', error));
       }, PissCompMaxGame.ROUND_TIMEOUT_MS - PissCompMaxGame.BUTTON_DISABLE_DELAY_MS);
     }, PissCompMaxGame.BUTTON_DISABLE_DELAY_MS);
   }
@@ -220,87 +247,74 @@ export class PissCompMaxGame {
    * Handle button interaction
    */
   async handleInteraction(interaction: MessageComponentInteraction): Promise<void> {
-    console.log(`[PissCompMax] Button clicked by ${interaction.user.id}, customId: ${interaction.customId}`);
-    console.log(`[PissCompMax] Game state - isGameOver: ${this.state.isGameOver}, isButtonEnabled: ${this.state.isButtonEnabled}`);
-    console.log(`[PissCompMax] Player 1: ${this.state.player1.id}, Player 2: ${this.state.player2.id}`);
+    const userId = interaction.user.id;
 
     if (this.state.isGameOver) {
-      console.log('[PissCompMax] Game already over, ignoring click');
-      await interaction.reply({
-        content: 'This game has already ended.',
-        ephemeral: true,
-      });
+      await interaction.reply({ content: 'This fight is over.', ephemeral: true }).catch(() => {});
       return;
     }
-
-    const userId = interaction.user.id;
 
     // Validate: only players can click
     if (userId !== this.state.player1.id && userId !== this.state.player2.id) {
-      console.log('[PissCompMax] Non-player tried to click');
-      await interaction.reply({
-        content: 'Only the participants can click this button!',
-        ephemeral: true,
-      });
+      await interaction.reply({ content: 'Only the two fighters can click this!', ephemeral: true }).catch(() => {});
       return;
     }
 
-    // Validate: button must be enabled
+    // First click wins the round. The button is locked right here, before anything is awaited,
+    // so a second click a few milliseconds later can never score as well.
     if (!this.state.isButtonEnabled) {
-      console.log('[PissCompMax] Button not enabled yet');
-      await interaction.reply({
-        content: 'Wait for the button to be enabled!',
-        ephemeral: true,
-      });
+      await interaction.reply({ content: 'Too slow!', ephemeral: true }).catch(() => {});
       return;
     }
-
-    console.log(`[PissCompMax] Button click validated, isButtonEnabled: ${this.state.isButtonEnabled}`);
-
-    // Determine winner (first to click wins)
-    const winnerId = userId;
-    const isPlayer1 = winnerId === this.state.player1.id;
-
-    // Clear timeouts
+    this.state.isButtonEnabled = false;
+    this.roundToken++;
     this.clearTimeouts();
 
-    // Update score
-    if (isPlayer1) {
-      this.state.player1Score++;
-    } else {
-      this.state.player2Score++;
-    }
+    // Acknowledge the click. Without this Discord shows "This interaction failed" on every attack.
+    await interaction.deferUpdate().catch(() => {});
 
-    console.log(`[PissCompMax] Score updated - Naoya: ${this.state.player1Score}, Opponent: ${this.state.player2Score}`);
+    const isPlayer1 = userId === this.state.player1.id;
 
-    // Show attack GIF
-    await this.showAttack(isPlayer1);
-
-    // Check for stage win
-    const stage = this.state.currentStage;
-    const opponentName = stage === 1 ? 'Choso' : 'Maki';
-
-    if (this.state.player1Score >= PissCompMaxGame.ROUNDS_TO_WIN) {
-      // Naoya wins the stage (and the game)
-      await this.handleGameWin(this.state.player1.id, this.state.player2.id, 'Naoya Zenin');
-    } else if (this.state.player2Score >= PissCompMaxGame.ROUNDS_TO_WIN) {
-      // Opponent wins the stage (and the game)
-      await this.handleGameWin(this.state.player2.id, this.state.player1.id, opponentName);
-    } else if (this.state.currentRound >= PissCompMaxGame.ROUNDS_PER_STAGE) {
-      // Stage ends 2-2
-      if (stage === 1) {
-        // Advance to Stage 2
-        await this.delay(2000);
-        await this.startStage(2);
+    try {
+      // Update score
+      if (isPlayer1) {
+        this.state.player1Score++;
       } else {
-        // Stage 2 also ends 2-2 - final draw
-        await this.handleFinalDraw();
+        this.state.player2Score++;
       }
-    } else {
-      // Next round
-      this.state.currentRound++;
-      await this.delay(2000);
-      await this.startRound();
+
+      // Show attack GIF
+      await this.showAttack(isPlayer1);
+
+      // Check for stage win
+      const stage = this.state.currentStage;
+      const opponentName = stage === 1 ? 'Choso' : 'Maki';
+
+      if (this.state.player1Score >= PissCompMaxGame.ROUNDS_TO_WIN) {
+        // Naoya wins the stage (and the game)
+        await this.handleGameWin(this.state.player1.id, this.state.player2.id, 'Naoya Zenin');
+      } else if (this.state.player2Score >= PissCompMaxGame.ROUNDS_TO_WIN) {
+        // Opponent wins the stage (and the game)
+        await this.handleGameWin(this.state.player2.id, this.state.player1.id, opponentName);
+      } else if (this.state.currentRound >= PissCompMaxGame.ROUNDS_PER_STAGE) {
+        // Stage ends 2-2
+        if (stage === 1) {
+          // Advance to Stage 2
+          await this.delay(2000);
+          await this.startStage(2);
+        } else {
+          // Stage 2 also ends 2-2 - final draw
+          await this.handleFinalDraw();
+        }
+      } else {
+        // Next round
+        this.state.currentRound++;
+        await this.delay(2000);
+        await this.startRound();
+      }
+    } catch (error) {
+      console.error('[PissCompMax] Error while handling attack:', error);
+      await this.abort();
     }
   }
 
@@ -346,7 +360,7 @@ export class PissCompMaxGame {
     await this.updateEmbed(
       stageName,
       attackGif,
-      `${winnerName} lands a hit!\n\nNaoya Zenin: ${this.state.player1Score}\n${opponentName}: ${this.state.player2Score}`,
+      `**${winnerName}** lands a hit! · **Naoya** ${this.state.player1Score} – ${this.state.player2Score} **${opponentName}**`,
       false // Button disabled during attack
     );
 
@@ -381,7 +395,7 @@ export class PissCompMaxGame {
     await this.updateEmbed(
       stageName,
       winGif,
-      `🏆 ${winnerName} WINS THE FIGHT!\n\n<@${winnerId}> is victorious!`,
+      `<:trophy:1545135066148118628> ${winnerName} WINS THE FIGHT!\n\n<@${winnerId}> is victorious!`,
       false // Button disabled
     );
 
@@ -416,7 +430,9 @@ export class PissCompMaxGame {
    * Handle round timeout
    */
   private async handleTimeout(): Promise<void> {
+    if (this.state.isGameOver) return;
     this.state.isGameOver = true;
+    this.state.isButtonEnabled = false;
 
     this.clearTimeouts();
 
@@ -444,9 +460,6 @@ export class PissCompMaxGame {
   ): Promise<void> {
     if (!this.state.message) return;
 
-    console.log(`[PissCompMax] Updating embed with GIF: ${gifUrl}`);
-    console.log(`[PissCompMax] Button enabled: ${buttonEnabled}`);
-
     // Add timestamp to URL to prevent Discord caching
     const uniqueGifUrl = `${gifUrl}?t=${Date.now()}`;
 
@@ -466,7 +479,6 @@ export class PissCompMaxGame {
         embeds: [embed],
         components,
       });
-      console.log('[PissCompMax] Embed updated successfully');
     } catch (error) {
       console.error('[PissCompMax] Error updating embed:', error);
     }
@@ -476,18 +488,16 @@ export class PissCompMaxGame {
    * Create the attack button
    */
   private createButton(enabled: boolean): ActionRowBuilder<ButtonBuilder>[] {
-    console.log(`[PissCompMax] Creating button - enabled: ${enabled}`);
     const row = new ActionRowBuilder<ButtonBuilder>();
 
     const button = new ButtonBuilder()
       .setCustomId('pisscompmax_attack')
+      .setEmoji(EMOJIS.swords)
       .setLabel('Attack!')
       .setStyle(ButtonStyle.Primary)
       .setDisabled(!enabled);
 
     row.addComponents(button);
-
-    console.log(`[PissCompMax] Button created - disabled: ${!enabled}`);
     return [row];
   }
 
