@@ -246,17 +246,16 @@ export async function handleQuoteCommand(message: Message, args: string[], comma
 
       // Handle GIF button click
       if (i.isButton() && i.customId === 'quote-gif') {
-        await i.deferReply({ ephemeral: true }); // Ephemeral so only the user sees the GIF
         try {
           const { width } = await sharp(currentBuffer).metadata();
           const gif = await sharp(currentBuffer)
             .resize({ width: Math.round(width! / 2) }) // Halve width since canvas renders at 2x
             .gif({ colours: 256, dither: 1.0, effort: 7 })
             .toBuffer();
-          await i.editReply({ files: [new AttachmentBuilder(gif, { name: 'quote.gif' })] });
+          await i.reply({ files: [new AttachmentBuilder(gif, { name: 'quote.gif' })] });
         } catch (gifError) {
           console.error('[QUOTE] Failed to generate GIF:', gifError);
-          await i.editReply({ content: 'Failed to generate GIF. Please try again.' }).catch(() => {});
+          await i.reply({ content: 'Failed to generate GIF. Please try again.' }).catch(() => {});
         }
         return;
       }
