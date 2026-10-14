@@ -23,8 +23,6 @@ import { handleCfCommand, handleCfInteraction } from '../commands/cf.js';
 import { handleImpostorCommand, handleImpostorInteraction, handleImpostorMessage } from '../commands/impostor.js';
 import { handleNumGuessCommand, handleNumGuessInteraction, handleNumGuessMessage } from '../commands/numguess.js';
 import { handleSimonSaysCommand, handleSimonSaysInteraction } from '../commands/simonsays.js';
-import { handleQuizCommand, handleQuizInteraction } from '../commands/quiz.js';
-import { handleChallengeCommand, handleChallengeInteraction } from '../commands/challenge.js';
 import { handleRedirectCommand } from '../commands/redirect.js';
 import { handleMogCommand, handleMogInteraction } from '../commands/mog.js';
 import { handleMoglbCommand, handleMoglbInteraction } from '../commands/moglb.js';
@@ -41,7 +39,6 @@ import {
 } from '../commands/agency.js';
 import { handlePhelpCommand } from '../commands/phelp.js';
 import { handleRltCommand, handleRltInteraction, handleRltModalSubmit } from '../commands/rlt.js';
-import { handleRolesCommand, handleRolesInteraction } from '../commands/roles.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
 
 export class DiscordClient {
@@ -228,18 +225,13 @@ export class DiscordClient {
         return;
       }
 
-      if (command === 'quiz') {
-        await handleQuizCommand(message, args);
-        return;
-      }
-
-      if (command === 'challenge') {
-        await handleChallengeCommand(message, args);
-        return;
-      }
-
       if (command === 'quote') {
-        await handleQuoteCommand(message, args);
+        await handleQuoteCommand(message, args, 'quote');
+        return;
+      }
+
+      if (command === 'dquote') {
+        await handleQuoteCommand(message, args, 'dquote');
         return;
       }
 
@@ -270,11 +262,6 @@ export class DiscordClient {
 
       if (command === 'rlt') {
         await handleRltCommand(message, args);
-        return;
-      }
-
-      if (command === 'roles') {
-        await handleRolesCommand(message);
         return;
       }
 
@@ -391,16 +378,6 @@ export class DiscordClient {
       return;
     }
 
-    if (customId.startsWith('quiz_')) {
-      await handleQuizInteraction(interaction);
-      return;
-    }
-
-    if (customId.startsWith('duel_')) {
-      await handleChallengeInteraction(interaction);
-      return;
-    }
-
     if (customId.startsWith('quote-')) {
       // Handled entirely by the message-scoped collector created inside
       // handleQuoteCommand (src/commands/quote.ts).
@@ -424,11 +401,6 @@ export class DiscordClient {
 
     if (customId.startsWith('rlt_')) {
       await handleRltInteraction(interaction);
-      return;
-    }
-
-    if (customId.startsWith('forfeit_role_')) {
-      await handleRolesInteraction(interaction);
       return;
     }
   }

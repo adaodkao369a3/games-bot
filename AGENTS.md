@@ -7,7 +7,6 @@ This file contains project-specific instructions for AI coding agents working on
 ### Entry Points and Startup Sequence
 1. **Entry point**: `src/index.ts`
    - Connects to PostgreSQL database
-   - Initializes title ownership from database
    - Starts Discord client
    - Sets up graceful shutdown handlers (SIGINT, SIGTERM)
 
@@ -34,7 +33,6 @@ src/
 ├── pisscomp/          # Piss Comp game (PissCompGame + PissCompMaxGame)
 ├── blackjack/         # Blackjack game (BlackjackGame + Blackjack2Game)
 ├── [other games]/     # Individual game modules (bomb, coinflip, etc.)
-├── titles/            # Title system (QuizGame, TitleDuelGame, TitleSystem)
 ├── quote/             # Quote generation
 └── index.ts           # Entry point
 ```
@@ -62,13 +60,10 @@ Button interactions are routed in `discord/client.ts` by checking `customId` pre
 - `impostor_*` → `handleImpostorInteraction`
 - `numguess_*` → `handleNumGuessInteraction`
 - `simonsays_*` → `handleSimonSaysInteraction`
-- `quiz_*` → `handleQuizInteraction`
-- `duel_*` → `handleChallengeInteraction`
 - `mog_*` → `handleMogInteraction`
 - `moglb_*` → `handleMoglbInteraction`
 - `hs_*` → `handleHighscoreInteraction`
 - `rlt_*` → `handleRltInteraction`
-- `forfeit_role_*` → `handleRolesInteraction`
 
 ### Channel Restrictions
 Some commands are restricted to specific channels (checked in `config/index.ts`):

@@ -249,10 +249,10 @@ export async function renderStackedQuoteCard(cards: QuoteCardOptions[]): Promise
   }
 
   // One shared watermark badge centered at each internal seam, instead of
-  // a per-card corner watermark.
+  // a per-card corner watermark. Always uses Butler font.
   for (let i = 0; i < N - 1; i++) {
     const seamY = (i + 1) * rowHeight;
-    drawWatermarkBadge(ctx, stackCardWidth / 2, seamY, isWhitePreset, fontOption);
+    drawWatermarkBadge(ctx, stackCardWidth / 2, seamY, isWhitePreset, FONT_OPTIONS.butler);
   }
 
   // Text/nickname/media drawn last (on top of every avatar+overlay), one
@@ -328,8 +328,8 @@ function drawStackCurveOverlay(
 function drawWatermarkBadge(ctx: SKRSContext2D, centerX: number, centerY: number, isWhitePreset: boolean, fontOption = FONT_OPTIONS.butler) {
   const label = 'BOMBO PRODUCTIONS';
 
-  ctx.font = 'bold 18px ' + fontOption.font + ', ' + fontOption.fallback;
-  ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.85)';
+  ctx.font = 'bold 15px ' + fontOption.font + ', ' + fontOption.fallback;
+  ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, centerX, centerY + 1);
@@ -355,7 +355,12 @@ function transformMask(source: ReturnType<typeof createCanvas>, w: number, h: nu
 
 function drawBackground(ctx: SKRSContext2D, preset: (typeof GRADIENT_PRESETS)[PresetName], cardWidth: number) {
   const { H } = LAYOUT;
-  fillPreset(ctx, preset, cardWidth, H);
+  // Use diagonal fill for color presets to match stacked cards
+  if (preset.type === 'solid') {
+    fillPreset(ctx, preset, cardWidth, H);
+  } else {
+    fillPresetDiagonal(ctx, preset, cardWidth, H, cardWidth, H, 0);
+  }
 }
 
 /** Shared fill logic so the single-card background and the multi-quote
@@ -592,7 +597,8 @@ function drawColorCurveOverlay(
   // The mask is always built assuming the avatar is at the LEFT edge;
   // mirrored cards just flip it, which moves the fade to the right edge
   // while keeping the same blend direction relative to the avatar.
-  const mask = transformMask(createCurveMask(cardWidth, pfpWidth, H, false) as any, cardWidth, H, mirror, false);
+  // includeSeamFade = true to get the same rounded corner melt as stacked cards.
+  const mask = transformMask(createCurveMask(cardWidth, pfpWidth, H, true) as any, cardWidth, H, mirror, false);
 
   // Keep only the area on the far side of the curved boundary. The mask is
   // feathered, so its alpha falls gradually toward the PFP instead of making
@@ -639,6 +645,7 @@ async function drawText(
     IMAGE_STACK_WIDTH_FRACTION,
     IMAGE_STACK_HEIGHT_FRACTION,
     IMAGE_STACK_GAP,
+    STACK_TOP_INSET,
   } = LAYOUT;
 
   // The quote/text column occupies whichever side the avatar doesn't.
@@ -658,7 +665,8 @@ async function drawText(
   const quoteRight = mirror
     ? quoteAreaX1 - quoteAreaWidth * nearAvatarInset
     : quoteAreaX1 - quoteAreaWidth * farInset;
-  const quoteTop = H * QUOTE_SAFE_TOP_INSET;
+  // Stacked rows use a larger top inset for more text room
+  const quoteTop = stacked ? H * STACK_TOP_INSET : H * QUOTE_SAFE_TOP_INSET;
   // Stacked rows are shorter, so instead of a % of height the name block
   // gets a fixed reserve at the bottom of the row — it can never spill.
   const quoteBottom = stacked ? H - LAYOUT.STACK_NAME_BLOCK_RESERVE : H * QUOTE_SAFE_BOTTOM_INSET;
@@ -757,9 +765,9 @@ async function drawText(
     const lineHeight = fontSize * 1.25;
     const blockHeight = lines.length * lineHeight;
 
-    // Vertically center quote text within its text area, then nudge lower
+    // Vertically center quote text within its text area
     const safeBoxCenterY = textAreaTop + textAreaHeight / 2;
-    let y = safeBoxCenterY - blockHeight / 2 + 5;
+    let y = safeBoxCenterY - blockHeight / 2 + lineHeight / 2;
 
     for (const line of lines) {
       // Calculate line width for proper centering
@@ -827,29 +835,24 @@ async function drawText(
   const nicknameY = quoteBottom + 20;
 
   if (stacked) {
-    // Stacked: the block sits at the outer edge of its quote column (away
-    // from the pfp) — far right for a normal card, far left for a mirrored
-    // one. The bar spans a fraction of the quote width, anchored to that
-    // same edge, and sits directly above the name and username.
+    // Stacked: bar and name centered in the quote column, same as single card.
+    // The left/right alternation from mirroring already gives the stack its zigzag.
     const barLength = quoteWidth * LAYOUT.STACK_BAR_LENGTH_FRACTION;
-    const edgeX = mirror ? quoteLeft : quoteRight;
-    const barX0 = mirror ? edgeX : edgeX - barLength;
-    const barX1 = mirror ? edgeX + barLength : edgeX;
 
     ctx.strokeStyle = isWhitePreset ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.4)';
     ctx.beginPath();
-    ctx.moveTo(barX0, nicknameY);
-    ctx.lineTo(barX1, nicknameY);
+    ctx.moveTo(fullAreaCenterX - barLength / 2, nicknameY);
+    ctx.lineTo(fullAreaCenterX + barLength / 2, nicknameY);
     ctx.stroke();
 
-    ctx.textAlign = mirror ? 'left' : 'right';
+    ctx.textAlign = 'center';
     ctx.font = `26px ${FONT_FALLBACK}`;
     ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)';
-    ctx.fillText(nickname, edgeX, nicknameY + 32);
+    ctx.fillText(nickname, fullAreaCenterX, nicknameY + 32);
 
     ctx.font = `20px ${FONT_FALLBACK}`;
     ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)';
-    ctx.fillText(`@${username}`, edgeX, nicknameY + 62);
+    ctx.fillText(`@${username}`, fullAreaCenterX, nicknameY + 62);
     ctx.textAlign = 'left'; // Reset to default
   } else {
     // Single card: bar and name centered in the quote column.

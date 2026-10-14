@@ -5,14 +5,17 @@ import {
   ActionRowBuilder,
   ComponentType,
   StickerFormatType,
+  ButtonBuilder,
+  ButtonStyle,
 } from 'discord.js';
 import { renderQuoteCard, renderStackedQuoteCard, QuoteCardOptions } from '../quote/renderer.js';
 import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS, FONT_OPTIONS, FontName } from '../quote/config.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { isStaff } from '../utils/permissions.js';
 import { getQuoteRedirectSettings } from '../database/client.js';
+import sharp from 'sharp';
 
-const THEME_NAMES: PresetName[] = ['classic', 'white', 'sunset', 'purple', 'aurora', 'gold', 'cherry', 'midnight', 'plasma', 'emerald', 'rose', 'ember', 'sapphire', 'coral', 'lime'];
+const THEME_NAMES: PresetName[] = ['classic', 'white', 'sunset', 'purple', 'aurora', 'gold', 'cherry', 'midnight', 'plasma', 'emerald', 'rose', 'ember', 'sapphire', 'coral', 'lime', 'silver_mist'];
 const FONT_NAMES: FontName[] = ['butler', 'roboto', 'roboto_bold', 'angels', 'blazed', 'bleeding_cowboys', 'bouncy', 'cowboy_movie', 'flame', 'hanged_letters', 'magazine_letter', 'matcha_world', 'next_ups', 'sabrina', 'spider_man', 'iknowaghost'];
 const QUOTE_REDIRECT_CHANNEL_ID = '1526869451834654821';
 const QUOTE_COOLDOWN_MS = 5 * 1000; // 5 seconds
@@ -68,7 +71,7 @@ async function buildQuoteSource(message: Message, target: Message): Promise<Quot
   };
 }
 
-export async function handleQuoteCommand(message: Message, args: string[]): Promise<void> {
+export async function handleQuoteCommand(message: Message, args: string[], commandName: string = 'quote'): Promise<void> {
   // Check cooldown (staff bypass)
   const now = Date.now();
   if (!isStaff(message.member) && now < quoteCooldownUntil) {
@@ -82,7 +85,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
   // Check if this is a reply to another message
   if (!message.reference?.messageId) {
     await message.reply(
-      'You need to reply to a message to create a quote card. Reply to a message and then use `.quote`.'
+      `You need to reply to a message to create a quote card. Reply to a message and then use \`.${commandName}\`.`
     );
     return;
   }
@@ -96,13 +99,11 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       return;
     }
 
-    // `.quote 2` stacks the replied-to message together with whatever IT
-    // was replying to — oldest on top, newest on bottom. (`.quote 3`,
-    // `.quote 4`, etc. can extend this later by walking further up the
-    // reply chain the same way.) If the replied-to message isn't itself a
-    // reply, there's nothing to stack with, so this silently falls back
-    // to a normal single quote card instead of erroring.
-    const requestedStack = args[0] === '2';
+    // `.dquote` stacks the replied-to message together with whatever IT
+    // was replying to — oldest on top, newest on bottom. If the replied-to
+    // message isn't itself a reply, there's nothing to stack with, so this
+    // silently falls back to a normal single quote card instead of erroring.
+    const requestedStack = commandName === 'dquote';
     let topTarget: Message | null = null;
 
     if (requestedStack && bottomTarget.reference?.messageId) {
@@ -148,6 +149,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
         sapphire: { id: '1556312302347620413' },
         coral: { id: '1556312275688751116' },
         lime: { id: '1556312287319691405' },
+        silver_mist: { id: '1556312307217211532' }, // TODO: Replace with actual silver_mist emoji ID
       };
 
       const themeSelect = new StringSelectMenuBuilder()
@@ -178,11 +180,18 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       return [
         new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(themeSelect),
         new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(fontSelect),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId('quote-gif')
+            .setLabel('GIF')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(disabled),
+        ),
       ];
     };
 
-    const buffer = await renderCard(preset, font);
-    const attachment = new AttachmentBuilder(buffer, { name: 'quote.png' });
+    let currentBuffer = await renderCard(preset, font);
+    const attachment = new AttachmentBuilder(currentBuffer, { name: 'quote.png' });
 
     // One jump link per quoted message, oldest first. Jump-to-original
     // link(s) go above the image, as message content — Discord renders
@@ -226,7 +235,6 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
     }
 
     const collector = sent.createMessageComponentCollector({
-      componentType: ComponentType.StringSelect,
       time: THEME_SELECT_EXPIRY_MS,
     });
 
@@ -235,6 +243,26 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
         await i.reply({ content: "This isn't your card to customize.", ephemeral: true });
         return;
       }
+
+      // Handle GIF button click
+      if (i.isButton() && i.customId === 'quote-gif') {
+        await i.deferReply({ ephemeral: true }); // Ephemeral so only the user sees the GIF
+        try {
+          const { width } = await sharp(currentBuffer).metadata();
+          const gif = await sharp(currentBuffer)
+            .resize({ width: Math.round(width! / 2) }) // Halve width since canvas renders at 2x
+            .gif({ colours: 256, dither: 1.0, effort: 7 })
+            .toBuffer();
+          await i.editReply({ files: [new AttachmentBuilder(gif, { name: 'quote.gif' })] });
+        } catch (gifError) {
+          console.error('[QUOTE] Failed to generate GIF:', gifError);
+          await i.editReply({ content: 'Failed to generate GIF. Please try again.' }).catch(() => {});
+        }
+        return;
+      }
+
+      // Handle select menu interactions
+      if (!i.isStringSelectMenu()) return;
 
       // Acknowledge the interaction immediately — Discord invalidates a
       // component interaction's token after 3s, and renderCard() (image
@@ -256,6 +284,7 @@ export async function handleQuoteCommand(message: Message, args: string[]): Prom
       let newAttachment: AttachmentBuilder;
       try {
         const newBuffer = await renderCard(preset, font);
+        currentBuffer = newBuffer; // Update currentBuffer for future GIF conversions
         newAttachment = new AttachmentBuilder(newBuffer, { name: 'quote.png' });
       } catch (renderError) {
         console.error('[QUOTE] Failed to re-render quote card on change:', renderError);

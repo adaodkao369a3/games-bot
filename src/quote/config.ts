@@ -19,10 +19,13 @@ export const LAYOUT = {
 
   // Right column layout (945px wide for 60% of card)
   // Quote text safe area (fractions of right column width and card height)
-  QUOTE_SAFE_LEFT_INSET: 0.06,   // ~6% of column width
-  QUOTE_SAFE_RIGHT_INSET: 0.045, // ~4.5% of column width
+  QUOTE_SAFE_LEFT_INSET: 0.03,   // ~3% of column width (avatar-side inset)
+  QUOTE_SAFE_RIGHT_INSET: 0.06,  // ~6% of column width (far-side inset)
   QUOTE_SAFE_TOP_INSET: 0.05,    // ~5% of card height
   QUOTE_SAFE_BOTTOM_INSET: 0.81, // ~81% of card height
+
+  // Stacked cards only: top inset (fraction of row height) for text area
+  STACK_TOP_INSET: 0.07,  // ~7% of row height
 
   // Nickname/username block position (fractions of right column width)
   NICKNAME_LEFT_FRACTION: 0.32,  // ~32% of column width
@@ -71,22 +74,24 @@ export const LAYOUT = {
   STACK_QUOTE_WIDTH_MULTIPLIER: 1.4,
 
   // Total composite height target for a stack, regardless of N (fixed at
-  // H*1.6 for now rather than H*N — each card's slot, and its square
+  // H*1.75 for now rather than H*N — each card's slot, and its square
   // avatar, shrinks to fit within this instead of the composite growing
-  // with every added card). Bumped from 1.5 so each row has room for the
-  // name block below the quote. Revisit this ratio if/when .quote 3+ needs
-  // a different one; for now every N squeezes into the same H*1.6 total.
-  STACK_HEIGHT_MULTIPLIER: 1.6,
+  // with every added card). Increased from 1.6 to give each row more room
+  // for the name block and seam badge. Revisit this ratio if/when .quote 3+
+  // needs a different one; for now every N squeezes into the same H*1.75 total.
+  STACK_HEIGHT_MULTIPLIER: 1.75,
 
   // Stacked cards only: fixed pixel height reserved at the bottom of each
   // row for the bar + nickname + username, so the block always fits inside
   // its row no matter how small the row gets (the single-card layout uses
-  // fractions of a taller card and is untouched).
-  STACK_NAME_BLOCK_RESERVE: 108,
+  // fractions of a taller card and is untouched). Increased from 108 to 128
+  // to give the handle more room above the seam.
+  STACK_NAME_BLOCK_RESERVE: 128,
 
   // Stacked cards only: the bar above the name spans this fraction of the
-  // quote column's width, anchored to the outer edge (away from the pfp).
-  STACK_BAR_LENGTH_FRACTION: 0.75,
+  // quote column's width, centered like the single card. Reduced from 0.75
+  // to 0.30 for a shorter bar that matches the single card.
+  STACK_BAR_LENGTH_FRACTION: 0.30,
 } as const;
 
 export const FONT_FALLBACK = 'Butler, Georgia, serif';
@@ -152,7 +157,8 @@ export type PresetName =
   | 'ember'
   | 'sapphire'
   | 'coral'
-  | 'lime';
+  | 'lime'
+  | 'silver_mist';
 
 export interface GradientPreset {
   type: 'solid' | 'linear';
@@ -176,4 +182,5 @@ export const GRADIENT_PRESETS: Record<PresetName, GradientPreset> = {
   sapphire: { type: 'linear', colors: [[220,240,255],[110,180,255],[30,110,230],[20,55,160],[8,20,65]], label: 'Sapphire' },
   coral:    { type: 'linear', colors: [[255,225,215],[255,160,135],[251,105,90],[205,55,60],[90,20,30]], label: 'Coral' },
   lime:     { type: 'linear', colors: [[245,255,205],[190,245,90],[120,220,35],[45,145,35],[12,65,25]], label: 'Lime' },
+  silver_mist: { type: 'linear', colors: [[255,255,255],[220,220,220],[160,160,160],[100,100,100],[50,50,50]], label: 'Silver Mist' },
 };

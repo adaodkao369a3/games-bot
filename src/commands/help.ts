@@ -8,7 +8,7 @@ import { EMOJIS } from '../utils/emoji-registry.js';
  * Button ids: help_<page>_<ownerUserId>. Only the person who opened the menu can use it.
  */
 
-type HelpPage = 'main' | 'casino' | 'agency' | 'games' | 'titles';
+type HelpPage = 'main' | 'casino' | 'agency' | 'games';
 
 const COLOR = 0xe06550;
 
@@ -51,6 +51,7 @@ function mainEmbed(): EmbedBuilder {
         name: `${EMOJIS.chat}  Quotes`,
         value: list(
           entry('.quote', 'Reply to a message to turn it into a quote card'),
+          entry('.dquote', 'Reply to a message to create a stacked quote (replied-to + its reply)'),
           'Themes: classic, white, sunset, purple, aurora, gold, cherry, midnight, plasma, emerald, rose, ember, sapphire, coral, lime',
         ),
         inline: false,
@@ -113,25 +114,11 @@ function gamesEmbed(): EmbedBuilder {
     );
 }
 
-function titlesEmbed(): EmbedBuilder {
-  return new EmbedBuilder()
-    .setTitle(`${EMOJIS.dcrown}  Titles`)
-    .setColor(COLOR)
-    .setDescription(
-      list(
-        entry('.quiz jjk', 'Take the JJK quiz to claim Lord of the Heian Era'),
-        entry('.challenge @user jjk', 'Challenge the current title holder'),
-        entry('.roles', 'See your earned roles and forfeit them for coins'),
-      )
-    );
-}
-
 function embedFor(page: HelpPage): EmbedBuilder {
   switch (page) {
     case 'casino': return casinoEmbed();
     case 'agency': return agencyEmbed();
     case 'games': return gamesEmbed();
-    case 'titles': return titlesEmbed();
     default: return mainEmbed();
   }
 }
@@ -152,7 +139,6 @@ function buttonsFor(current: HelpPage, ownerId: string): ActionRowBuilder<Button
       make('casino', 'Casino', EMOJIS.cash),
       make('agency', 'Talent Agency', EMOJIS.people),
       make('games', 'Games', EMOJIS.controller),
-      make('titles', 'Titles', EMOJIS.dcrown)
     ),
   ];
 }
@@ -174,7 +160,7 @@ export async function handleHelpInteraction(interaction: Interaction): Promise<v
 
   try {
     // help_<page>_<ownerId>
-    const match = /^help_(main|casino|agency|games|titles)_(\d+)$/.exec(interaction.customId);
+    const match = /^help_(main|casino|agency|games)_(\d+)$/.exec(interaction.customId);
     if (!match) {
       await interaction.deferUpdate().catch(() => {});
       return;
