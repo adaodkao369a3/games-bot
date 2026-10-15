@@ -211,16 +211,6 @@ async function initializeSchema(): Promise<void> {
         console.log('✓ goon_edge_tracking table exists');
       }
 
-      // Goon/edge rework columns (streak bonus, power-up, daily goon penalty). Idempotent for existing installs.
-      await pool!.query(`
-        ALTER TABLE goon_edge_tracking
-          ADD COLUMN IF NOT EXISTS edge_streak INTEGER NOT NULL DEFAULT 0,
-          ADD COLUMN IF NOT EXISTS last_edge_streak_at TIMESTAMP WITH TIME ZONE,
-          ADD COLUMN IF NOT EXISTS goon_powerup_until TIMESTAMP WITH TIME ZONE,
-          ADD COLUMN IF NOT EXISTS goon_daily_count INTEGER NOT NULL DEFAULT 0,
-          ADD COLUMN IF NOT EXISTS goon_daily_date DATE
-      `);
-
       // Check if quote_redirect_settings table exists
       const quoteRedirectCheck = await pool!.query(`
         SELECT table_name 
@@ -369,6 +359,45 @@ async function initializeSchema(): Promise<void> {
         console.log('✓ chat_rewards_tracking table created');
       } else {
         console.log('✓ chat_rewards_tracking table exists');
+      }
+
+      // Check if hustle_gig_tracking table exists
+      const hustleGigCheck = await pool!.query(`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_name = 'hustle_gig_tracking'
+        AND table_schema = 'public'
+      `);
+
+      if (hustleGigCheck.rows.length === 0) {
+        console.log('⚠ hustle_gig_tracking table does not exist, creating...');
+
+        await pool!.query(`
+          CREATE TABLE hustle_gig_tracking (
+            user_id VARCHAR(255) PRIMARY KEY,
+            last_gig_used TIMESTAMP WITH TIME ZONE,
+            last_hustle_used TIMESTAMP WITH TIME ZONE,
+            gig_daily_count INTEGER NOT NULL DEFAULT 0,
+            gig_daily_date DATE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
+        await pool!.query(`
+          CREATE INDEX idx_hustle_gig_tracking_daily_date ON hustle_gig_tracking(gig_daily_date)
+        `);
+
+        await pool!.query(`
+          CREATE TRIGGER update_hustle_gig_tracking_updated_at
+          BEFORE UPDATE ON hustle_gig_tracking
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column()
+        `);
+
+        console.log('✓ Migration completed: hustle_gig_tracking table created');
+      } else {
+        console.log('✓ hustle_gig_tracking table exists');
       }
     }
 

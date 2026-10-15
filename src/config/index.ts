@@ -32,7 +32,7 @@ export function isTalentAgencyChannel(channelId: string): boolean {
 }
 
 /**
- * Check if a channel ID is in the allowed goon/edge channels
+ * Check if a channel ID is in the allowed hustle/gig channels
  */
 export function isGoonEdgeChannel(channelId: string): boolean {
   return config.goonEdgeChannelIds.includes(channelId);

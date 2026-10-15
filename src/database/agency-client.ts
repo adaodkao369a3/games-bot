@@ -64,6 +64,7 @@ export interface Refusal {
 }
 
 export type Ok<T> = { ok: true } & T;
+export type GrantResult = Ok<{ granted: boolean }>;
 export type Result<T> = Ok<T> | Refusal;
 
 /** Type guard for refusals (the project runs with strict: false, so `!r.ok` alone doesn't narrow). */
@@ -338,6 +339,44 @@ export async function getPlayer(userId: string): Promise<PlayerRow> {
     await c.query('INSERT INTO pa_players (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [userId]);
     const r = await c.query('SELECT user_id, last_scout_at FROM pa_players WHERE user_id = $1', [userId]);
     return r.rows[0];
+  });
+}
+
+/**
+ * Grant Tsunade as a free starter character if the user doesn't already have her.
+ * Idempotent and safe against concurrent calls. Returns Result<GrantResult>:
+ * - ok: granted: true if Tsunade was granted, false if user already has her
+ * - ok: false with refusal if roster is full
+ */
+export async function grantStarterTsunade(userId: string, now: Date = new Date()): Promise<Result<GrantResult>> {
+  return runTx(userId, async ({ tx }) => {
+    // Check if user already has Tsunade
+    const owned = await tx.query('SELECT 1 FROM pa_roster WHERE user_id = $1 AND character_slug = $2', [userId, 'tsunade']);
+    if (owned.rows.length > 0) {
+      return { ok: true as const, granted: false }; // Already has Tsunade
+    }
+
+    // Check roster size
+    const count = await tx.query('SELECT count(*)::int AS n FROM pa_roster WHERE user_id = $1', [userId]);
+    if (count.rows[0].n >= MAX_ROSTER) {
+      throw refuse('roster_full', `Your roster is full (${MAX_ROSTER}). Cannot grant starter.`);
+    }
+
+    // Insert Tsunade as a starter character (free, level 1, full stamina, resting)
+    const ins = await tx.query(
+      `INSERT INTO pa_roster (user_id, character_slug, level, stamina, stamina_updated_at, status)
+       VALUES ($1, $2, 1, 100, $3, 'resting') RETURNING *`,
+      [userId, 'tsunade', now]
+    );
+
+    // Also mark her as discovered (so she doesn't appear in scout results)
+    await tx.query('INSERT INTO pa_discovered (user_id, character_slug) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, 'tsunade']);
+
+    const tier = mapTier((await tx.query('SELECT * FROM pa_tiers WHERE tier_key = $1', ['intern'])).rows[0]);
+    const character = mapCharacter((await tx.query('SELECT * FROM pa_characters WHERE slug = $1', ['tsunade'])).rows[0]);
+    const entry = mapRoster(ins.rows[0], new Map([['tsunade', character]]), new Map([['intern', tier]]))!;
+
+    return { ok: true as const, granted: true };
   });
 }
 

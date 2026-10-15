@@ -26,8 +26,8 @@ import { handleSimonSaysCommand, handleSimonSaysInteraction } from '../commands/
 import { handleRedirectCommand } from '../commands/redirect.js';
 import { handleMogCommand, handleMogInteraction } from '../commands/mog.js';
 import { handleMoglbCommand, handleMoglbInteraction } from '../commands/moglb.js';
-import { handleGoonCommand } from '../commands/goon.js';
-import { handleEdgeCommand } from '../commands/edge.js';
+import { handleGigCommand } from '../commands/gig.js';
+import { handleHustleCommand } from '../commands/hustle.js';
 import { handleAvatarCommand } from '../commands/avatar.js';
 import {
   handlePscoutCommand,
@@ -250,13 +250,13 @@ export class DiscordClient {
         return;
       }
 
-      if (command === 'goon') {
-        await handleGoonCommand(message);
+      if (command === 'gig') {
+        await handleGigCommand(message);
         return;
       }
 
-      if (command === 'edge') {
-        await handleEdgeCommand(message);
+      if (command === 'hustle') {
+        await handleHustleCommand(message);
         return;
       }
 

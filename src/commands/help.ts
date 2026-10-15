@@ -33,8 +33,8 @@ function mainEmbed(): EmbedBuilder {
         value: list(
           entry('.wallet', 'Check your Bombo Coin balance'),
           entry('.highscore', 'The Bombo Coin leaderboard (also `.hs`)'),
-          entry('.goon', 'Claim coins on a cooldown *(goon channel)*'),
-          entry('.edge', 'Build an edge streak for bonus coins *(goon channel)*'),
+          entry('.hustle', 'Network and pitch for coins *(talent agency channel)*'),
+          entry('.gig', 'Book quick paid gigs *(talent agency channel)*'),
         ),
         inline: false,
       },

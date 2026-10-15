@@ -34,6 +34,7 @@ import {
   getRoster,
   getRosterEntry,
   getTiers,
+  grantStarterTsunade,
   isExactNameMatch,
   recruitTransaction,
   scoutTransaction,
@@ -158,17 +159,54 @@ async function buildHub(userId: string, note?: string): Promise<View> {
 
   const embed = new EmbedBuilder().setColor(GOLD).setTitle('🕴️ Your Talent Agency');
 
-  if (roster.length === 0) {
+  // Grant Tsunade if user doesn't already have her (both new and existing players)
+  const grantResult = await grantStarterTsunade(userId, now);
+  const wasJustGranted = !failed(grantResult) && grantResult.granted;
+
+  // If roster was empty before and we just granted Tsunade, show onboarding message
+  if (roster.length === 0 && wasJustGranted) {
+    // Reload roster after granting
+    const newRoster = await getRoster(userId);
+    if (newRoster.length > 0) {
+      // Roster now has Tsunade, update the display
+      const tsunade = newRoster[0];
+      let text = `**Welcome to the agency!** 🎉\n\nYou've been given **${tsunade.character.name}** as your starter talent.\n\n`;
+      text += `She's an Intern who earns ${coins(payoutPerBlock(tsunade.character, tsunade.level))} per 30-min work block.\n\n`;
+      text += `**Next steps:**\n`;
+      text += `• Use **\`.pwork ${tsunade.character.name}\`** to send her to work\n`;
+      text += `• Use **\`.pcollect\`** to collect earnings after 30+ minutes\n`;
+      text += `• Use **\`.hustle\`** and **\`.gig\`** for quick coin income\n`;
+      text += `• Use **\`.pscout\`** to find stronger talent to recruit\n\n`;
+      text += `Tsunade will recover stamina while resting. Care costs ${coins(careCost(tsunade.tier, 100))} when she needs it.`;
+
+      embed.setDescription(`${note ? note + '\n\n' : ''}${text}`);
+      const tsunadeStamina = currentStamina(tsunade, now);
+      embed.addFields(
+        { name: `${tsunade.character.name} (Starter)`, value: `${tsunade.tier.label} Lv${tsunade.level} · ${staminaBar(tsunadeStamina)}`, inline: false },
+        { name: 'Income', value: `${coins(payoutPerBlock(tsunade.character, tsunade.level))} per 30 min`, inline: true },
+        { name: 'Stamina Cost', value: `${tsunade.character.stamina_cost} per block`, inline: true }
+      );
+      return { embeds: [embed], components: [], files: [] };
+    }
+  }
+
+  // Reload roster if we just granted Tsunade to an existing player
+  const finalRoster = wasJustGranted ? await getRoster(userId) : roster;
+
+  // Add a note if Tsunade was just granted to an existing player
+  const grantNote = wasJustGranted && roster.length > 0 ? '🎉 **Tsunade has joined your roster!** She\'s marked as (Starter) in your list.' : note;
+
+  if (finalRoster.length === 0) {
     const unsigned = discovered;
     let text = "Your roster is emptier than Bob Kun's fridge.\nUse **__`.pscout`__** to find talent, then recruit someone.";
     if (unsigned.length > 0) {
       text += `\n\n**Scouted, not signed yet**\n${unsigned.map((c) => `• ${c.name}: ${coins(c.recruit_price)}`).join('\n')}\nUse \`\`\`.precruit <name>\`\`\` to sign them.`;
     }
-    embed.setDescription(`${note ? note + '\n\n' : ''}${text}`);
+    embed.setDescription(`${grantNote ? grantNote + '\n\n' : ''}${text}`);
     return { embeds: [embed], components: [], files: [] };
   }
 
-  const working = roster.filter((e) => e.status === 'working');
+  const working = finalRoster.filter((e) => e.status === 'working');
   const ready: RosterEntry[] = [];
   const out: RosterEntry[] = [];
   let waiting = 0;
@@ -179,18 +217,22 @@ async function buildHub(userId: string, note?: string): Promise<View> {
       waiting += workEarnings(e.character, e.level, e.stamina, started, now).coins;
     } else out.push(e);
   }
-  const resting = roster.filter((e) => e.status === 'resting');
+  const resting = finalRoster.filter((e) => e.status === 'resting');
 
   const lines: string[] = [];
-  if (note) lines.push(note, '');
-  lines.push(`Roster **${roster.length}/${MAX_ROSTER}**  ·  Out working **${working.length}/${MAX_WORKING}**`);
+  if (grantNote) lines.push(grantNote, '');
+  lines.push(`Roster **${finalRoster.length}/${MAX_ROSTER}**  ·  Out working **${working.length}/${MAX_WORKING}**`);
   lines.push(`Waiting to collect: **${coins(waiting)}**${waiting > 0 ? '  (**__`.pcollect`__**)' : ''}`);
-  const fmtEntry = (e: RosterEntry) => `• **${e.character.name}** (${e.tier.label} Lv${e.level}): ${statusLine(e, now)}`;
+  const fmtEntry = (e: RosterEntry) => {
+    const isStarter = e.character.slug === 'tsunade';
+    const nameDisplay = isStarter ? `${e.character.name} (Starter)` : e.character.name;
+    return `• **${nameDisplay}** (${e.tier.label} Lv${e.level}): ${statusLine(e, now)}`;
+  };
   if (ready.length) lines.push('', '**Ready to collect**', ...ready.map(fmtEntry));
   if (out.length) lines.push('', '**Out working**', ...out.map(fmtEntry));
   if (resting.length) lines.push('', '**Resting**', ...resting.map(fmtEntry));
 
-  const owned = new Set(roster.map((e) => e.character_slug));
+  const owned = new Set(finalRoster.map((e) => e.character_slug));
   const unsigned = discovered.filter((c) => !owned.has(c.slug));
   if (unsigned.length) {
     lines.push('', '**Scouted, not signed**', ...unsigned.map((c) => `• ${c.name}: ${coins(c.recruit_price)}  (\`\`\`.precruit ${c.name}\`\`\`)`));
@@ -201,7 +243,7 @@ async function buildHub(userId: string, note?: string): Promise<View> {
     .setCustomId(ids('select', userId, 'hub'))
     .setPlaceholder('Open a profile...')
     .addOptions(
-      roster.slice(0, 25).map((e) =>
+      finalRoster.slice(0, 25).map((e) =>
         new StringSelectMenuOptionBuilder()
           .setLabel(e.character.name.slice(0, 100))
           .setDescription(`${e.tier.label} · Lv${e.level} · ${e.status === 'working' ? 'Working' : `Resting ${currentStamina(e, now)}/100`}`.slice(0, 100))
@@ -218,10 +260,11 @@ function buildProfile(e: RosterEntry, userId: string, note?: string): View {
   const care = careCost(e.tier, stamina);
   const train = trainCost(e.character, e.level);
   const income = payoutPerBlock(e.character, e.level);
+  const isStarter = e.character.slug === 'tsunade';
 
   const embed = new EmbedBuilder()
     .setColor(GOLD)
-    .setTitle(e.character.name)
+    .setTitle(`${e.character.name}${isStarter ? ' (Starter)' : ''}`)
     .setDescription(`*${e.character.blurb}*${note ? `\n\n${note}` : ''}`)
     .addFields(
       { name: 'Rank', value: e.tier.label, inline: true },

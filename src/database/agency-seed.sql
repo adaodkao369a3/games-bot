@@ -15,6 +15,10 @@ ON CONFLICT (tier_key) DO UPDATE SET
   recruit_price = EXCLUDED.recruit_price, base_payout = EXCLUDED.base_payout, care_price = EXCLUDED.care_price;
 
 INSERT INTO pa_characters (slug, name, tier_key, kind, blurb, image_file, recruit_price, base_payout, stamina_cost) VALUES
+  ('tsunade', 'Tsunade', 'intern', 'female',
+   'Legendary Sannin and expert medical ninja. A reliable starter for any agency.',
+   'tsunade.png', 0, 60, 10),
+
   ('saitama', 'Saitama', 'intern', 'male',
    'The One-Punch Man. Somehow still looking for a good sale at the supermarket.',
    'saitama.png', 3500, 75, 15),
