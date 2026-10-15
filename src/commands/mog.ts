@@ -3,6 +3,7 @@ import { MogImageGenerator, MogImageData } from '../utils/mog-image-generator.js
 import { ErrorHandler } from '../utils/error-handler.js';
 import { getMogProfile, createMogProfile, updateMogProfile } from '../database/client.js';
 import { removeCoins, getCoinBalanceInfo } from '../services/coins.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
 
 // Rank classifications
 const RANK_CLASSIFICATIONS = {
@@ -153,7 +154,7 @@ export async function handleMogCommand(message: Message, args: string[]): Promis
     // Create retry button (includes both requester and target user IDs)
     const retryButton = new ButtonBuilder()
       .setCustomId(`mog_retry_${message.author.id}_${userId}`)
-      .setLabel('ascend')
+      .setLabel(`${EMOJIS.chad} ascend`)
       .setStyle(ButtonStyle.Primary);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(retryButton);
@@ -173,7 +174,7 @@ export async function handleMogCommand(message: Message, args: string[]): Promis
   }
 }
 
-const RETRY_PRICE = 1000000;
+const RETRY_PRICE = 50000;
 
 // Track processing interactions to prevent duplicate charges
 const processingInteractions = new Set<string>();
@@ -330,7 +331,7 @@ async function handleMogRetryButton(interaction: MessageComponentInteraction): P
     // Create retry button (includes both requester and target user IDs)
     const retryButton = new ButtonBuilder()
       .setCustomId(`mog_retry_${requesterId}_${targetUserId}`)
-      .setLabel('ascend')
+      .setLabel(`${EMOJIS.chad} ascend`)
       .setStyle(ButtonStyle.Primary);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(retryButton);

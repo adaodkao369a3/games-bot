@@ -24,7 +24,7 @@
 | **.hs** | Bombo Coin leaderboard (alias for .highscore). Shows top players by balance. Pagination support. Game floor/Talent Agency channels only. |
 | **.highscore** | Bombo Coin leaderboard. Shows top players by balance. Pagination support. Game floor/Talent Agency channels only. |
 | **.impostor** | Find the impostor among the crew. Multiplayer game with button interactions. Channel-based game state. |
-| **.mog [@user]** | Generate MOG Archive classification card. Shows rank (D-SS), stars, attributes, theme. Can ascend (reroll) for 1M coins. |
+| **.mog [@user]** | Generate MOG Archive classification card. Shows rank (D-SS), stars, attributes, theme. Can ascend (reroll) for 50k coins. |
 | **.moglb** | MOG Files leaderboard. Ranked by rank, stars, and total attributes. Pagination support. Server-specific. |
 | **.numguess** | Guess the hidden number game. Channel-based. Users submit guesses via chat. |
 | **.pisscomp @user** | Piss Competition. Fill your meter first by clicking buttons. Multiplayer challenge. Channel-based. |
