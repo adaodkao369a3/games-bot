@@ -154,7 +154,8 @@ export async function handleMogCommand(message: Message, args: string[]): Promis
     // Create retry button (includes both requester and target user IDs)
     const retryButton = new ButtonBuilder()
       .setCustomId(`mog_retry_${message.author.id}_${userId}`)
-      .setLabel(`${EMOJIS.chad} ascend`)
+      .setEmoji(EMOJIS.chad)
+      .setLabel('ascend')
       .setStyle(ButtonStyle.Primary);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(retryButton);
@@ -331,7 +332,8 @@ async function handleMogRetryButton(interaction: MessageComponentInteraction): P
     // Create retry button (includes both requester and target user IDs)
     const retryButton = new ButtonBuilder()
       .setCustomId(`mog_retry_${requesterId}_${targetUserId}`)
-      .setLabel(`${EMOJIS.chad} ascend`)
+      .setEmoji(EMOJIS.chad)
+      .setLabel('ascend')
       .setStyle(ButtonStyle.Primary);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(retryButton);
