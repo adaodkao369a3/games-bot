@@ -50,7 +50,7 @@ export async function handleHustleCommand(message: Message): Promise<void> {
     if (timeSinceLastUse < HUSTLE_COOLDOWN_MS) {
       const remainingTime = Math.ceil((HUSTLE_COOLDOWN_MS - timeSinceLastUse) / 1000 / 60);
       const cooldownEmbed = new EmbedBuilder()
-        .setTitle('<:alarm1:1545148991782518844> Cooldown Active')
+        .setTitle('<a:alarm1:1545148991782518844> Cooldown Active')
         .setDescription(`You need to wait ${remainingTime} more minutes before hustling again.`)
         .setColor(0xFFA500);
       await message.reply({ embeds: [cooldownEmbed] });

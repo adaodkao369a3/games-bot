@@ -56,7 +56,7 @@ export async function handleGigCommand(message: Message): Promise<void> {
     if (timeSinceLastUse < GIG_COOLDOWN_MS) {
       const remainingTime = Math.ceil((GIG_COOLDOWN_MS - timeSinceLastUse) / 1000 / 60);
       const cooldownEmbed = new EmbedBuilder()
-        .setTitle('<:alarm1:1545148991782518844> Cooldown Active')
+        .setTitle('<a:alarm1:1545148991782518844> Cooldown Active')
         .setDescription(`You need to wait ${remainingTime} more minutes before booking another gig.`)
         .setColor(0xFFA500);
       await message.reply({ embeds: [cooldownEmbed] });
