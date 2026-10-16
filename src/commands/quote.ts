@@ -29,6 +29,53 @@ interface QuoteSource {
   url: string;
 }
 
+/**
+ * Replaces Discord user and role mentions with their actual names.
+ * Handles both <@userId> and <@!userId> formats for users, and <@&roleId> for roles.
+ */
+async function resolveUserMentions(text: string, guild: any): Promise<string> {
+  if (!guild) return text;
+
+  let resolvedText = text;
+
+  // Resolve user mentions (<@userId> and <@!userId>)
+  const userMentionRegex = /<@!?(\d+)>/g;
+  let match;
+
+  while ((match = userMentionRegex.exec(text)) !== null) {
+    const [fullMatch, userId] = match;
+
+    try {
+      const member = await guild.members.fetch(userId).catch(() => null);
+      if (member) {
+        const displayName = member.nickname || member.user.username;
+        resolvedText = resolvedText.replace(fullMatch, `@${displayName}`);
+      }
+    } catch (error) {
+      // If we can't resolve the mention, leave it as-is
+      console.warn(`[Quote] Failed to resolve user mention for ID ${userId}:`, error);
+    }
+  }
+
+  // Resolve role mentions (<@&roleId>)
+  const roleMentionRegex = /<@&(\d+)>/g;
+  while ((match = roleMentionRegex.exec(text)) !== null) {
+    const [fullMatch, roleId] = match;
+
+    try {
+      const role = await guild.roles.fetch(roleId).catch(() => null);
+      if (role) {
+        resolvedText = resolvedText.replace(fullMatch, `@${role.name}`);
+      }
+    } catch (error) {
+      // If we can't resolve the mention, leave it as-is
+      console.warn(`[Quote] Failed to resolve role mention for ID ${roleId}:`, error);
+    }
+  }
+
+  return resolvedText;
+}
+
 /** Extracts avatar/nickname/text/sticker/image from a single target message. */
 async function buildQuoteSource(message: Message, target: Message): Promise<QuoteSource> {
   // Server nickname (falling back to username) — never the account's
@@ -62,8 +109,11 @@ async function buildQuoteSource(message: Message, target: Message): Promise<Quot
   // content]" placeholder in that case — the media fills the quote area
   // on its own instead.
   const hasRealText = Boolean(target.content && target.content.trim().length > 0);
-  const quoteText =
+  const rawQuoteText =
     hasRealText ? target.content : stickerUrl || imageUrl ? '' : '[no text content]';
+
+  // Resolve user mentions to actual usernames
+  const quoteText = await resolveUserMentions(rawQuoteText, message.guild);
 
   return {
     opts: { avatarUrl, quoteText, nickname, username, stickerUrl, imageUrl },
