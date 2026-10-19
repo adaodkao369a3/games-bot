@@ -19,7 +19,7 @@ This file contains project-specific instructions for AI coding agents working on
 ### Directory Structure
 ```
 src/
-├── commands/          # Prefix command handlers (.trial, .bj, .pisscomp, etc.)
+├── commands/          # Prefix command handlers (.trial, .bj, etc.)
 ├── agency/            # Talent Agency pure game logic (no I/O, no DB)
 ├── games/             # Game modules
 │   ├── shared/        # Shared utilities (VoteManager)
@@ -30,7 +30,6 @@ src/
 ├── utils/             # Utilities (error-handler, gif-duration, wager-parser)
 ├── config/            # Configuration and validation
 ├── types/             # TypeScript type definitions
-├── pisscomp/          # Piss Comp game (PissCompGame + PissCompMaxGame)
 ├── blackjack/         # Blackjack game (BlackjackGame + Blackjack2Game)
 ├── [other games]/     # Individual game modules (bomb, coinflip, etc.)
 ├── quote/             # Quote generation
@@ -46,7 +45,6 @@ src/
 
 ### Interaction Routing Convention
 Button interactions are routed in `discord/client.ts` by checking `customId` prefixes:
-- `pisscomp_*` → `handlePissCompInteraction`
 - `trial_*` → `handleTrialInteraction`
 - `pa_*` → `handleAgencyInteraction` (Talent Agency)
 - `diceduel_*` → `handleDiceDuelInteraction`
@@ -73,7 +71,7 @@ Some commands are restricted to specific channels (checked in `config/index.ts`)
 - Multiple channels can be configured for each channel type by adding their IDs to the respective arrays in config
 
 ### Game State Management
-- Games use in-memory Maps to track active games (e.g., `activeGames` Map in pisscomp.ts)
+- Games use in-memory Maps to track active games
 - Game state is **not persisted** to database
 - Bot restart loses all active game state
 - This is a known limitation, not a bug
@@ -118,7 +116,7 @@ The `custom_id` error occurred when debug logging attempted to access `button.da
 ### CustomId Format Conventions
 - Follow existing pattern: `<game>_<action>_<params>`
 - Talent Agency uses: `pa_<action>_<ownerUserId>_<arg>` (every handler validates ownerUserId)
-- Examples: `pisscomp_pump_p1`, `trial_guilty_vote`, `pa_care_12345_42`
+- Examples: `trial_guilty_vote`, `pa_care_12345_42`
 - Never reuse prefixes across different games
 - Keep customIds consistent with their handlers
 
@@ -217,7 +215,7 @@ Both commands must succeed before committing. If either fails:
 ### Commit Message Format
 Use descriptive commit messages explaining what was changed and why. Example:
 ```
-Fix PissCompMax button interaction logging
+Fix button interaction logging
 
 Removed unsafe access to button.data.custom_id which caused
 TypeScript compilation error. The logging was debug-only and

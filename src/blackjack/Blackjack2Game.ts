@@ -1,6 +1,6 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Client } from 'discord.js';
 import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
-import { Card, createDeck, calculateHandTotal, isBlackjack, isBust, formatHand } from './CardDeck.js';
+import { Card, createDeck, calculateHandTotal, isBust, formatHand } from './CardDeck.js';
 import { EMOJIS } from '../utils/emoji-registry.js';
 import { CROSS, TICK, coins, num, respond, nope, COIN } from '../utils/casino-ui.js';
 
@@ -247,28 +247,6 @@ export class Blackjack2Game {
     // Player 1 starts
     this.data.currentPlayer = 'player1';
 
-    // Check for natural blackjacks
-    const p1Blackjack = isBlackjack(this.data.player1Hand.hand);
-    const p2Blackjack = isBlackjack(this.data.player2Hand.hand);
-
-    if (p1Blackjack) {
-      this.data.player1Hand.finished = true;
-    }
-    if (p2Blackjack) {
-      this.data.player2Hand.finished = true;
-    }
-
-    if (p1Blackjack && p2Blackjack) {
-      // Both have blackjack - go to dealer
-      await this.playDealer(interaction);
-      return;
-    }
-
-    if (p1Blackjack) {
-      // Player 1 has blackjack, move to player 2
-      this.data.currentPlayer = 'player2';
-    }
-
     await respond(interaction, {
       embeds: [await this.createGameEmbed()],
       components: [this.createGameButtons()],
@@ -473,9 +451,7 @@ export class Blackjack2Game {
    */
   private payoutFor(hand: PlayerHand): number {
     if (hand.result === 'win') {
-      return isBlackjack(hand.hand)
-        ? Math.floor(hand.betAmount * GAME_CONFIG.blackjackMultiplier)
-        : hand.betAmount * 2;
+      return hand.betAmount * 2;
     }
     if (hand.result === 'push') {
       return hand.betAmount;
@@ -491,20 +467,14 @@ export class Blackjack2Game {
     this.clearTimeout();
 
     const dealerTotal = calculateHandTotal(this.data.dealerHand);
-    const dealerBlackjack = isBlackjack(this.data.dealerHand);
 
     // Determine results for each player
     for (const hand of [this.data.player1Hand, this.data.player2Hand]) {
       if (hand.result === 'bust') continue;
 
       const playerTotal = calculateHandTotal(hand.hand);
-      const playerBlackjack = isBlackjack(hand.hand);
 
-      if (playerBlackjack && !dealerBlackjack) {
-        hand.result = 'win';
-      } else if (dealerBlackjack && !playerBlackjack) {
-        hand.result = 'lose';
-      } else if (isBust(this.data.dealerHand)) {
+      if (isBust(this.data.dealerHand)) {
         hand.result = 'win';
       } else if (playerTotal > dealerTotal) {
         hand.result = 'win';
@@ -526,7 +496,7 @@ export class Blackjack2Game {
           'bj2',
           {
             reason: '2-Player Blackjack winnings',
-            description: hand.result === 'win' ? 'Won blackjack' : 'Push',
+            description: hand.result === 'win' ? 'Won' : 'Push',
             gameInstanceId: `${this.data.gameInstanceId}_${hand.userId}`,
           }
         );

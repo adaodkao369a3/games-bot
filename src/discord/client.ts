@@ -5,7 +5,6 @@ import { ErrorHandler } from '../utils/error-handler.js';
 import { ChatRewardsService } from '../services/chat-rewards.js';
 import { handleHelpCommand, handleHelpInteraction } from '../commands/help.js';
 import { handleBobkunCommand } from '../commands/bobkun.js';
-import { handlePissCompCommand, handlePissCompMaxCommand, handlePissCompInteraction } from '../commands/pisscomp.js';
 import { handleTrialCommand, handleTrialInteraction, handleTrialModalSubmit } from '../commands/trial.js';
 import { handleGambleCommand } from '../commands/gamble.js';
 import { handleQuoteCommand } from '../commands/quote.js';
@@ -101,16 +100,6 @@ export class DiscordClient {
 
       if (command === 'bobkun') {
         await handleBobkunCommand(message);
-        return;
-      }
-
-      if (command === 'pisscomp') {
-        await handlePissCompCommand(message, args);
-        return;
-      }
-
-      if (command === 'pisscompmax') {
-        await handlePissCompMaxCommand(message, args);
         return;
       }
 
@@ -304,11 +293,6 @@ export class DiscordClient {
 
     if (customId.startsWith('help_')) {
       await handleHelpInteraction(interaction);
-      return;
-    }
-
-    if (customId.startsWith('pisscomp_') || customId.startsWith('pisscompmax_')) {
-      await handlePissCompInteraction(interaction);
       return;
     }
 

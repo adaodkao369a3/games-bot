@@ -1,6 +1,6 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Client } from 'discord.js';
 import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
-import { Card, createDeck, calculateHandTotal, isBlackjack, isBust, formatHand } from './CardDeck.js';
+import { Card, createDeck, calculateHandTotal, isBust, formatHand } from './CardDeck.js';
 import { EMOJIS } from '../utils/emoji-registry.js';
 import { CROSS, TICK, coins, signedCoins, respond, nope } from '../utils/casino-ui.js';
 
@@ -105,13 +105,6 @@ export class BlackjackGame {
     this.data.playerHand.push(this.data.deck.pop()!);
     this.data.dealerHand.push(this.data.deck.pop()!);
     this.data.dealerHand.push(this.data.deck.pop()!);
-
-    // Natural blackjack: settle straight away, no buttons, no timeout
-    if (isBlackjack(this.data.playerHand)) {
-      const sent = await this.settleNaturalBlackjack(message);
-      this.data.message = sent;
-      return;
-    }
 
     let sentMessage: Message;
     try {
@@ -302,18 +295,11 @@ export class BlackjackGame {
 
     const playerTotal = calculateHandTotal(this.data.playerHand);
     const dealerTotal = calculateHandTotal(this.data.dealerHand);
-    const playerBlackjack = isBlackjack(this.data.playerHand);
-    const dealerBlackjack = isBlackjack(this.data.dealerHand);
 
     let result: BlackjackResult;
     let payout = 0;
 
-    if (playerBlackjack && !dealerBlackjack) {
-      result = 'win';
-      payout = Math.floor(this.data.betAmount * GAME_CONFIG.blackjackMultiplier);
-    } else if (dealerBlackjack && !playerBlackjack) {
-      result = 'lose';
-    } else if (isBust(this.data.dealerHand)) {
+    if (isBust(this.data.dealerHand)) {
       result = 'win';
       payout = this.data.betAmount * 2;
     } else if (isBust(this.data.playerHand)) {
@@ -335,48 +321,13 @@ export class BlackjackGame {
         'bj',
         {
           reason: 'Blackjack winnings',
-          description: result === 'win' ? 'Won blackjack' : 'Push',
+          description: result === 'win' ? 'Won' : 'Push',
           gameInstanceId: this.data.gameInstanceId,
         }
       );
     }
 
     await respond(interaction, {
-      embeds: [await this.createResultEmbed(result, payout)],
-      components: [],
-    });
-  }
-
-  /**
-   * Natural blackjack on the deal: pay out and show the result directly.
-   */
-  private async settleNaturalBlackjack(message: Message): Promise<Message> {
-    this.state = 'complete';
-
-    const dealerBlackjack = isBlackjack(this.data.dealerHand);
-    let result: 'win' | 'push';
-    let payout: number;
-
-    if (dealerBlackjack) {
-      result = 'push';
-      payout = this.data.betAmount;
-    } else {
-      result = 'win';
-      payout = Math.floor(this.data.betAmount * GAME_CONFIG.blackjackMultiplier);
-    }
-
-    await awardCoins(
-      this.data.userId,
-      payout,
-      'bj',
-      {
-        reason: 'Blackjack winnings',
-        description: result === 'win' ? 'Natural blackjack' : 'Push against dealer blackjack',
-        gameInstanceId: this.data.gameInstanceId,
-      }
-    );
-
-    return message.reply({
       embeds: [await this.createResultEmbed(result, payout)],
       components: [],
     });
@@ -461,8 +412,7 @@ export class BlackjackGame {
     let color: number;
 
     if (result === 'win') {
-      const label = isBlackjack(this.data.playerHand) ? 'BLACKJACK' : 'WIN';
-      headline = `${TICK} **${label}** ${signedCoins(net)}`;
+      headline = `${TICK} **WIN** ${signedCoins(net)}`;
       color = COLORS.win;
     } else if (result === 'push') {
       headline = `${EMOJIS.hand_emoji} **PUSH** · ${coins(payout)} back`;

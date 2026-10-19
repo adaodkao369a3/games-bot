@@ -108,8 +108,6 @@ function gamesEmbed(): EmbedBuilder {
         entry('.impostor', 'Find the impostor among the crew'),
         entry('.numguess', 'Guess the hidden number'),
         entry('.simonsays', 'Follow the commands and survive'),
-        entry('.pisscomp @user', 'Fill your meter first'),
-        entry('.pisscompmax @user', 'Piss comp, then a fight to the finish'),
       )
     );
 }

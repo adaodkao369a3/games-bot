@@ -28,8 +28,6 @@
 | **.mog [@user]** | Generate MOG Archive classification card. Shows rank (D-SS), stars, attributes, theme. Can ascend (reroll) for 50k coins. |
 | **.moglb** | MOG Files leaderboard. Ranked by rank, stars, and total attributes. Pagination support. Server-specific. |
 | **.numguess** | Guess the hidden number game. Channel-based. Users submit guesses via chat. |
-| **.pisscomp @user** | Piss Competition. Fill your meter first by clicking buttons. Multiplayer challenge. Channel-based. |
-| **.pisscompmax @user** | Piss Comp with JJK fight sequence. Normal Piss Comp first, then fight to finish. No coins awarded during first round. |
 | **.quote** | Reply to a message to create a quote card. Supports 16 themes, 15 fonts. Theme/font selection menus. GIF conversion. 5-second cooldown. |
 | **.dquote** | Reply to create stacked quote (replied-to + its reply). Same features as .quote. |
 | **.rlt <amount> [number]** | Roulette. Bet on colors, odd/even, dozens, or exact number (0-36). Game floor channel only. Wager-based. |
@@ -77,7 +75,6 @@
 
 ### Multiplayer Games
 - .trial (courtroom voting)
-- .pisscomp / .pisscompmax (button mashing)
 - .wordbomb (word chain)
 - .impostor (find the impostor)
 - .numguess (number guessing)
