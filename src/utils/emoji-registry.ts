@@ -31,6 +31,7 @@ export const EMOJIS = {
   slotsseven: '<:slotsseven:1545161915649753119>',
   slotsstrawberry: '<:slotsstrawberry:1545161917834993804>',
   lotteryslots: '<:lotteryslots:1545161895261241454>',
+  jackpot: '<:jackpot:1561716707536674878>',
 
   // Medals & Rankings
   firstplacetrophy: '<a:firstplacetrophy:1545135079926267964>',

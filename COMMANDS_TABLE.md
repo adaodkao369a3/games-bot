@@ -5,8 +5,9 @@
 | **.pscout** | Scout new talent (free, 30-minute cooldown). Discover characters with different tiers (Intern to Legend). Talent Agency channel only. |
 | **.precruit <name>** | Sign discovered talent to your roster. Pay recruit price based on tier. Talent Agency channel only. |
 | **.pwork <name>** | Send talent to work for 30-minute blocks. Earnings based on tier/level. Max 5 talent working at once. Talent Agency channel only. |
+| **.pwork all** | Send all available talent to work at once. Respects stamina and MAX_WORKING limit. Talent Agency channel only. |
 | **.pcollect** | Collect earnings from talent who finished 30-minute work blocks. Can collect up to 2 hours of work. Talent Agency channel only. |
-| **.plist** | View agency hub with roster, status (working/resting), stamina bars, and talent profiles. Talent Agency channel only. |
+| **.plist** | View agency hub with roster, status (working/resting), stamina bars, and talent profiles. Talent Agency channel only. Button to view scouted talent with pagination. |
 | **.phelp** | Display Talent Agency guide with command list, hustle/gig mechanics, and tier payout information. |
 | **.bj <amount>** | Single-player Blackjack against dealer. Game floor channel only. Supports wager amounts (500, 10k, 1.5m, all). |
 | **.bj2 @user <amount>** | Two-player Blackjack against dealer. Challenge another user. Game floor channel only. Both players bet same amount. |

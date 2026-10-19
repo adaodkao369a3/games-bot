@@ -235,7 +235,7 @@ async function buildHub(userId: string, note?: string): Promise<View> {
   const owned = new Set(finalRoster.map((e) => e.character_slug));
   const unsigned = discovered.filter((c) => !owned.has(c.slug));
   if (unsigned.length) {
-    lines.push('', '**Scouted, not signed**', ...unsigned.map((c) => `• ${c.name}: ${coins(c.recruit_price)}  (\`\`\`.precruit ${c.name}\`\`\`)`));
+    lines.push('', `**Scouted, not signed:** ${unsigned.length} available (use the button below to view)`);
   }
   embed.setDescription(lines.join('\n').slice(0, 4000));
 
@@ -250,7 +250,21 @@ async function buildHub(userId: string, note?: string): Promise<View> {
           .setValue(String(e.id))
       )
     );
-  return { embeds: [embed], components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)], files: [] };
+
+  const scoutedButton = new ButtonBuilder()
+    .setCustomId(ids('scouted', userId, '0'))
+    .setLabel(`Scouted (${unsigned.length})`)
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(unsigned.length === 0);
+
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(scoutedButton)
+    ],
+    files: []
+  };
 }
 
 function buildProfile(e: RosterEntry, userId: string, note?: string): View {
@@ -344,6 +358,75 @@ function confirmView(title: string, text: string, yesId: string, noId: string): 
     new ButtonBuilder().setCustomId(noId).setEmoji('cross:1558430092043096154').setLabel('NO').setStyle(ButtonStyle.Danger)
   );
   return { embeds: [embed], components: [row], files: [] };
+}
+
+async function buildScoutedView(userId: string, page: number = 0): Promise<View> {
+  const PER_PAGE = 5;
+  const [roster, discovered, tiers] = await Promise.all([getRoster(userId), getDiscovered(userId), getTiers()]);
+
+  const tiersById = tierMap(tiers);
+  const owned = new Set(roster.map((e) => e.character_slug));
+  const unsigned = discovered.filter((c) => !owned.has(c.slug));
+
+  if (unsigned.length === 0) {
+    const embed = new EmbedBuilder()
+      .setColor(GOLD)
+      .setTitle('🔍 Scouted Talent')
+      .setDescription("You haven't scouted any talent yet. Use **__`.pscout`__** to find new talent.");
+
+    const backButton = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(ids('back', userId, 'list'))
+        .setLabel('Back to Roster')
+        .setStyle(ButtonStyle.Secondary)
+    );
+    return { embeds: [embed], components: [backButton], files: [] };
+  }
+
+  const totalPages = Math.ceil(unsigned.length / PER_PAGE);
+  const safePage = Math.min(Math.max(0, page), totalPages - 1);
+  const startIdx = safePage * PER_PAGE;
+  const endIdx = Math.min(startIdx + PER_PAGE, unsigned.length);
+  const pageItems = unsigned.slice(startIdx, endIdx);
+
+  const embed = new EmbedBuilder()
+    .setColor(GOLD)
+    .setTitle('🔍 Scouted Talent')
+    .setDescription(`Scouted, not signed yet (${unsigned.length} total)\n\n${pageItems.map((c) => {
+      const tier = tiersById.get(c.tier_key);
+      const tierLabel = tier?.label || c.tier_key;
+      return `• **${c.name}** (${tierLabel}): ${coins(c.recruit_price)}  (\`\`\`.precruit ${c.name}\`\`\`)`;
+    }).join('\n')}`)
+    .setFooter({ text: `Page ${safePage + 1}/${totalPages}` });
+
+  const components: ActionRowBuilder<any>[] = [];
+
+  if (totalPages > 1) {
+    const row = new ActionRowBuilder<ButtonBuilder>();
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(ids('scouted_prev', userId, safePage))
+        .setLabel('Previous')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(safePage === 0),
+      new ButtonBuilder()
+        .setCustomId(ids('scouted_next', userId, safePage))
+        .setLabel('Next')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(safePage >= totalPages - 1)
+    );
+    components.push(row);
+  }
+
+  const backButton = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(ids('back', userId, 'list'))
+      .setLabel('Back to Roster')
+      .setStyle(ButtonStyle.Secondary)
+  );
+  components.push(backButton);
+
+  return { embeds: [embed], components, files: [] };
 }
 
 function collectEmbed(lines: CollectLine[], stillWorking: CollectLine[], total: number, newBalance: number | null, alreadyPaid: boolean): EmbedBuilder {
@@ -455,7 +538,7 @@ export async function handlePworkCommand(message: Message, args: string[]): Prom
   }
   try {
     const userId = message.author.id;
-    const query = args.join(' ').trim();
+    const query = args.join(' ').trim().toLowerCase();
     const roster = await getRoster(userId);
 
     if (!query) {
@@ -467,11 +550,63 @@ export async function handlePworkCommand(message: Message, args: string[]): Prom
         return;
       }
       await message.reply(
-        `Who's clocking in? Use \`\`\`.pwork <name>\`\`\`. (${out}/${MAX_WORKING} out)\n` +
+        `Who's clocking in? Use \`\`\`.pwork <name>\`\`\` or \`\`\`.pwork all\`\`\` to send everyone available. (${out}/${MAX_WORKING} out)\n` +
           (available.length
             ? available.map((e) => `• **${e.character.name}** (${e.tier.label} Lv${e.level}): stamina ${currentStamina(e, now)}/100`).join('\n')
             : 'Nobody is free right now.')
       );
+      return;
+    }
+
+    // Handle "all" argument to send all available talent to work
+    if (query === 'all') {
+      const now = new Date();
+      const available = roster.filter((e) => e.status === 'resting' && currentStamina(e, now) > 0);
+      const out = roster.filter((e) => e.status === 'working').length;
+
+      if (roster.length === 0) {
+        await message.reply('You have no talent yet. Use **__`.pscout`__** first.');
+        return;
+      }
+
+      if (available.length === 0) {
+        await message.reply('Nobody is available to work. Either everyone is already working or out of stamina.');
+        return;
+      }
+
+      if (out >= MAX_WORKING) {
+        await message.reply(`You already have ${MAX_WORKING} talent working. Collect earnings first with \`\`\`.pcollect\`\`\`.`);
+        return;
+      }
+
+      // Send all available talent to work (respecting MAX_WORKING limit)
+      const slotsAvailable = MAX_WORKING - out;
+      const toSend = available.slice(0, slotsAvailable);
+      const sent: string[] = [];
+      const failedNames: string[] = [];
+
+      for (const entry of toSend) {
+        const result = await sendToWork(userId, entry.id);
+        if (failed(result)) {
+          failedNames.push(entry.character.name);
+        } else {
+          sent.push(`**${entry.character.name}** (${entry.tier.label} Lv${entry.level})`);
+        }
+      }
+
+      const responseLines: string[] = [];
+      if (sent.length > 0) {
+        responseLines.push(`💼 Sent ${sent.length} talent to work (${out + sent.length}/${MAX_WORKING} out):`);
+        responseLines.push(...sent.map(s => `• ${s}`));
+      }
+      if (failedNames.length > 0) {
+        responseLines.push(`\n⚠️ Couldn't send ${failedNames.length} talent: ${failedNames.join(', ')}`);
+      }
+      if (available.length > slotsAvailable) {
+        responseLines.push(`\n📋 ${available.length - slotsAvailable} more were available but max working limit (${MAX_WORKING}) reached.`);
+      }
+
+      await message.reply(responseLines.join('\n'));
       return;
     }
 
@@ -605,6 +740,26 @@ export async function handleAgencyInteraction(interaction: any): Promise<void> {
 
     case 'back': {
       await render(interaction, await buildHub(userId));
+      return;
+    }
+
+    case 'scouted': {
+      const page = Number(arg);
+      await render(interaction, await buildScoutedView(userId, page));
+      return;
+    }
+
+    case 'scouted_prev': {
+      const currentPage = Number(arg);
+      const newPage = Math.max(0, currentPage - 1);
+      await render(interaction, await buildScoutedView(userId, newPage));
+      return;
+    }
+
+    case 'scouted_next': {
+      const currentPage = Number(arg);
+      const newPage = currentPage + 1;
+      await render(interaction, await buildScoutedView(userId, newPage));
       return;
     }
 

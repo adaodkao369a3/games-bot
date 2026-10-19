@@ -7,7 +7,8 @@ import { EMOJIS } from '../utils/emoji-registry.js';
 import { CROSS, TICK, coins, signedCoins } from '../utils/casino-ui.js';
 
 const SLOT_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>', '<:slotsstrawberry:1545161917834993804>'];
-const WIN_SYMBOL = '<:slotsseven:1545161915649753119>';
+const WIN_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>'];
+const JACKPOT_SYMBOL = '<:jackpot:1561716707536674878>';
 
 function randomSymbol(exclude?: string): string {
   let symbol: string;
@@ -30,9 +31,10 @@ function progressiveReelFrame(stopped1: string | null, stopped2: string | null, 
 
 // Landing frame: 3-of-a-kind on the win symbol for a win, a guaranteed
 // non-matching combo for a loss.
-function finalReelFrame(won: boolean): string {
+function finalReelFrame(won: boolean, jackpot: boolean): string {
   if (won) {
-    return `${WIN_SYMBOL}  ${WIN_SYMBOL}  ${WIN_SYMBOL}`;
+    const symbol = jackpot ? JACKPOT_SYMBOL : WIN_SYMBOLS[Math.floor(Math.random() * WIN_SYMBOLS.length)];
+    return `${symbol}  ${symbol}  ${symbol}`;
   }
   const a = randomSymbol();
   const b = randomSymbol(a);
@@ -126,7 +128,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
     }
 
     // Pre-calculate the final landing frame and extract individual symbols
-    const landingFrame = finalReelFrame(won);
+    const landingFrame = finalReelFrame(won, jackpot);
     // Extract the three symbols by splitting (format: "emoji1 emoji2 emoji3")
     const parts = landingFrame.split(' ').filter(part => part.trim().length > 0);
     const symbol1 = parts[0] || '<:slotsseven:1545161915649753119>';
