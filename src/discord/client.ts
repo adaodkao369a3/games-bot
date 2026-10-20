@@ -39,6 +39,7 @@ import {
 import { handlePhelpCommand } from '../commands/phelp.js';
 import { handleRltCommand, handleRltInteraction, handleRltModalSubmit } from '../commands/rlt.js';
 import { AniListCharacterService } from '../services/anilist-character-service.js';
+import { quoteContextCommand, QUOTE_APP_COMMAND_NAME, handleQuoteContextMenu, handleQuoteAppInteraction } from '../commands/quoteApp.js';
 
 export class DiscordClient {
   private client: Client;
@@ -76,6 +77,14 @@ export class DiscordClient {
     
     // Set bot status
     this.client.user?.setActivity('games', { type: 3 as any });
+
+    // Register the "Apps > Quote" message command (works in any server or DM
+    // for people who added the app to their account). This bot has no other
+    // application commands, so setting the global list is safe.
+    this.client.application?.commands
+      .set([quoteContextCommand.toJSON()])
+      .then(() => console.log('[Commands] Registered Apps > Quote'))
+      .catch((error) => console.error('[Commands] Failed to register Apps > Quote:', error));
     
     // Initialize AniList service (non-blocking, will populate cache in background if needed)
     const anilistService = AniListCharacterService.getInstance();
@@ -278,7 +287,11 @@ export class DiscordClient {
 
   private async onInteractionCreate(interaction: any): Promise<void> {
     try {
-      if (interaction.isMessageComponent()) {
+      if (interaction.isMessageContextMenuCommand()) {
+        if (interaction.commandName === QUOTE_APP_COMMAND_NAME) {
+          await handleQuoteContextMenu(interaction);
+        }
+      } else if (interaction.isMessageComponent()) {
         await this.handleButtonInteraction(interaction);
       } else if (interaction.isModalSubmit()) {
         await this.handleModalSubmit(interaction);
@@ -290,6 +303,11 @@ export class DiscordClient {
 
   private async handleButtonInteraction(interaction: any): Promise<void> {
     const customId = interaction.customId;
+
+    if (customId.startsWith('qapp_')) {
+      await handleQuoteAppInteraction(interaction);
+      return;
+    }
 
     if (customId.startsWith('help_')) {
       await handleHelpInteraction(interaction);
