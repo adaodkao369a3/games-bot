@@ -2,7 +2,7 @@ import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, 
 import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
 import { Card, createDeck, calculateHandTotal, isBust, formatHand } from './CardDeck.js';
 import { EMOJIS } from '../utils/emoji-registry.js';
-import { CROSS, TICK, coins, num, respond, nope, COIN } from '../utils/casino-ui.js';
+import { CROSS, TICK, coins, num, betWin, respond, nope, COIN } from '../utils/casino-ui.js';
 
 type Blackjack2State = 'idle' | 'challenging' | 'playing' | 'dealer_turn' | 'complete' | 'declined' | 'timeout';
 
@@ -626,16 +626,16 @@ export class Blackjack2Game {
       let outcome: string;
       if (hand.result === 'win') {
         icon = TICK;
-        outcome = `**+${num(net)}** ${COIN}`;
+        outcome = betWin(hand.betAmount, payout);
       } else if (hand.result === 'push') {
         icon = EMOJIS.hand_emoji;
         outcome = 'push';
       } else if (hand.result === 'bust') {
         icon = EMOJIS.fire;
-        outcome = `**-${num(hand.betAmount)}** ${COIN}`;
+        outcome = betWin(hand.betAmount, 0);
       } else {
         icon = CROSS;
-        outcome = `**-${num(hand.betAmount)}** ${COIN}`;
+        outcome = betWin(hand.betAmount, 0);
       }
 
       description += `${icon} **${hand.username}**  ·  **${hand.result === 'bust' ? 'BUST' : total}**  ·  ${outcome}\n${cards}\n\n`;

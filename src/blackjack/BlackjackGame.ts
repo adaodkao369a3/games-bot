@@ -2,7 +2,7 @@ import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, 
 import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
 import { Card, createDeck, calculateHandTotal, isBust, formatHand } from './CardDeck.js';
 import { EMOJIS } from '../utils/emoji-registry.js';
-import { CROSS, TICK, coins, signedCoins, respond, nope } from '../utils/casino-ui.js';
+import { CROSS, TICK, coins, signedCoins, betWin, respond, nope } from '../utils/casino-ui.js';
 
 type BlackjackState = 'idle' | 'playing' | 'dealer_turn' | 'complete' | 'timeout';
 
@@ -406,22 +406,20 @@ export class BlackjackGame {
   private async createResultEmbed(result: BlackjackResult, payout: number): Promise<EmbedBuilder> {
     const playerTotal = calculateHandTotal(this.data.playerHand);
     const dealerTotal = calculateHandTotal(this.data.dealerHand);
-    const net = payout - this.data.betAmount;
-
     let headline: string;
     let color: number;
 
     if (result === 'win') {
-      headline = `${TICK} **WIN** ${signedCoins(net)}`;
+      headline = `${TICK} **WIN**  ·  ${betWin(this.data.betAmount, payout)}`;
       color = COLORS.win;
     } else if (result === 'push') {
-      headline = `${EMOJIS.hand_emoji} **PUSH** · ${coins(payout)} back`;
+      headline = `${EMOJIS.hand_emoji} **PUSH**  ·  ${coins(payout)} back`;
       color = COLORS.push;
     } else if (result === 'bust') {
-      headline = `${EMOJIS.fire} **BUST** ${signedCoins(-this.data.betAmount)}`;
+      headline = `${EMOJIS.fire} **BUST**  ·  ${betWin(this.data.betAmount, 0)}`;
       color = COLORS.lose;
     } else {
-      headline = `${CROSS} **LOSE** ${signedCoins(-this.data.betAmount)}`;
+      headline = `${CROSS} **LOSE**  ·  ${betWin(this.data.betAmount, 0)}`;
       color = COLORS.lose;
     }
 

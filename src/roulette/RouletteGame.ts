@@ -1,7 +1,7 @@
 import { Message, MessageComponentInteraction, MessageEditOptions, ModalSubmitInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder, TextInputBuilder, TextInputStyle, ModalBuilder } from 'discord.js';
 import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
 import { EMOJIS } from '../utils/emoji-registry.js';
-import { CROSS, TICK, coins, signedCoins, nope } from '../utils/casino-ui.js';
+import { CROSS, TICK, coins, signedCoins, betWin, nope } from '../utils/casino-ui.js';
 import { renderWheel, pocketIndexFromAngle, angleForPocket } from './RouletteWheelRenderer.js';
 import { RouletteBet, isWinningBet, describeBet, payoutMultiplier, getNumberColor, WHEEL_ORDER } from './roulette-logic.js';
 
@@ -437,13 +437,13 @@ export class RouletteGame {
 
   private async showResult(edit: Editor, result: number, bet: RouletteBet, won: boolean, payout: number): Promise<void> {
     const color = getNumberColor(result);
-    const net = won ? payout - this.data.betAmount : -this.data.betAmount;
+    const back = won ? payout : 0;
 
     const description =
       `${COLOR_EMOJI[color]}  **${result}**  ·  ${color.toUpperCase()}\n\n` +
       (won
-        ? `${TICK}  **WIN**  ${signedCoins(net)}  ·  ${describeBet(bet)}`
-        : `${CROSS}  **LOSS**  ${signedCoins(net)}  ·  ${describeBet(bet)}`);
+        ? `${TICK}  **WIN**  ·  ${betWin(this.data.betAmount, back)}\n${describeBet(bet)}`
+        : `${CROSS}  **LOSS**  ·  ${betWin(this.data.betAmount, back)}\n${describeBet(bet)}`);
 
     const name = `wheel_${this.data.gameId}_final.png`;
     const embed = new EmbedBuilder()

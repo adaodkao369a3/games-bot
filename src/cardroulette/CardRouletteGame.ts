@@ -1,7 +1,7 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Client } from 'discord.js';
 import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
 import { EMOJIS } from '../utils/emoji-registry.js';
-import { CROSS, coins, signedCoins, mult, respond, nope } from '../utils/casino-ui.js';
+import { CROSS, coins, signedCoins, betWin, mult, respond, nope } from '../utils/casino-ui.js';
 
 type CardRouletteState = 'idle' | 'playing' | 'complete' | 'cashout' | 'timeout';
 
@@ -499,12 +499,10 @@ export class CardRouletteGame {
   }
 
   private createCashoutEmbed(): EmbedBuilder {
-    const netProfit = this.data.currentPayout - this.data.betAmount;
-
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setDescription(
-        `${EMOJIS.moneybag}  **Cashed out**  ${signedCoins(netProfit)}\n\n` +
+        `${EMOJIS.moneybag}  **Cashed out**  ·  ${betWin(this.data.betAmount, this.data.currentPayout)}\n\n` +
         `${EMOJIS.cards} **${this.data.drawsSurvived}**  ·  ${mult(getMultiplier(this.data.drawsSurvived))}${this.historyLine()}`
       )
       .setColor(COLORS.cashout);
@@ -516,7 +514,7 @@ export class CardRouletteGame {
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
       .setDescription(
-        `${card.emoji}  **${card.name.toUpperCase()}**  ${CROSS}  ${signedCoins(-this.data.betAmount)}\n\n` +
+        `${card.emoji}  **${card.name.toUpperCase()}**  ${CROSS}  ·  ${betWin(this.data.betAmount, 0)}\n\n` +
         `${EMOJIS.cards} survived **${this.data.drawsSurvived}**${this.historyLine()}`
       )
       .setColor(COLORS.loss);

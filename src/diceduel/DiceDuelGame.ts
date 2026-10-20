@@ -1,7 +1,7 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
 import { EMOJIS } from '../utils/emoji-registry.js';
-import { coins, respond, nope } from '../utils/casino-ui.js';
+import { coins, betWin, respond, nope } from '../utils/casino-ui.js';
 
 type DiceDuelState = 'idle' | 'challenging' | 'accepted' | 'rolling_p1' | 'rolling_p2' | 'round_result' | 'complete' | 'declined' | 'expired';
 
@@ -485,7 +485,7 @@ export class DiceDuelGame {
 
     return new EmbedBuilder()
       .setDescription(
-        `${EMOJIS.trophy}  **${winnerName}** wins ${coins(winnings)}\n\n` +
+        `${EMOJIS.trophy}  **${winnerName}** wins  ·  ${betWin(this.data.betAmount, winnings)}\n\n` +
         `**${this.data.player1Name}**  **${this.data.player1Score}** – **${this.data.player2Score}**  **${this.data.player2Name}**\n\n` +
         `${this.lastRound}`
       )

@@ -4,6 +4,7 @@ import { cwd } from 'process';
 import { existsSync } from 'fs';
 import { LAYOUT, GRADIENT_PRESETS, PresetName, FONT_FALLBACK, EMOJI_FONT, FONT_OPTIONS, FontName } from './config.js';
 import { segmentText, preloadCustomEmojis, getCustomEmojiFromCache, Segment, TextFormatting } from './textSegmenter.js';
+import { drawEffect, EffectName } from './effects.js';
 
 const PROJECT_ROOT = cwd();
 
@@ -70,6 +71,8 @@ export interface QuoteCardOptions {
   username: string;
   preset?: PresetName;
   font?: FontName;
+  /** Overlay drawn above the avatar + gradient and below all text. */
+  effect?: EffectName;
   /** Direct image URL for a sticker attached to the quoted message (PNG/APNG). */
   stickerUrl?: string;
   /** Direct URL for a quoted message's image attachment. Only used when there's no sticker. */
@@ -128,6 +131,9 @@ async function renderQuoteCardLayer(opts: QuoteCardOptions, layout: LayerOptions
   // Mirroring the card flips which side that curve faces.
   drawColorCurveOverlay(ctx, preset, cardWidth, pfpWidth, mirror);
 
+  // Effect layer: above the avatar and gradient, below every piece of text.
+  await drawEffect(ctx, opts.effect, cardWidth, H, isWhitePreset);
+
   await drawText(
     ctx,
     opts.quoteText,
@@ -146,6 +152,193 @@ async function renderQuoteCardLayer(opts: QuoteCardOptions, layout: LayerOptions
   );
 
   return canvas.toBuffer('image/png');
+}
+
+/**
+ * Portrait card (single quotes only, text only, no stickers/images):
+ *   top 40%     avatar, fading into the gradient
+ *   bottom 60%  quote text, then the dash divider, nickname + @username
+ *   bottom right  BOMBO PRODUCTIONS
+ * Layer order: avatar, gradient, effect, text.
+ */
+export async function renderPortraitQuoteCard(opts: QuoteCardOptions): Promise<Buffer> {
+  const { PORTRAIT_W: W, PORTRAIT_H: H, PORTRAIT_PFP_FRACTION } = LAYOUT;
+  const preset = GRADIENT_PRESETS[opts.preset ?? 'classic'];
+  const isWhitePreset = (opts.preset ?? 'classic') === 'white';
+  const fontOption = FONT_OPTIONS[opts.font ?? 'butler'];
+  const pfpHeight = Math.round(H * PORTRAIT_PFP_FRACTION);
+
+  const SCALE = 2;
+  const canvas = createCanvas(W * SCALE, H * SCALE);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+
+  // 1. Backdrop (same fill the landscape card uses)
+  fillPresetDiagonal(ctx, preset, W, H, W, H, 0);
+
+  // 2. Avatar across the top 40%. Faces sit in the upper part of most
+  //    avatars, so the crop is biased towards the top instead of the middle.
+  const avatarImg = await loadImage(opts.avatarUrl);
+  {
+    const scale = Math.max(W / avatarImg.width, pfpHeight / avatarImg.height);
+    const dw = avatarImg.width * scale;
+    const dh = avatarImg.height * scale;
+    const cropX = (dw - W) / 2;
+    const cropY = (dh - pfpHeight) * 0.3;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, pfpHeight);
+    ctx.clip();
+    ctx.drawImage(avatarImg, -cropX, -cropY, dw, dh);
+    ctx.restore();
+  }
+
+  // 3. Gradient over the avatar: the backdrop colour fades in from the
+  //    middle of the avatar down to its bottom edge, then covers everything.
+  {
+    const overlay = createCanvas(W * SCALE, H * SCALE);
+    const octx = overlay.getContext('2d');
+    octx.scale(SCALE, SCALE);
+    fillPresetDiagonal(octx, preset, W, H, W, H, 0);
+    // Mask: transparent high up the avatar, fully opaque from its bottom edge down.
+    const maskCanvas = createCanvas(W * SCALE, H * SCALE);
+    const mctx = maskCanvas.getContext('2d');
+    mctx.scale(SCALE, SCALE);
+    const fade = mctx.createLinearGradient(0, pfpHeight * 0.4, 0, pfpHeight + 4);
+    fade.addColorStop(0, 'rgba(0,0,0,0)');
+    fade.addColorStop(0.5, 'rgba(0,0,0,0.5)');
+    fade.addColorStop(1, 'rgba(0,0,0,1)');
+    mctx.fillStyle = fade;
+    mctx.fillRect(0, 0, W, pfpHeight + 4);
+    mctx.fillStyle = '#000';
+    mctx.fillRect(0, pfpHeight + 4, W, H - pfpHeight - 4);
+    octx.globalCompositeOperation = 'destination-in';
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+    octx.drawImage(maskCanvas as any, 0, 0);
+    ctx.drawImage(overlay as any, 0, 0, W, H);
+  }
+
+  // 4. Effect layer
+  await drawEffect(ctx, opts.effect, W, H, isWhitePreset);
+
+  // 5. Text
+  const ink = isWhitePreset ? '#000000' : '#ffffff';
+  const sideInset = W * 0.08;
+  const textLeft = sideInset;
+  const textWidth = W - sideInset * 2;
+  const textTop = pfpHeight + 36;
+  const dividerY = H - 215;
+  const textBottom = dividerY - 40;
+  const textHeight = textBottom - textTop;
+  const centerX = W / 2;
+
+  const quote = opts.quoteText.trim().length > 0 ? opts.quoteText : '[no text content]';
+  const segments = segmentText(quote);
+  await preloadCustomEmojis(segments);
+
+  ctx.fillStyle = ink;
+  ctx.textBaseline = 'middle';
+  if (!isWhitePreset) {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.32)';
+    ctx.shadowBlur = 2;
+    ctx.shadowOffsetY = 1;
+  }
+
+  const { fontSize, lines } = fitFontSize(ctx, segments, textWidth * 0.95, textHeight, 62, 28, fontOption);
+  const lineHeight = fontSize * 1.25;
+  let y = textTop + textHeight / 2 - (lines.length * lineHeight) / 2 + lineHeight / 2;
+  for (const line of lines) {
+    paintLine(ctx, line, fontSize, fontOption, isWhitePreset, centerX, y);
+    y += lineHeight;
+  }
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+
+  // Dash divider, nickname, @username
+  const dashLength = textWidth * 0.26;
+  ctx.strokeStyle = isWhitePreset ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(centerX - dashLength / 2, dividerY);
+  ctx.lineTo(centerX + dashLength / 2, dividerY);
+  ctx.stroke();
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `30px ${FONT_FALLBACK}`;
+  ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)';
+  ctx.fillText(opts.nickname, centerX, dividerY + 42, textWidth);
+  ctx.font = `22px ${FONT_FALLBACK}`;
+  ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)';
+  ctx.fillText(`@${opts.username}`, centerX, dividerY + 80, textWidth);
+
+  // Watermark, bottom right
+  ctx.font = 'bold 16px ' + FONT_FALLBACK;
+  ctx.fillStyle = isWhitePreset ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.5)';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('BOMBO PRODUCTIONS', W - LAYOUT.WATERMARK_RIGHT_MARGIN - 6, H - LAYOUT.WATERMARK_BOTTOM_MARGIN);
+  ctx.textAlign = 'left';
+
+  return canvas.toBuffer('image/png');
+}
+
+/** Draws one wrapped line (text, emoji, custom emoji, formatting) centred on centerX. */
+function paintLine(
+  ctx: SKRSContext2D,
+  line: Segment[],
+  fontSize: number,
+  fontOption: (typeof FONT_OPTIONS)[FontName],
+  isWhitePreset: boolean,
+  centerX: number,
+  y: number,
+) {
+  const ink = isWhitePreset ? '#000000' : '#ffffff';
+  const lineWidth = measureLineWidth(ctx, line, fontSize, fontOption);
+  const startX = centerX - lineWidth / 2;
+  let xOffset = 0;
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+
+  for (const segment of line) {
+    const formatting = segment.formatting || {};
+    if (segment.type === 'text') {
+      applyTextFormatting(ctx, formatting, fontSize, fontOption, isWhitePreset);
+      ctx.fillStyle = ink;
+      ctx.fillText(segment.content, startX + xOffset, y);
+      const w = ctx.measureText(segment.content).width;
+      if (formatting.underline || formatting.strikethrough) {
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const ly = formatting.underline ? y + fontSize * 0.15 : y - fontSize * 0.05;
+        ctx.moveTo(startX + xOffset, ly);
+        ctx.lineTo(startX + xOffset + w, ly);
+        ctx.stroke();
+      }
+      xOffset += w;
+    } else if (segment.type === 'emoji') {
+      ctx.font = `${fontSize}px ${EMOJI_FONT}`;
+      ctx.fillStyle = ink;
+      ctx.fillText(segment.content, startX + xOffset, y);
+      xOffset += ctx.measureText(segment.content).width;
+    } else if (segment.type === 'customEmoji') {
+      const emojiImage = getCustomEmojiFromCache(segment);
+      if (emojiImage) {
+        const emojiSize = fontSize * 1.15;
+        ctx.drawImage(emojiImage, startX + xOffset, y - emojiSize / 2, emojiSize, emojiSize);
+        xOffset += emojiSize;
+      } else {
+        ctx.font = `${fontSize}px ${fontOption.font}, ${fontOption.fallback}`;
+        ctx.fillStyle = ink;
+        const fallbackText = `:${segment.name}:`;
+        ctx.fillText(fallbackText, startX + xOffset, y);
+        xOffset += ctx.measureText(fallbackText).width;
+      }
+    }
+  }
 }
 
 /**
@@ -247,6 +440,9 @@ export async function renderStackedQuoteCard(cards: QuoteCardOptions[]): Promise
 
     ctx.restore();
   }
+
+  // Effect layer over the whole composite, below all text.
+  await drawEffect(ctx, cards[0].effect, stackCardWidth, compH, isWhitePreset);
 
   // One shared watermark badge centered at each internal seam, instead of
   // a per-card corner watermark. Always uses Butler font.

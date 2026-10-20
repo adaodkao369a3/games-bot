@@ -1,7 +1,7 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
 import { EMOJIS } from '../utils/emoji-registry.js';
-import { COIN, CROSS, TICK, coins, signedCoins, mult, respond, nope } from '../utils/casino-ui.js';
+import { COIN, CROSS, TICK, coins, signedCoins, betWin, mult, respond, nope } from '../utils/casino-ui.js';
 
 type CoinFlipState = 'idle' | 'playing' | 'complete' | 'cashout' | 'timeout';
 
@@ -333,7 +333,7 @@ export class CoinFlipGame {
 
     const description =
       `${sideEmoji(flip)}  **${flip}**  ${CROSS}  ·  called **${call}**\n\n` +
-      `${signedCoins(-this.data.betAmount)}` +
+      `${betWin(this.data.betAmount, 0)}` +
       (this.data.streak > 0 ? `  ·  ${EMOJIS.fire} **${this.data.streak}**` : '') +
       this.historyLine();
 
@@ -442,10 +442,8 @@ export class CoinFlipGame {
   }
 
   private createCashoutEmbed(): EmbedBuilder {
-    const netProfit = this.data.currentPayout - this.data.betAmount;
-
     const description =
-      `${EMOJIS.moneybag}  **Cashed out**  ${signedCoins(netProfit)}\n\n` +
+      `${EMOJIS.moneybag}  **Cashed out**  ·  ${betWin(this.data.betAmount, this.data.currentPayout)}\n\n` +
       `${EMOJIS.fire} **${this.data.streak}**  ·  ${mult(getMultiplier(this.data.streak))}` +
       this.historyLine();
 

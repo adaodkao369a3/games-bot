@@ -25,6 +25,12 @@ export function signedCoins(n: number): string {
   return `**${n >= 0 ? '+' : '-'}${num(Math.abs(n))}** ${COIN}`;
 }
 
+/** **500** <coin> ➜ **900** <coin>  ·  **+400**   (bet, what you got back, net) */
+export function betWin(bet: number, payout: number): string {
+  const net = payout - bet;
+  return `${coins(bet)} ➜ ${coins(payout)}  ·  **${net >= 0 ? '+' : '-'}${num(Math.abs(net))}**`;
+}
+
 /** Multiplier without trailing zeros: 2 -> x2, 1.25 -> x1.25 */
 export function mult(m: number): string {
   return `x${Number(m.toFixed(2))}`;

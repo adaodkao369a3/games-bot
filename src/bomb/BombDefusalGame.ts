@@ -1,6 +1,14 @@
 import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
-import { awardCoins, removeCoins } from '../services/coins.js';
-import { getCoinBalanceInfo } from '../services/coins.js';
+import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
+import { EMOJIS } from '../utils/emoji-registry.js';
+import { CROSS, coins, betWin, mult } from '../utils/casino-ui.js';
+
+const COLORS = {
+  playing: 0x3498db,
+  safe: 0x2ecc71,
+  loss: 0xe74c3c,
+  cashout: 0xffd700,
+};
 
 type BombDefusalState = 'idle' | 'playing' | 'complete' | 'cashout' | 'timeout';
 
@@ -135,17 +143,17 @@ function generateChallenge(stage: number): Challenge {
     const shuffled = [...WIRE_COLORS].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, numChoices);
     options = selected.map(w => `${w.emoji} ${w.name}`);
-    description = 'CUT THE SAFE WIRE';
+    description = 'Cut the safe wire';
   } else if (type === 'buttons') {
     // Generate numbered buttons
     const buttonNumbers = Array.from({ length: numChoices }, (_, i) => i + 1);
     options = buttonNumbers.map(n => `🔘 ${n}`);
-    description = 'PRESS THE SAFE BUTTON';
+    description = 'Press the safe button';
   } else {
     // Generate switches
     const switchLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].slice(0, numChoices);
     options = switchLabels.map(s => `🔀 ${s}`);
-    description = 'FLIP THE SAFE SWITCH';
+    description = 'Flip the safe switch';
   }
 
   // Randomly select correct option
@@ -189,15 +197,12 @@ export class BombDefusalGame {
     // Check if user has enough coins
     const coinInfo = await getCoinBalanceInfo(this.data.userId);
     if (!coinInfo) {
-      await message.reply('Unable to retrieve your Bombo Coin balance. Please try again later.');
+      await message.reply('Could not check your balance. Try again.');
       return;
     }
 
     if (coinInfo.balance < this.data.betAmount) {
-      await message.reply(
-        `You don't have enough Bombo Coins for this bet! You need ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
-        `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>`
-      );
+      await message.reply(`Not enough coins. You have ${coins(coinInfo.balance)}.`);
       return;
     }
 
@@ -213,7 +218,7 @@ export class BombDefusalGame {
     );
 
     if (deduction === null) {
-      await message.reply('Failed to process your wager. Please try again.');
+      await message.reply('Could not take your bet. Try again.');
       return;
     }
 
@@ -225,11 +230,10 @@ export class BombDefusalGame {
     this.data.currentChallenge = generateChallenge(this.data.currentStage);
 
     const initialEmbed = this.createGameEmbed();
-    const row = this.createChallengeButtons();
 
     const sentMessage = await message.reply({
       embeds: [initialEmbed],
-      components: [row],
+      components: this.createChallengeButtons(),
     });
 
     this.data.messageId = sentMessage.id;
@@ -248,7 +252,7 @@ export class BombDefusalGame {
     // Verify user
     if (interaction.user.id !== this.data.userId) {
       await interaction.reply({
-        content: 'This is not your game!',
+        content: 'Not your game.',
         ephemeral: true,
       });
       return;
@@ -262,7 +266,7 @@ export class BombDefusalGame {
       await this.handleCashout(interaction);
     } else {
       await interaction.reply({
-        content: 'Unknown action.',
+        content: 'Unknown button.',
         ephemeral: true,
       });
     }
@@ -274,7 +278,7 @@ export class BombDefusalGame {
   private async handleChoice(interaction: MessageComponentInteraction, choiceIndex: number): Promise<void> {
     if (this.state !== 'playing') {
       await interaction.reply({
-        content: 'Invalid action for current state.',
+        content: 'This game is over.',
         ephemeral: true,
       });
       return;
@@ -292,12 +296,11 @@ export class BombDefusalGame {
       // Generate next challenge
       this.data.currentChallenge = generateChallenge(this.data.currentStage);
 
-      const embed = this.createGameEmbed('<:tick:1558430105120804884> DEFUSED!');
-      const row = this.createChallengeButtons();
+      const embed = this.createGameEmbed(`${EMOJIS.tick}  **Defused**`);
 
       await interaction.update({
         embeds: [embed],
-        components: [row],
+        components: this.createChallengeButtons(),
       });
     } else {
       // Wrong choice - explosion
@@ -311,7 +314,7 @@ export class BombDefusalGame {
   private async handleCashout(interaction: MessageComponentInteraction): Promise<void> {
     if (this.state !== 'playing') {
       await interaction.reply({
-        content: 'Invalid action for current state.',
+        content: 'This game is over.',
         ephemeral: true,
       });
       return;
@@ -319,7 +322,7 @@ export class BombDefusalGame {
 
     if (this.data.stagesDefused < 1) {
       await interaction.reply({
-        content: 'You need to defuse at least one stage to cash out!',
+        content: 'Defuse one stage first.',
         ephemeral: true,
       });
       return;
@@ -342,7 +345,7 @@ export class BombDefusalGame {
 
     if (awardResult === null) {
       await interaction.update({
-        content: 'Failed to award winnings. Please contact support.',
+        content: 'Payout failed. Tell an admin.',
         components: [],
       });
       return;
@@ -369,16 +372,12 @@ export class BombDefusalGame {
 
     const embed = new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('💥 BOOM!')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Selected:** ${selectedOption}\n` +
-        `**Correct:** ${correctOption}\n\n` +
-        `**Stage Reached:** ${this.data.currentStage}\n\n` +
-        `**Stages Defused:** ${this.data.stagesDefused}\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `**Amount Lost:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `━━━━━━━━━━━━━━`)
-      .setColor(0xe74c3c);
+      .setDescription(
+        `💥  **BOOM**  ·  ${betWin(this.data.betAmount, 0)}\n\n` +
+        `${selectedOption}  ${CROSS}  ·  safe was ${correctOption}\n\n` +
+        `${EMOJIS.purplebomb} **${this.data.stagesDefused}** defused`
+      )
+      .setColor(COLORS.loss);
 
     await interaction.update({
       embeds: [embed],
@@ -406,12 +405,8 @@ export class BombDefusalGame {
 
     const embed = new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('<a:purplebomb:1545149042378407986> BOMB DEFUSAL')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Game timed out.\n\n` +
-        `Your bet has been refunded.\n\n` +
-        `━━━━━━━━━━━━━━`)
-      .setColor(0xe74c3c);
+      .setDescription(`${EMOJIS.alarm1}  **Timed out**  ·  ${coins(this.data.betAmount)} refunded`)
+      .setColor(COLORS.loss);
 
     await message.edit({
       embeds: [embed],
@@ -441,71 +436,63 @@ export class BombDefusalGame {
   private createGameEmbed(statusMessage: string = ''): EmbedBuilder {
     const challenge = this.data.currentChallenge!;
     const multiplier = getMultiplier(this.data.stagesDefused);
-    
-    let description = `**STAGE**\n${this.data.currentStage}\n\n`;
-    description += `**BET**\n${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `**POTENTIAL WIN**\n${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n`;
-    description += `**DEFUSED**\n${this.data.stagesDefused}\n\n`;
-    description += `**MULTIPLIER**\nx${multiplier.toFixed(2)}\n\n`;
-    description += `**${challenge.description}**\n\n`;
 
-    if (statusMessage) {
-      description += `**${statusMessage}**\n\n`;
-    }
+    const stats =
+      `${EMOJIS.purplebomb}  **Stage ${this.data.currentStage}**  ·  ${mult(multiplier)}  ·  ${coins(this.data.currentPayout)}`;
+
+    const description =
+      (statusMessage ? `${statusMessage}\n\n` : '') +
+      `${stats}\n\n**${challenge.description}**`;
 
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('<a:purplebomb:1545149042378407986> BOMB DEFUSAL')
       .setDescription(description)
-      .setColor(0x3498db);
+      .setColor(statusMessage ? COLORS.safe : COLORS.playing);
   }
 
   private createCashoutEmbed(): EmbedBuilder {
-    const netProfit = this.data.currentPayout - this.data.betAmount;
-    const multiplier = getMultiplier(this.data.stagesDefused);
-
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl })
-      .setTitle('<:moneybag:1545149026528268308> CASHED OUT!')
-      .setDescription(`━━━━━━━━━━━━━━\n\n` +
-        `**Stages Defused:** ${this.data.stagesDefused}\n\n` +
-        `**Final Multiplier:** x${multiplier.toFixed(2)}\n\n` +
-        `**Original Bet:** ${this.data.betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `**Amount Won:** ${this.data.currentPayout.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `**Net Profit:** ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n\n` +
-        `━━━━━━━━━━━━━━`)
-      .setColor(0xFFD700);
+      .setDescription(
+        `${EMOJIS.moneybag}  **Cashed out**  ·  ${betWin(this.data.betAmount, this.data.currentPayout)}\n\n` +
+        `${EMOJIS.purplebomb} **${this.data.stagesDefused}** defused  ·  ${mult(getMultiplier(this.data.stagesDefused))}`
+      )
+      .setColor(COLORS.cashout);
   }
 
   // Button creation methods
 
-  private createChallengeButtons(): ActionRowBuilder<ButtonBuilder> {
+  /**
+   * Choice buttons (max 4 per row, so up to 8 choices fit in 2 rows) plus a
+   * Cash out row once at least one stage is defused. Discord allows at most
+   * 5 buttons per row, so one long row would break from stage 4 on.
+   */
+  private createChallengeButtons(): ActionRowBuilder<ButtonBuilder>[] {
     const challenge = this.data.currentChallenge!;
-    const row = new ActionRowBuilder<ButtonBuilder>();
-    
-    // Add choice buttons
+    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+
     challenge.options.forEach((option, index) => {
-      row.addComponents(
+      if (index % 4 === 0) rows.push(new ActionRowBuilder<ButtonBuilder>());
+      rows[rows.length - 1].addComponents(
         new ButtonBuilder()
           .setCustomId(`bomb_choice_${index}`)
           .setLabel(option)
-          .setStyle(ButtonStyle.Primary)
+          .setStyle(ButtonStyle.Secondary)
       );
     });
 
-    // Add cash out button if at least one stage defused
     if (this.data.stagesDefused >= 1) {
-      const cashOutRow = new ActionRowBuilder<ButtonBuilder>();
-      cashOutRow.addComponents(
-        new ButtonBuilder()
-          .setCustomId('bomb_cashout')
-          .setEmoji('<:moneybag:1545149026528268308>')
-          .setLabel('CASH OUT')
-          .setStyle(ButtonStyle.Success)
+      rows.push(
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId('bomb_cashout')
+            .setEmoji(EMOJIS.moneybag)
+            .setLabel(`Cash out · ${this.data.currentPayout.toLocaleString('en-US')}`)
+            .setStyle(ButtonStyle.Success)
+        )
       );
-      return cashOutRow;
     }
 
-    return row;
+    return rows;
   }
 }

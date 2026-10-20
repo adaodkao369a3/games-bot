@@ -4,7 +4,7 @@ import { ErrorHandler } from '../utils/error-handler.js';
 import { parseWagerAmount } from '../utils/wager-parser.js';
 import { config, isGameFloorChannel } from '../config/index.js';
 import { EMOJIS } from '../utils/emoji-registry.js';
-import { CROSS, TICK, coins, signedCoins } from '../utils/casino-ui.js';
+import { CROSS, TICK, coins, signedCoins, betWin } from '../utils/casino-ui.js';
 
 const SLOT_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>', '<:slotsstrawberry:1545161917834993804>'];
 const WIN_SYMBOLS = ['<:slotsbanana:1545161905574903868>', '<:slotsbar:1545161910348029963>', '<:slotscherry:1545161913045098537>', '<:slotsseven:1545161915649753119>'];
@@ -209,14 +209,13 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       const balanceAfter = balanceAfterDeduction + payout;
 
       // Edit message with win result embed (net profit; the reels move into the embed)
-      const net = payout - wager;
       const winResultEmbed = new EmbedBuilder()
         .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
         .setDescription(
           `${symbol1}  ${symbol2}  ${symbol3}\n\n` +
           (jackpot
-            ? `${EMOJIS.win}  **JACKPOT x10**  ${signedCoins(net)}`
-            : `${TICK}  **WIN**  ${signedCoins(net)}`)
+            ? `${EMOJIS.win}  **JACKPOT x10**  ·  ${betWin(wager, payout)}`
+            : `${TICK}  **WIN**  ·  ${betWin(wager, payout)}`)
         )
         .setColor(jackpot ? 0xFFD700 : 0x2ecc71);
 
@@ -227,7 +226,7 @@ export async function handleGambleCommand(message: Message, args: string[]): Pro
       // Edit message with lose result embed
       const loseResultEmbed = new EmbedBuilder()
         .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
-        .setDescription(`${symbol1}  ${symbol2}  ${symbol3}\n\n${CROSS}  **LOSS**  ${signedCoins(-wager)}`)
+        .setDescription(`${symbol1}  ${symbol2}  ${symbol3}\n\n${CROSS}  **LOSS**  ·  ${betWin(wager, 0)}`)
         .setColor(0xe74c3c);
 
       await initialMessage.edit({ content: null, embeds: [loseResultEmbed] });

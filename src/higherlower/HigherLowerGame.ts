@@ -2,7 +2,7 @@ import { Message, MessageComponentInteraction, ActionRowBuilder, ButtonBuilder, 
 import { awardCoins, removeCoins, getCoinBalanceInfo } from '../services/coins.js';
 import { EMOJIS } from '../utils/emoji-registry.js';
 import { cardEmojiKey } from '../blackjack/CardDeck.js';
-import { CROSS, TICK, coins, signedCoins, mult, respond, nope } from '../utils/casino-ui.js';
+import { CROSS, TICK, coins, signedCoins, betWin, mult, respond, nope } from '../utils/casino-ui.js';
 
 type HigherLowerState = 'idle' | 'playing' | 'complete' | 'cashout' | 'timeout';
 
@@ -468,12 +468,10 @@ export class HigherLowerGame {
   }
 
   private createCashoutEmbed(): EmbedBuilder {
-    const netProfit = this.data.currentPayout - this.data.betAmount;
-
     return new EmbedBuilder()
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl || undefined })
       .setDescription(
-        `${EMOJIS.moneybag}  **Cashed out**  ${signedCoins(netProfit)}\n\n` +
+        `${EMOJIS.moneybag}  **Cashed out**  ·  ${betWin(this.data.betAmount, this.data.currentPayout)}\n\n` +
         `${this.cardsLine()}\n\n${EMOJIS.fire} **${this.data.streak}**  ·  ${mult(getMultiplier(this.data.streak))}`
       )
       .setColor(COLORS.cashout);
@@ -484,7 +482,7 @@ export class HigherLowerGame {
       .setAuthor({ name: this.data.username, iconURL: this.data.avatarUrl || undefined })
       .setDescription(
         `${this.cardsLine()}  ${CROSS}\n\n` +
-        `${signedCoins(-this.data.betAmount)}` +
+        `${betWin(this.data.betAmount, 0)}` +
         (this.data.streak > 0 ? `  ·  ${EMOJIS.fire} **${this.data.streak}**` : '')
       )
       .setColor(COLORS.loss);

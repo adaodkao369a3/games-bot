@@ -31,6 +31,12 @@ export const LAYOUT = {
   NICKNAME_LEFT_FRACTION: 0.32,  // ~32% of column width
   NICKNAME_RIGHT_FRACTION: 0.66,  // ~66% of column width
 
+  // Portrait mode (single text-only quote): 900x1500 card, avatar owns the
+  // top 40%, the quote block owns the remaining 60%.
+  PORTRAIT_W: 900,
+  PORTRAIT_H: 1500,
+  PORTRAIT_PFP_FRACTION: 0.4,
+
   // Watermark position (absolute pixels from edges)
   WATERMARK_RIGHT_MARGIN: 17,
   WATERMARK_BOTTOM_MARGIN: 18,

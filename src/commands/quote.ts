@@ -8,7 +8,8 @@ import {
   ButtonBuilder,
   ButtonStyle,
 } from 'discord.js';
-import { renderQuoteCard, renderStackedQuoteCard, QuoteCardOptions } from '../quote/renderer.js';
+import { renderQuoteCard, renderStackedQuoteCard, renderPortraitQuoteCard, QuoteCardOptions } from '../quote/renderer.js';
+import { getEffectOptions, EffectName } from '../quote/effects.js';
 import { GRADIENT_PRESETS, PresetName, THEME_SELECT_EXPIRY_MS, FONT_OPTIONS, FontName } from '../quote/config.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { isStaff } from '../utils/permissions.js';
@@ -27,6 +28,8 @@ type QuoteSourceOpts = Omit<QuoteCardOptions, 'preset'>;
 interface QuoteSource {
   opts: QuoteSourceOpts;
   url: string;
+  /** true when the message has real text (portrait mode needs text) */
+  hasText: boolean;
 }
 
 /**
@@ -118,6 +121,7 @@ async function buildQuoteSource(message: Message, target: Message): Promise<Quot
   return {
     opts: { avatarUrl, quoteText, nickname, username, stickerUrl, imageUrl },
     url: target.url,
+    hasText: hasRealText,
   };
 }
 
@@ -170,15 +174,26 @@ export async function handleQuoteCommand(message: Message, args: string[], comma
 
     let preset: PresetName = 'classic';
     let font: FontName = 'butler';
+    let effect: EffectName = 'none';
+    let portrait = false;
+
+    // Portrait is for one quote with real text (no stickers/images, no stacks).
+    const canPortrait = !isStacked && sources[0].hasText;
 
     // Shared theme across every card in the stack — one select-menu
     // controls all of them.
-    const renderCard = async (chosenPreset: PresetName, chosenFont: FontName) => {
+    const renderCard = async () => {
       const cardsWithTheme: QuoteCardOptions[] = sources.map((s) => ({
         ...s.opts,
-        preset: chosenPreset,
-        font: chosenFont,
+        preset,
+        font,
+        effect,
       }));
+      if (portrait && canPortrait) {
+        // Portrait ignores stickers and images
+        const { stickerUrl, imageUrl, ...textOnly } = cardsWithTheme[0];
+        return renderPortraitQuoteCard(textOnly);
+      }
       return isStacked ? renderStackedQuoteCard(cardsWithTheme) : renderQuoteCard(cardsWithTheme[0]);
     };
 
@@ -227,20 +242,46 @@ export async function handleQuoteCommand(message: Message, args: string[], comma
           }))
         );
 
+      const effectOptions = getEffectOptions();
+      const effectSelect = new StringSelectMenuBuilder()
+        .setCustomId('quote-effect-select')
+        .setPlaceholder('Choose an effect…')
+        .setDisabled(disabled)
+        .addOptions(
+          Object.entries(effectOptions).map(([name, opt]) => ({
+            label: opt.label,
+            description: opt.description,
+            value: name,
+            default: name === effect,
+          }))
+        );
+
+      const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId('quote-gif')
+          .setLabel('GIF')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(disabled),
+      );
+      if (canPortrait) {
+        buttons.addComponents(
+          new ButtonBuilder()
+            .setCustomId('quote-mode')
+            .setLabel(portrait ? 'Landscape' : 'Portrait')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(disabled),
+        );
+      }
+
       return [
         new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(themeSelect),
         new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(fontSelect),
-        new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId('quote-gif')
-            .setLabel('GIF')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(disabled),
-        ),
+        new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(effectSelect),
+        buttons,
       ];
     };
 
-    let currentBuffer = await renderCard(preset, font);
+    let currentBuffer = await renderCard();
     const attachment = new AttachmentBuilder(currentBuffer, { name: 'quote.png' });
 
     // One jump link per quoted message, oldest first. Jump-to-original
@@ -310,6 +351,26 @@ export async function handleQuoteCommand(message: Message, args: string[], comma
         return;
       }
 
+      // Portrait / Landscape toggle
+      if (i.isButton() && i.customId === 'quote-mode') {
+        await i.deferUpdate();
+        portrait = !portrait;
+        try {
+          currentBuffer = await renderCard();
+        } catch (renderError) {
+          portrait = !portrait;
+          console.error('[QUOTE] Failed to switch quote mode:', renderError);
+          await i.followUp({ content: 'Could not switch the layout. Try again.', ephemeral: true }).catch(() => {});
+          return;
+        }
+        const modeAttachment = new AttachmentBuilder(currentBuffer, { name: 'quote.png' });
+        await i.editReply({ files: [modeAttachment], components: buildSelectRow() });
+        if (redirectMessage) {
+          await redirectMessage.edit({ files: [new AttachmentBuilder(currentBuffer, { name: 'quote.png' })], components: [] }).catch(() => {});
+        }
+        return;
+      }
+
       // Handle select menu interactions
       if (!i.isStringSelectMenu()) return;
 
@@ -328,11 +389,13 @@ export async function handleQuoteCommand(message: Message, args: string[], comma
         preset = chosen as PresetName;
       } else if (customId === 'quote-font-select') {
         font = chosen as FontName;
+      } else if (customId === 'quote-effect-select') {
+        effect = chosen as EffectName;
       }
 
       let newAttachment: AttachmentBuilder;
       try {
-        const newBuffer = await renderCard(preset, font);
+        const newBuffer = await renderCard();
         currentBuffer = newBuffer; // Update currentBuffer for future GIF conversions
         newAttachment = new AttachmentBuilder(newBuffer, { name: 'quote.png' });
       } catch (renderError) {

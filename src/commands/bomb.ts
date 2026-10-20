@@ -4,6 +4,7 @@ import { getCoinBalanceInfo } from '../services/coins.js';
 import { ErrorHandler } from '../utils/error-handler.js';
 import { parseWagerAmount } from '../utils/wager-parser.js';
 import { config, isGameFloorChannel } from '../config/index.js';
+import { coins } from '../utils/casino-ui.js';
 
 // Active games keyed by user ID
 const activeGames = new Map<string, BombDefusalGame>();
@@ -22,17 +23,14 @@ export async function handleBombCommand(message: Message, args: string[]): Promi
 
   // Parse bet amount
   if (args.length < 1) {
-    await message.reply(
-      'Please specify an amount to bet. Usage: `.bomb [amount]`\n' +
-      'Examples: `.bomb 500`, `.bomb 10k`, `.bomb 1.5m`, `.bomb all`'
-    );
+    await message.reply('Usage: `.bomb <amount>`  e.g. `.bomb 500`, `.bomb 10k`, `.bomb all`');
     return;
   }
 
   // Get user's current balance first, since "all"/"max" depend on it.
   const coinInfo = await getCoinBalanceInfo(userId);
   if (!coinInfo) {
-    await message.reply('Unable to retrieve your Bombo Coin balance. Please try again later.');
+    await message.reply('Could not check your balance. Try again.');
     return;
   }
 
@@ -40,25 +38,18 @@ export async function handleBombCommand(message: Message, args: string[]): Promi
   const betAmount = parseWagerAmount(betArg, coinInfo.balance);
 
   if (betAmount === null || isNaN(betAmount) || betAmount <= 0) {
-    await message.reply(
-      'Please specify a valid positive amount to bet.\n' +
-      'Examples: `.bomb 500`, `.bomb 10k`, `.bomb 1.5m`, `.bomb all`'
-    );
+    await message.reply('That bet is not valid. Try `.bomb 500`, `.bomb 10k` or `.bomb all`.');
     return;
   }
 
   // Check if user already has an active game
   if (activeGames.has(userId)) {
-    await message.reply('You already have an active Bomb Defusal game in progress!');
+    await message.reply('You already have a bomb game running.');
     return;
   }
 
   if (coinInfo.balance < betAmount) {
-    await message.reply(
-      `You don't have enough Bombo Coins for this bet! You need ${betAmount.toLocaleString('en-US')} <:bombocoin:1545139736312815840>.\n` +
-      `Your current balance: ${coinInfo.balance.toLocaleString('en-US')} <:bombocoin:1545139736312815840>\n` +
-      `Tip: use \`.bomb all\` to bet your entire balance.`
-    );
+    await message.reply(`Not enough coins. You have ${coins(coinInfo.balance)}.`);
     return;
   }
 
@@ -87,7 +78,7 @@ export async function handleBombCommand(message: Message, args: string[]): Promi
     
   } catch (error) {
     console.error('[Bomb Command] Error:', error);
-    await message.reply('An error occurred while starting Bomb Defusal. Please try again.');
+    await message.reply('Could not start the game. Try again.');
     await ErrorHandler.handleMessageError(message, error, 'bomb command');
   }
 }
@@ -101,7 +92,7 @@ export async function handleBombInteraction(interaction: MessageComponentInterac
 
   if (!game) {
     await interaction.reply({
-      content: 'No active Bomb Defusal game found.',
+      content: 'No bomb game running.',
       ephemeral: true,
     });
     return;
@@ -112,7 +103,7 @@ export async function handleBombInteraction(interaction: MessageComponentInterac
   } catch (error) {
     console.error('[Bomb Interaction] Error:', error);
     await interaction.reply({
-      content: 'An error occurred during Bomb Defusal.',
+      content: 'Something went wrong.',
       ephemeral: true,
     });
   }
